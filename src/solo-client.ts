@@ -1,10 +1,7 @@
 import type { Transport } from "./transport/types.js";
+import { SoloAgentToolsSchema, type SoloAgentTool } from "./types/solo.js";
 
-export interface AgentTool {
-  name: string;
-  description?: string;
-  inputSchema?: unknown;
-}
+export type { SoloAgentTool };
 
 export class SoloClientError extends Error {
   constructor(
@@ -45,10 +42,19 @@ export class SoloClient {
     await this._transport.close();
   }
 
-  async listAgentTools(): Promise<AgentTool[]> {
-    const result = await this._request("tools/list", {});
-    const parsed = result as { tools?: AgentTool[] };
-    return parsed.tools ?? [];
+  async listAgentTools(): Promise<SoloAgentTool[]> {
+    const result = await this._request("tools/call", {
+      name: "list_agent_tools",
+      arguments: {},
+    });
+    const response = result as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const textContent = response.content?.find((c) => c.type === "text");
+    if (!textContent?.text) {
+      throw new Error("list_agent_tools returned no text content");
+    }
+    return SoloAgentToolsSchema.parse(JSON.parse(textContent.text));
   }
 
   private _handleMessage(message: unknown): void {
