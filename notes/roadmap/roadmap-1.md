@@ -1,9 +1,21 @@
 # Roadmap 1 — Solo Orchestrator Companion
 
 **Project**: Duo  
-**Status**: active  
+**Status**: shipped  
 **Intake**: `notes/proposals/solo-orchestrator-companion-intake.md`  
-**Currently working on**: Step 5
+
+---
+
+## Summary
+
+Roadmap 1 shipped 2026-05-02 (17h 10m round duration). All 5 steps complete:
+- Step 1: TypeScript MCP server + Solo connection + test harness
+- Step 2: Tier-based agent selection (3 tiers, token classification)
+- Step 3: Solo spawn integration (spawnProcess client method)
+- Step 4: Policy overrides, structured logging, resolver diagnostics
+- Step 5: Documentation, packaging (@procrastivity/duo), CI/release workflows (OIDC), manual bootstrap guide
+
+Core feature (tier-based MCP companion) complete, 229 tests, ready for manual bootstrap publish.
 
 ---
 
@@ -120,3 +132,5 @@
 - Standalone single-file binaries (e.g. `bun build --compile`) and Homebrew-style channels are **deferred** to a follow-up step; revisit if non-Node installation friction is reported or if Solo itself ships as a binary
 
 **Risk**: low
+
+**Round 1 shipped**: 2026-05-02
