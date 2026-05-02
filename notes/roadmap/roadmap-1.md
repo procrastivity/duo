@@ -3,7 +3,7 @@
 **Project**: Duo  
 **Status**: active  
 **Intake**: `notes/proposals/solo-orchestrator-companion-intake.md`  
-**Currently working on**: Step 2
+**Currently working on**: Step 3
 
 ---
 
@@ -36,16 +36,16 @@
 
 **Shipping criteria**:
 
-- [ ] `list_agent_tiers` returns `small`, `medium`, `large` availability with selected default and alternatives
-- [ ] `resolve_agent_tool` returns selected `agent_tool_id`, classification source (`command` or `name_fallback`), alternatives, and diagnostics
-- [ ] Disabled tools excluded before any tier matching
-- [ ] Command tokens classify first; name tokens only on fallback; match source always reported
-- [ ] Default selection strategy when multiple candidates match: **random**; alternatives always listed
-- [ ] `unsupported_tier` error for unknown tier labels; `tier_unavailable` when no enabled candidate exists
-- [ ] Fixture tests: `opencode-ghc-haiku`, `opencode-ghc-sonnet`, `codex-fast`, `codex-standard`, `codex-flagship` (all enabled)
-- [ ] Fixture tests: disabled variants of matching tools (assert ignored)
-- [ ] Fixture tests: misleading name + accurate command; accurate name + misleading command
-- [ ] Fixture tests: ambiguous and unknown command cases with expected structured diagnostics
+- [x] `list_agent_tiers` returns `small`, `medium`, `large` availability with selected default and alternatives
+- [x] `resolve_agent_tool` returns selected `agent_tool_id`, classification source (`command` or `name_fallback`), alternatives, and diagnostics
+- [x] Disabled tools excluded before any tier matching
+- [x] Command tokens classify first; name tokens only on fallback; match source always reported
+- [x] Default selection strategy when multiple candidates match: **random**; alternatives always listed
+- [x] `unsupported_tier` error for unknown tier labels; `tier_unavailable` when no enabled candidate exists
+- [x] Fixture tests: `opencode-ghc-haiku`, `opencode-ghc-sonnet`, `codex-fast`, `codex-standard`, `codex-flagship` (all enabled)
+- [x] Fixture tests: disabled variants of matching tools (assert ignored)
+- [x] Fixture tests: misleading name + accurate command; accurate name + misleading command
+- [x] Fixture tests: ambiguous and unknown command cases with expected structured diagnostics
 
 **Deferred decisions resolved in this step**:
 
