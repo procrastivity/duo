@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Policy, PolicySchema } from "./types/policy";
+import { Policy, PolicySchema } from "./types/policy.js";
 
 const formatZodError = (error: z.ZodError): string => {
   const first = error.issues[0];

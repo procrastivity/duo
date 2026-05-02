@@ -1,6 +1,0 @@
-pyproject.toml
-src/duo.egg-info/PKG-INFO
-src/duo.egg-info/SOURCES.txt
-src/duo.egg-info/dependency_links.txt
-src/duo.egg-info/requires.txt
-src/duo.egg-info/top_level.txt

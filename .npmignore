@@ -23,6 +23,9 @@ src/
 tsconfig.json
 vitest.config.js
 vitest.config.ts
+vitest.config.d.ts
+vitest.config.d.ts.map
+vitest.config.js.map
 flake.nix
 flake.lock
 pyproject.toml
@@ -30,3 +33,4 @@ mcp-server-config.json
 *.test.js
 *.test.d.ts
 __fixtures__/
+*.tgz

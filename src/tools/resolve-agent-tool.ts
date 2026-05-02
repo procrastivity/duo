@@ -52,7 +52,7 @@ export async function resolveAgentToolHandler(
       logger.resolutionFailure({
         requested_tier: input.tier,
         error_code: String(err.code),
-        available_tiers: TIER_LABELS,
+        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
       });
       return mcpError(err.code, err.message);
     }
@@ -81,7 +81,7 @@ export async function resolveAgentToolHandler(
       logger.resolutionFailure({
         requested_tier: input.tier,
         error_code: "unsupported_tier",
-        available_tiers: TIER_LABELS,
+        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
       });
       return mcpError(
         err.code,
@@ -92,7 +92,7 @@ export async function resolveAgentToolHandler(
       logger.resolutionFailure({
         requested_tier: input.tier,
         error_code: "tier_unavailable",
-        available_tiers: TIER_LABELS,
+        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
       });
       return mcpError(
         err.code,

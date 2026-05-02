@@ -9,6 +9,7 @@ import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-ti
 import {
   resolveAgentToolHandler,
   ResolveAgentToolInputSchema,
+  type ResolveAgentToolInput,
 } from "./tools/resolve-agent-tool.js";
 import {
   spawnAgentHandler,
@@ -62,7 +63,7 @@ export class DuoServer implements MCPServer {
           "List available agent tools grouped by tier (small, medium, large) with default selection and alternatives",
         inputSchema: ListAgentTiersInputSchema,
       },
-      async () => listAgentTiers(soloClient),
+      (async () => listAgentTiers(soloClient)) as any,
     );
 
     this._mcpServer.registerTool(
@@ -72,13 +73,13 @@ export class DuoServer implements MCPServer {
           "Resolve and select an agent tool for a specific tier (small, medium, or large)",
         inputSchema: ResolveAgentToolInputSchema,
       },
-      async (input) => resolveAgentToolHandler(
+      (async (input: unknown) => resolveAgentToolHandler(
         soloClient,
         this._logger,
-        input,
+        input as ResolveAgentToolInput,
         classifierPolicy,
         selectionPreference,
-      ),
+      )) as any,
     );
 
     this._mcpServer.registerTool(
@@ -88,14 +89,14 @@ export class DuoServer implements MCPServer {
           "Spawn a new agent process for a given tier with optional name and project scope",
         inputSchema: SpawnAgentInputSchema,
       },
-      async (input) => spawnAgentHandler(
+      (async (input: unknown) => spawnAgentHandler(
         soloClient,
         this._config,
         this._logger,
         input as SpawnAgentInput,
         classifierPolicy,
         selectionPreference,
-      ),
+      )) as any,
     );
 
     const serverTransport = new StdioServerTransport();
