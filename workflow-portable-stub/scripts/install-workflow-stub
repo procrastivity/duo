@@ -1,0 +1,137 @@
+#!/bin/sh
+
+set -eu
+
+usage() {
+  cat <<'USAGE'
+Usage: install-workflow-stub --target PATH [options]
+
+Options:
+  --target PATH          Destination project root (required)
+  --project-name NAME    Replace PROJECT_NAME tokens with NAME
+  --mode MODE            File conflict mode: skip | overwrite | backup (default: skip)
+  --help                 Show this help
+
+Notes:
+  - Installs playbooks to: <target>/notes/playbook/
+  - Installs planning templates to: <target>/notes/
+USAGE
+}
+
+TARGET=""
+PROJECT_NAME=""
+MODE="skip"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --target)
+      [ "$#" -ge 2 ] || { echo "error: --target requires a value" >&2; exit 1; }
+      TARGET=$2
+      shift 2
+      ;;
+    --project-name)
+      [ "$#" -ge 2 ] || { echo "error: --project-name requires a value" >&2; exit 1; }
+      PROJECT_NAME=$2
+      shift 2
+      ;;
+    --mode)
+      [ "$#" -ge 2 ] || { echo "error: --mode requires a value" >&2; exit 1; }
+      MODE=$2
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+[ -n "$TARGET" ] || { echo "error: --target is required" >&2; usage >&2; exit 1; }
+case "$MODE" in
+  skip|overwrite|backup) ;;
+  *)
+    echo "error: --mode must be one of: skip, overwrite, backup" >&2
+    exit 1
+    ;;
+esac
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+STUB_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+PLAYBOOK_SRC="$STUB_ROOT/playbook"
+NOTES_SRC="$STUB_ROOT/notes"
+
+TARGET_ROOT=$(CDPATH= cd -- "$TARGET" 2>/dev/null && pwd || true)
+if [ -z "$TARGET_ROOT" ]; then
+  echo "error: target path does not exist: $TARGET" >&2
+  exit 1
+fi
+
+if [ "$TARGET_ROOT" = "$STUB_ROOT" ] || [ "$TARGET_ROOT" = "$STUB_ROOT/notes" ]; then
+  echo "error: refusing to install into the stub source directory" >&2
+  exit 1
+fi
+
+mkdir -p "$TARGET_ROOT/notes/playbook"
+mkdir -p "$TARGET_ROOT/notes"
+
+copy_file() {
+  src=$1
+  dest=$2
+
+  if [ -e "$dest" ]; then
+    case "$MODE" in
+      skip)
+        echo "skip: $dest"
+        return 0
+        ;;
+      overwrite)
+        :
+        ;;
+      backup)
+        backup_path="$dest.bak"
+        i=1
+        while [ -e "$backup_path" ]; do
+          backup_path="$dest.bak.$i"
+          i=$((i + 1))
+        done
+        mv "$dest" "$backup_path"
+        echo "backup: $dest -> $backup_path"
+        ;;
+    esac
+  fi
+
+  cp "$src" "$dest"
+  echo "write: $dest"
+}
+
+copy_tree_files() {
+  src_root=$1
+  dest_root=$2
+
+  find "$src_root" -type f | while IFS= read -r src_file; do
+    rel=${src_file#"$src_root"/}
+    dest_file="$dest_root/$rel"
+    dest_dir=$(dirname "$dest_file")
+    mkdir -p "$dest_dir"
+    copy_file "$src_file" "$dest_file"
+  done
+}
+
+copy_tree_files "$PLAYBOOK_SRC" "$TARGET_ROOT/notes/playbook"
+copy_tree_files "$NOTES_SRC" "$TARGET_ROOT/notes"
+
+if [ -n "$PROJECT_NAME" ]; then
+  find "$TARGET_ROOT/notes" -type f | while IFS= read -r f; do
+    tmp="$f.tmp.install-workflow-stub"
+    sed "s/PROJECT_NAME/$PROJECT_NAME/g" "$f" > "$tmp"
+    mv "$tmp" "$f"
+  done
+  echo "replace: PROJECT_NAME -> $PROJECT_NAME"
+fi
+
+echo "done: installed workflow stub into $TARGET_ROOT"

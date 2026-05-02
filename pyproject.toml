@@ -1,0 +1,12 @@
+[project]
+name = "duo"
+version = "0.0.0"
+description = "Little buddy for Solo"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+]
