@@ -3,7 +3,7 @@
 **Project**: Duo  
 **Status**: active  
 **Intake**: `notes/proposals/solo-orchestrator-companion-intake.md`  
-**Currently working on**: Step 4
+**Currently working on**: Step 5
 
 ---
 
