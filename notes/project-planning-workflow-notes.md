@@ -196,3 +196,34 @@ Use this for each shipped step.
 ## Retrospectives
 
 (append one section per shipped step below)
+
+---
+
+### Step 2 Retro — 2026-05-02
+
+**Duration**: ~16 minutes elapsed (7 tasks, 5 batches, 4 commits)
+
+**What worked**:
+- Batching strategy (A → B → C → D parallel → E) executed flawlessly; no blockers.
+- Parallel builders (Batch D: tasks 5, 6) reduced task 7 wait time with no idle builders.
+- Fixture-first approach (Task 2) unified testing across classifier, resolver, and MCP tools; single source of truth prevented test divergence.
+- Large-tier escalation for Task 4 (resolver) paid off — no rework needed on complex PRD §7b pipeline.
+- Timer-based orchestration (idle detection) eliminated polling; builders waited cleanly for prior batches.
+- SDK's registerTool + input validation pattern worked well; no manual schema parsing bugs.
+
+**What didn't**:
+- Task 5 test initially failed due to confusion over which disabled IDs applied to mixedRealistic fixture; required one iteration to fix. Fixture documentation could be more explicit about per-set disabled vs. enabled ids.
+- Solo timer model added mild context overhead during batch transitions; might benefit from a "batch done" shorthand in future steps.
+
+**Metrics**:
+- Tests: 103 passing (9 files)
+- Commits: 4 (implementation, roadmap, archive cleanup, gitignore)
+- Builders spawned: 7 (1 × Task 1, 1 × Task 2, 1 × Task 3, 2 × Task 4, 2 × Tasks 5–6)
+- Tier assignments: small (1), medium (5), large (2) per playbook policy
+
+**Next step readiness**:
+- Step 3 (spawn_agent) can proceed; MCP surface stable and tested.
+- Playbook follow-up docs added for Solo timer patterns and mcp-cli anti-pattern.
+- Archive structure in place; step-02-workplan ready for archival after Step Boundary.
+
+---
