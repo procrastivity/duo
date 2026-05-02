@@ -227,3 +227,38 @@ Use this for each shipped step.
 - Archive structure in place; step-02-workplan ready for archival after Step Boundary.
 
 ---
+
+### Step 3 Retro — 2026-05-02
+
+**Duration**: ~45 minutes elapsed (4 tasks, 3 batches, 2 commits)
+
+**What worked**:
+- Batch parallelism (A: Tasks 1–2 parallel) with large-tier escalation for Task 3 (spawn_agent logic) eliminated rework; spawned as opus from the start and completed without iteration.
+- Fixture-based testing with mocked SoloClient (spawn-results.ts) provided a comprehensive contract test surface for all error paths, precedence permutations, and edge cases.
+- Project_id precedence logic (caller > config > omit) implemented cleanly via helper function; independent unit testing verified all 4 cases.
+- Solo error taxonomy decision (single spawn_rejected code with solo_code + verbatim message) simplified handler without sacrificing diagnostic clarity; all error sources (name, agent_tool_id, permission) routed uniformly.
+- Step 2 retro lessons applied: explicit fixture/disabled-id documentation, batch-done shorthand in builder outcomes, todo sync at batch boundaries (no state drift).
+
+**What didn't**:
+- No issues; build proceeded smoothly across all 4 tasks with no escalations or retries.
+
+**Metrics**:
+- Tests: 134 passing (10 files, +31 new tests from Step 3)
+- Commits: 2 (implementation + workplan archive)
+- Builders spawned: 4 (1 × Task 1, 1 × Task 2, 1 × Task 3 large-tier, 1 × Task 4)
+- Tier assignments: small (0), medium (3), large (1) per playbook policy
+- Batch outcome: Batch A (T1/T2 parallel) → Batch B (T3 large) → Batch C (T4)
+
+**Shipping criteria verified**:
+- [x] spawn_agent with tier + optional name calls Solo spawn_process(kind="agent", agent_tool_id=N)
+- [x] Response includes Solo process_id, final name, selected tier, and tool summary
+- [x] Caller project_id takes precedence; SOLO_PROJECT_ID is default scope fallback
+- [x] Solo rejection returns structured error (spawn_rejected code + solo_code + request echo); never reports success on failure
+- [x] Name rejection returns structured error; no hidden retry with different name
+
+**Next step readiness**:
+- Step 4 (YAML policy overrides and structured logging) can proceed; spawn_agent surface stable and tested.
+- Playbook follow-up: batch-done shorthand and fixture/disabled-id documentation patterns now established for future steps.
+- Archive structure in place; step-03-workplan ready for reference; researcher and coordinator processes closed post-boundary.
+
+---
