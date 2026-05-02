@@ -11,6 +11,37 @@ You are operating inside Solo MCP. Use Solo tools for process control, todos, sc
 - Use todos as the primary durable coordination surface.
 - Use scratchpads for rolling context, not as a replacement for todo state.
 
+### Pausing and waiting
+
+Solo timers let an agent pause and resume on a signal. When a timer fires, Solo injects its `body` into your PTY as a fresh user turn, so your next action picks up automatically — no polling loop, no burned context.
+
+- `mcp__solo__timer_set` — pause for a fixed duration (one-shot, or repeating via `loop` / `repeat_every_ms`).
+- `mcp__solo__timer_fire_when_idle_any` / `mcp__solo__timer_fire_when_idle_all` — resume when watched processes go idle (i.e., finish their current task). Use for worker quiet periods, not service readiness.
+- `mcp__solo__wait_for_bound_port` — for service readiness (port open), not worker idle.
+
+### Anti-pattern: Do not use `mcp-cli` from bash
+
+❌ **Wrong**: Do not call `mcp-cli solo ...` from bash scripts or Monitor commands.
+
+```bash
+# WRONG — do not do this
+mcp-cli solo get_process_output --process-name orchestrator
+mcp-cli solo spawn_process kind=agent agent_tool_id=3
+```
+
+✅ **Right**: Use the Solo MCP tool interface directly via the tool calls available to you.
+
+```
+mcp__solo__get_process_output(process_name="orchestrator")
+mcp__solo__spawn_process(kind="agent", agent_tool_id=3)
+```
+
+**Why**: `mcp-cli` is for CLI usage outside of MCP; inside an agent you have direct access to the MCP tools. Calling `mcp-cli` from bash introduces complexity, shell escaping issues, and slower poll loops. Instead:
+
+- **For one-shot queries**: Call the MCP tool directly (e.g., `mcp__solo__get_process_output()`).
+- **For polling/waiting**: Use `Monitor` with a bash loop that checks local conditions (file existence, exit codes from quick commands), not `mcp-cli` calls. Or use `mcp__solo__timer_fire_when_idle_any()` / `mcp__solo__timer_fire_when_idle_all()` for process idle detection.
+- **For coordination**: Use `mcp__solo__kv_set()`, `mcp__solo__todo_*()`, `mcp__solo__scratchpad_*()` instead of bash-based state files.
+
 ### Solo control-plane terminology
 
 Use this language consistently in prompts, comments, and playbook updates:

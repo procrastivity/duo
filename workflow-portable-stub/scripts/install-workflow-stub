@@ -9,18 +9,35 @@ Usage: install-workflow-stub --target PATH [options]
 Options:
   --target PATH          Destination project root (required)
   --project-name NAME    Replace PROJECT_NAME tokens with NAME
-  --mode MODE            File conflict mode: skip | overwrite | backup (default: skip)
+  --force                Also overwrite project-specific files (default: preserve them)
   --help                 Show this help
 
 Notes:
   - Installs playbooks to: <target>/notes/playbook/
   - Installs planning templates to: <target>/notes/
+  - Stable playbook content is overwritten on every install.
+  - Project-specific files (backlog, planning notes, proposal/roadmap
+    READMEs, intake/roadmap/workplan templates) are written only if
+    missing; their existing contents are preserved on re-install.
+    Pass --force to overwrite them too.
 USAGE
 }
 
 TARGET=""
 PROJECT_NAME=""
-MODE="skip"
+FORCE=0
+
+# Paths (relative to <target>/) that the installer should NOT overwrite
+# once they exist. Drift on these files is expected per project.
+PROTECTED_PATHS="
+notes/backlog.md
+notes/project-planning-workflow-notes.md
+notes/proposals/README.md
+notes/proposals/intake-output-template.md
+notes/roadmap/README.md
+notes/roadmap/roadmap-1.md
+notes/roadmap/step-01-workplan.md
+"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -34,10 +51,9 @@ while [ "$#" -gt 0 ]; do
       PROJECT_NAME=$2
       shift 2
       ;;
-    --mode)
-      [ "$#" -ge 2 ] || { echo "error: --mode requires a value" >&2; exit 1; }
-      MODE=$2
-      shift 2
+    --force)
+      FORCE=1
+      shift 1
       ;;
     --help|-h)
       usage
@@ -52,13 +68,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$TARGET" ] || { echo "error: --target is required" >&2; usage >&2; exit 1; }
-case "$MODE" in
-  skip|overwrite|backup) ;;
-  *)
-    echo "error: --mode must be one of: skip, overwrite, backup" >&2
-    exit 1
-    ;;
-esac
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 STUB_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
@@ -79,47 +88,51 @@ fi
 mkdir -p "$TARGET_ROOT/notes/playbook"
 mkdir -p "$TARGET_ROOT/notes"
 
+WRITTEN=0
+SKIPPED=0
+
+TMPLIST=$(mktemp)
+trap 'rm -f "$TMPLIST"' EXIT
+
+is_protected() {
+  candidate=$1
+  for p in $PROTECTED_PATHS; do
+    if [ "$p" = "$candidate" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 copy_file() {
   src=$1
   dest=$2
+  target_rel=$3
 
-  if [ -e "$dest" ]; then
-    case "$MODE" in
-      skip)
-        echo "skip: $dest"
-        return 0
-        ;;
-      overwrite)
-        :
-        ;;
-      backup)
-        backup_path="$dest.bak"
-        i=1
-        while [ -e "$backup_path" ]; do
-          backup_path="$dest.bak.$i"
-          i=$((i + 1))
-        done
-        mv "$dest" "$backup_path"
-        echo "backup: $dest -> $backup_path"
-        ;;
-    esac
+  if [ -e "$dest" ] && [ "$FORCE" -eq 0 ] && is_protected "$target_rel"; then
+    echo "skip-protected: $dest"
+    SKIPPED=$((SKIPPED + 1))
+    return 0
   fi
 
   cp "$src" "$dest"
   echo "write: $dest"
+  WRITTEN=$((WRITTEN + 1))
 }
 
 copy_tree_files() {
   src_root=$1
   dest_root=$2
 
-  find "$src_root" -type f | while IFS= read -r src_file; do
+  find "$src_root" -type f > "$TMPLIST"
+  while IFS= read -r src_file; do
     rel=${src_file#"$src_root"/}
     dest_file="$dest_root/$rel"
+    target_rel=${dest_file#"$TARGET_ROOT/"}
     dest_dir=$(dirname "$dest_file")
     mkdir -p "$dest_dir"
-    copy_file "$src_file" "$dest_file"
-  done
+    copy_file "$src_file" "$dest_file" "$target_rel"
+  done < "$TMPLIST"
 }
 
 copy_tree_files "$PLAYBOOK_SRC" "$TARGET_ROOT/notes/playbook"
@@ -134,4 +147,4 @@ if [ -n "$PROJECT_NAME" ]; then
   echo "replace: PROJECT_NAME -> $PROJECT_NAME"
 fi
 
-echo "done: installed workflow stub into $TARGET_ROOT"
+echo "done: installed workflow stub into $TARGET_ROOT ($WRITTEN written, $SKIPPED skipped-protected)"
