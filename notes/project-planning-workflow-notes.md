@@ -262,3 +262,44 @@ Use this for each shipped step.
 - Archive structure in place; step-03-workplan ready for reference; researcher and coordinator processes closed post-boundary.
 
 ---
+
+### Step 4 Retro — 2026-05-02
+
+**Duration**: ~52 minutes elapsed (6 tasks, 4 batches, 4 commits)
+
+**What worked**:
+- Batch A parallelism (T1 + T4, policy schema + logger module, both leaf modules) completed in ~3m with zero dependencies; 177 tests, foundation solid.
+- Batch B sequential with large-tier escalation (T2 → T3): T2 (classifier override-awareness, 191 tests) executed smoothly; T3 (large-tier resolver) handled the critical matched_tokens shape change (string[] → object[]) without fixture breakage — resolver invariants held.
+- Idle-based orchestration (solo_timer_fire_when_idle_any) remained performant; prevented manual polling; builder transition between batches automated cleanly.
+- Fixture-based test strategy (no live Solo connection needed) proved again: all 229 tests fixture-based, all passing pre-boundary.
+- Per-token source tagging (built_in|override) design validated: extend/replace merge logic clear, dedup behavior explicit, and diagnostics unambiguous when both token types present in same tier.
+- Logger allow-list discipline (explicit field destructuring per event type) enforced sensitive-field invariant (no prompt/task/project_id/requested_name leakage); 3-event surface (resolution.success, resolution.failure, spawn.success) aligned with Story 13 exactly.
+- Git archive pattern (git mv source → archive/, single commit) executed correctly; source-path deletion leakage finally eliminated (Step 2/3 recurring issue fixed).
+
+**What didn't**:
+- Phase 1 (workplan production): researcher (process_id 255) completed workplan silently without volunteer ping. Required orchestrator nudge to pull output and verify completion. Lesson: active orchestrator polling (not passive builder/researcher pings) is the reliable signal in async environments. Applied for Phase 2 — all task completions detected via idle timer, no silent waits.
+- Minor: T3 (resolver) build took ~6m37s (1m longer than T1/T2 peers), but within acceptable large-tier timeline; no escalation needed.
+
+**Metrics**:
+- Tests: 229 passing (12 files, +95 new tests from Step 4: 27 policy + 16 logger + 16 classifier + 16 resolver + 20 tool handlers)
+- Commits: 4 (workplan add, implementation, workplan archive, roadmap header)
+- Builders spawned: 6 (1 × T1, 1 × T4 both medium; 1 × T2 medium, 1 × T3 large; 1 × T5 medium, 1 × T6 medium)
+- Researcher: 1 (process_id 255, claude-opus, Phase 1 workplan production)
+- Tier assignments: small (0), medium (5), large (1) per risk assessment
+- Batch outcome: A (parallel, 1m43s) → B (sequential T2/T3, 2m03s + 6m37s) → C (5 single, 3m22s) → D (single, 2m38s)
+
+**Shipping criteria verified**:
+- [x] YAML policy overrides for command-token patterns (extend/replace per-tier, default extend)
+- [x] Structured operational logs for resolution + spawn (pino to stderr, 3 event types, ISO timestamp)
+- [x] Field-level YAML errors (zod validation, error-path strings, 3 snapshot tests)
+- [x] Resolver diagnostics distinguishing override vs built-in (per-token source tag, override_token_count, preference_applied)
+- [x] Logs omit prompts/free-form task content (allow-list per event, 16 forbidden-field sweep tests)
+- [x] Complete test coverage (invalid YAML, override-source diagnostics, log shapes all exercised)
+
+**Next step readiness**:
+- Step 5 (docs, packaging, final review) can proceed; core feature set stable at 229 tests.
+- Playbook refinement: researcher silent-completion pattern identified; future Phase 1 roles should include explicit "done" marker or rely on orchestrator active polling.
+- Git archive pattern (source-path deletion + workplan archival) now working as documented — no leakage on Step 4.
+- Coordinator context scratchpad (step-04-context) archived post-boundary; all builders/researcher closed cleanly.
+
+---
