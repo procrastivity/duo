@@ -5,6 +5,8 @@ import { parseConfig } from "./config.js";
 import { SoloClient } from "./solo-client.js";
 import type { SoloAgentTool } from "./types/solo.js";
 import { enabledRuntimes } from "./__fixtures__/agent-tools.js";
+import { spawnSuccessFromEnvProjectId } from "./__fixtures__/spawn-results.js";
+import { SpawnAgentInputSchema } from "./tools/spawn-agent.js";
 
 const validRawConfig = {
   solo: {
@@ -16,9 +18,13 @@ const validRawConfig = {
   },
 };
 
-const makeClient = (tools: SoloAgentTool[] = enabledRuntimes) =>
+const makeClient = (
+  tools: SoloAgentTool[] = enabledRuntimes,
+  spawnResult: unknown = spawnSuccessFromEnvProjectId,
+) =>
   ({
     listAgentTools: vi.fn().mockResolvedValue(tools),
+    spawnProcess: vi.fn().mockResolvedValue(spawnResult),
     connect: vi.fn().mockResolvedValue(undefined),
   }) as unknown as SoloClient;
 
@@ -177,6 +183,93 @@ describe("DuoServer", () => {
         const result = await resolveAgentToolHandler({ tier: "medium" });
         expect(result).toBeDefined();
       }
+    });
+  });
+});
+
+describe("spawn_agent tool", () => {
+  describe("registration", () => {
+    it("registers spawn_agent under that exact name", async () => {
+      const config = parseConfig(validRawConfig);
+      const mockClient = makeClient();
+      const server = new DuoServer(config, mockClient);
+
+      vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
+
+      const registeredToolNames: string[] = [];
+      vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
+        (toolName: string) => {
+          registeredToolNames.push(toolName);
+          return undefined as unknown;
+        },
+      );
+
+      await server.start();
+
+      expect(registeredToolNames).toContain("spawn_agent");
+    });
+  });
+
+  describe("input schema", () => {
+    it("rejects missing tier", () => {
+      const result = SpawnAgentInputSchema.safeParse({ name: "my-agent" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects empty-string name", () => {
+      const result = SpawnAgentInputSchema.safeParse({ tier: "small", name: "" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects empty-string project_id", () => {
+      const result = SpawnAgentInputSchema.safeParse({ tier: "small", project_id: "" });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("handler", () => {
+    it("calls spawnProcess on the injected SoloClient", async () => {
+      const config = parseConfig(validRawConfig);
+      const mockClient = makeClient();
+      const server = new DuoServer(config, mockClient);
+
+      vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
+
+      let capturedHandler: ((input?: unknown) => Promise<unknown>) | undefined;
+      vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
+        (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
+          if (toolName === "spawn_agent") capturedHandler = handler;
+          return undefined as unknown;
+        },
+      );
+
+      await server.start();
+
+      await capturedHandler?.({ tier: "medium" });
+      expect(mockClient.spawnProcess).toHaveBeenCalled();
+    });
+
+    it("passes config.solo.projectId to spawnProcess when caller omits project_id", async () => {
+      const configWithProjectId = parseConfig(validRawConfig, { SOLO_PROJECT_ID: "proj-env-xyz" });
+      const mockClient = makeClient(enabledRuntimes, spawnSuccessFromEnvProjectId);
+      const server = new DuoServer(configWithProjectId, mockClient);
+
+      vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
+
+      let capturedHandler: ((input?: unknown) => Promise<unknown>) | undefined;
+      vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
+        (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
+          if (toolName === "spawn_agent") capturedHandler = handler;
+          return undefined as unknown;
+        },
+      );
+
+      await server.start();
+
+      await capturedHandler?.({ tier: "medium" });
+      expect(mockClient.spawnProcess).toHaveBeenCalledWith(
+        expect.objectContaining({ project_id: "proj-env-xyz" }),
+      );
     });
   });
 });

@@ -8,6 +8,11 @@ import {
   resolveAgentToolHandler,
   ResolveAgentToolInputSchema,
 } from "./tools/resolve-agent-tool.js";
+import {
+  spawnAgentHandler,
+  SpawnAgentInputSchema,
+  type SpawnAgentInput,
+} from "./tools/spawn-agent.js";
 
 export interface MCPServer {
   start(): Promise<void>;
@@ -57,6 +62,16 @@ export class DuoServer implements MCPServer {
         inputSchema: ResolveAgentToolInputSchema,
       },
       async (input) => resolveAgentToolHandler(soloClient, input),
+    );
+
+    this._mcpServer.registerTool(
+      "spawn_agent",
+      {
+        description:
+          "Spawn a new agent process for a given tier with optional name and project scope",
+        inputSchema: SpawnAgentInputSchema,
+      },
+      async (input) => spawnAgentHandler(soloClient, this._config, input as SpawnAgentInput),
     );
 
     const serverTransport = new StdioServerTransport();
