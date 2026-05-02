@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { parse as parseYaml } from "yaml";

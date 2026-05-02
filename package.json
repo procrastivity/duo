@@ -1,11 +1,23 @@
 {
-  "name": "duo",
+  "name": "@procrastivity/duo",
   "version": "0.1.0",
-  "private": true,
+  "description": "Solo MCP companion for agent tier-based selection and override-aware orchestration.",
   "type": "module",
+  "bin": {
+    "duo": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
