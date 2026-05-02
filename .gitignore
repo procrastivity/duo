@@ -1,1 +1,7 @@
 /.direnv
+*.egg-info/
+mcp-server-config.json
+node_modules/
+.venv/
+dist/
+build/
