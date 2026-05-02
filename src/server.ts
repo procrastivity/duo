@@ -3,6 +3,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { parseConfig, type SoloConfig } from "./config.js";
 import { StdioTransport } from "./transport/stdio.js";
 import { SoloClient } from "./solo-client.js";
+import { createLogger, type Logger } from "./logger.js";
+import { buildClassifierPolicy, defaultPolicy } from "./classifier.js";
 import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-tiers.js";
 import {
   resolveAgentToolHandler,
@@ -29,11 +31,13 @@ export class DuoServer implements MCPServer {
   private readonly _config: SoloConfig;
   private readonly _mcpServer: McpServer;
   private readonly _soloClient: SoloClient | null;
+  private readonly _logger: Logger;
 
-  constructor(config: SoloConfig, soloClient?: SoloClient) {
+  constructor(config: SoloConfig, soloClient?: SoloClient, logger?: Logger) {
     this._config = config;
     this._mcpServer = new McpServer({ name: "duo", version: "0.1.0" });
     this._soloClient = soloClient || null;
+    this._logger = logger || createLogger();
   }
 
   async start(): Promise<void> {
@@ -42,6 +46,13 @@ export class DuoServer implements MCPServer {
     if (!this._soloClient) {
       await soloClient.connect();
     }
+
+    // Build classifier policy from config
+    const classifierPolicy = this._config.policy
+      ? buildClassifierPolicy(this._config.policy)
+      : defaultPolicy();
+
+    const selectionPreference = this._config.policy?.selection?.preference;
 
     // Register tools
     this._mcpServer.registerTool(
@@ -61,7 +72,13 @@ export class DuoServer implements MCPServer {
           "Resolve and select an agent tool for a specific tier (small, medium, or large)",
         inputSchema: ResolveAgentToolInputSchema,
       },
-      async (input) => resolveAgentToolHandler(soloClient, input),
+      async (input) => resolveAgentToolHandler(
+        soloClient,
+        this._logger,
+        input,
+        classifierPolicy,
+        selectionPreference,
+      ),
     );
 
     this._mcpServer.registerTool(
@@ -71,7 +88,14 @@ export class DuoServer implements MCPServer {
           "Spawn a new agent process for a given tier with optional name and project scope",
         inputSchema: SpawnAgentInputSchema,
       },
-      async (input) => spawnAgentHandler(soloClient, this._config, input as SpawnAgentInput),
+      async (input) => spawnAgentHandler(
+        soloClient,
+        this._config,
+        this._logger,
+        input as SpawnAgentInput,
+        classifierPolicy,
+        selectionPreference,
+      ),
     );
 
     const serverTransport = new StdioServerTransport();
@@ -83,12 +107,15 @@ export class DuoServer implements MCPServer {
   }
 }
 
-export async function createServer(rawConfig: unknown): Promise<DuoServer> {
+export async function createServer(
+  rawConfig: unknown,
+  logger?: Logger,
+): Promise<DuoServer> {
   let config: SoloConfig;
   try {
     config = parseConfig(rawConfig);
   } catch (err) {
     throw new ServerConfigError(err instanceof Error ? err.message : String(err));
   }
-  return new DuoServer(config);
+  return new DuoServer(config, undefined, logger);
 }

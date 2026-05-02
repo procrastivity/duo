@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { classify } from "./classifier.js";
+import {
+  classify,
+  buildClassifierPolicy,
+  defaultPolicy,
+} from "./classifier.js";
 import type { SoloAgentTool } from "./types/solo.js";
 import {
   accurateNameMisleadingCommand,
@@ -65,7 +69,7 @@ describe("classify (edge-case fixtures)", () => {
       { tier: "small", token: "mini" },
     ]);
     expect(result.diagnostics.commandTokensSeen).toEqual([
-      { tier: "large", token: "opus" },
+      { tier: "large", token: "opus", source: "built_in" },
     ]);
   });
 
@@ -88,8 +92,8 @@ describe("classify (edge-case fixtures)", () => {
     expect(result.matchedTokens).toEqual([]);
     expect(result.diagnostics.commandTokensSeen).toEqual(
       expect.arrayContaining([
-        { tier: "small", token: "haiku" },
-        { tier: "large", token: "opus" },
+        { tier: "small", token: "haiku", source: "built_in" },
+        { tier: "large", token: "opus", source: "built_in" },
       ]),
     );
   });
@@ -243,5 +247,250 @@ describe("classify (purity)", () => {
     const snapshot = JSON.stringify(tool);
     classify(tool);
     expect(JSON.stringify(tool)).toBe(snapshot);
+  });
+});
+
+describe("buildClassifierPolicy + classify (override-awareness)", () => {
+  it("no policy passed → all hits report matchSource === 'built_in'", () => {
+    const tool = findRuntime("opencode-ghc-haiku");
+    const result = classify(tool);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("defaultPolicy() → all hits report matchSource === 'built_in'", () => {
+    const tool = findRuntime("opencode-ghc-haiku");
+    const policy = defaultPolicy();
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("extend mode adds new token → hit reports matchSource === 'override'", () => {
+    const tool: SoloAgentTool = {
+      id: 500,
+      name: "custom-runner",
+      command: "runner --model tiny",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["tiny"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("override");
+    expect(result.matchedTokens).toContain("tiny");
+  });
+
+  it("replace mode wipes built-ins → affected tier only uses override tokens", () => {
+    // Use a tool with command containing only "haiku", and name that doesn't contain a size token
+    const tool: SoloAgentTool = {
+      id: 509,
+      name: "custom-runner",
+      command: "runner --model haiku",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "replace",
+          tokens: ["tiny"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    // "haiku" no longer matches in command (it was replaced)
+    expect(result.tier).toBeNull();
+    expect(result.source).toBe("none");
+  });
+
+  it("replace mode with new token matching → reports matchSource === 'override'", () => {
+    const tool: SoloAgentTool = {
+      id: 501,
+      name: "custom-runner",
+      command: "runner --model tiny",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "replace",
+          tokens: ["tiny"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("override");
+  });
+
+  it("override token shadowed by built-in → reports matchSource === 'built_in' (dedup keeps built-in)", () => {
+    const tool: SoloAgentTool = {
+      id: 502,
+      name: "custom-runner",
+      command: "runner --model haiku",
+      tool_type: "custom",
+      enabled: true,
+    };
+    // "haiku" is already a built-in small token; adding it as an override should not change source
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["haiku"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("built_in");
+    expect(result.matchedTokens).toContain("haiku");
+  });
+
+  it("mixed extend with both built-in and override tokens for same tier → first-matched token source reported", () => {
+    const tool: SoloAgentTool = {
+      id: 503,
+      name: "mixed-runner",
+      command: "runner --haiku --tiny",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["tiny"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    // Built-in tokens are iterated first in extend mode, so "haiku" comes before "tiny"
+    expect(result.matchSource).toBe("built_in");
+    expect(result.matchedTokens).toContain("haiku");
+    expect(result.matchedTokens).toContain("tiny");
+  });
+
+  it("source defaults to built_in when no match (source === 'none')", () => {
+    const unknownTool = unknownCommand;
+    const result = classify(unknownTool);
+    expect(result.source).toBe("none");
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("name fallback → matchSource === 'built_in'", () => {
+    const tool = accurateNameMisleadingCommand;
+    const result = classify(tool);
+    expect(result.source).toBe("name_fallback");
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("ambiguous command → matchSource === 'built_in' (no match)", () => {
+    const tool = ambiguousCommand;
+    const result = classify(tool);
+    expect(result.ambiguous).toBe(true);
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("extend mode with override-only tier hit → reports matchSource === 'override'", () => {
+    const tool: SoloAgentTool = {
+      id: 504,
+      name: "bespoke-runner",
+      command: "runner --model bespoke-mid",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        medium: {
+          mode: "replace",
+          tokens: ["bespoke-mid"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("medium");
+    expect(result.matchSource).toBe("override");
+  });
+
+  it("extend mode case-insensitive dedup → case variation of built-in is built_in", () => {
+    const tool: SoloAgentTool = {
+      id: 505,
+      name: "case-test",
+      command: "runner --model HAIKU",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["Haiku"], // Different case
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchSource).toBe("built_in");
+  });
+
+  it("extend mode preserves token iteration order for tie-breaking", () => {
+    const tool1: SoloAgentTool = {
+      id: 506,
+      name: "test-first-override",
+      command: "runner --model override-first built-second",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["override-first"],
+        },
+      },
+    });
+    // Both override and built-in present, but built-in iteration comes first
+    // so we need a tool where override appears in command first to test iteration order
+    const tool2: SoloAgentTool = {
+      id: 507,
+      name: "test-builtin-order",
+      command: "runner --mini --haiku",
+      tool_type: "custom",
+      enabled: true,
+    };
+    // Both mini and haiku are built-in small tokens
+    // They should appear in the order they're in COMMAND_TOKENS
+    const result = classify(tool2, policy);
+    expect(result.matchedTokens[0]).toBe("haiku"); // haiku comes first in COMMAND_TOKENS.small
+  });
+
+  it("multiple override tokens in extend mode → dedup, first occurrence wins", () => {
+    const tool: SoloAgentTool = {
+      id: 508,
+      name: "dedup-test",
+      command: "runner --model tiny",
+      tool_type: "custom",
+      enabled: true,
+    };
+    const policy = buildClassifierPolicy({
+      command_tokens: {
+        small: {
+          mode: "extend",
+          tokens: ["tiny", "tiny"],
+        },
+      },
+    });
+    const result = classify(tool, policy);
+    expect(result.tier).toBe("small");
+    expect(result.matchedTokens).toEqual(["tiny"]);
   });
 });

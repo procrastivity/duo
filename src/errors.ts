@@ -1,4 +1,4 @@
-import type { Tier } from "./classifier.js";
+import type { Tier, TokenSource } from "./classifier.js";
 
 export const TIER_LABELS: readonly Tier[] = ["small", "medium", "large"];
 
@@ -9,6 +9,7 @@ export interface IgnoredToolDiagnostic {
   reason: "ambiguous" | "unclassifiable" | "wrong_tier" | "excluded";
   detected_tier?: Tier;
   matched_tokens?: string[];
+  match_source?: TokenSource;
 }
 
 export interface ResolverDiagnostics {
@@ -19,7 +20,9 @@ export interface ResolverDiagnostics {
   ambiguous_count: number;
   unclassifiable_count: number;
   candidates_considered: number;
-  strategy: "random";
+  strategy: "random" | "custom";
+  override_token_count: number;
+  preference_applied: boolean;
 }
 
 export interface TierUnavailableDiagnostics extends ResolverDiagnostics {
@@ -51,5 +54,14 @@ export class TierUnavailableError extends Error {
     );
     this.name = "TierUnavailableError";
     this.diagnostics = diagnostics;
+  }
+}
+
+export class InvalidResolverOptionsError extends Error {
+  readonly code = "invalid_resolver_options" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidResolverOptionsError";
   }
 }

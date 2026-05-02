@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PolicySchema, type Policy } from "./types/policy.js";
 
 export const soloStdioTransportSchema = z
   .object({
@@ -19,6 +20,7 @@ export const soloConfigSchema = z
         projectId: z.string().min(1, "solo.projectId cannot be empty").optional(),
       })
       .strict(),
+    policy: PolicySchema.optional(),
   })
   .strict();
 

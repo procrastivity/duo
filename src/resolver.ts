@@ -1,5 +1,12 @@
-import { classify, type Classification, type Tier } from "./classifier.js";
 import {
+  classify,
+  type Classification,
+  type ClassifierTokenPolicy,
+  type Tier,
+  type TokenSource,
+} from "./classifier.js";
+import {
+  InvalidResolverOptionsError,
   TIER_LABELS,
   TierUnavailableError,
   UnsupportedTierError,
@@ -7,14 +14,22 @@ import {
   type ResolverDiagnostics,
   type TierUnavailableDiagnostics,
 } from "./errors.js";
+import type { PreferenceSelector } from "./types/policy.js";
 import type { SoloAgentTool } from "./types/solo.js";
 
-export type SelectionStrategy = "random";
+export type SelectionStrategy = "random" | "custom";
 
 export interface ResolverOptions {
   strategy?: SelectionStrategy;
   excludeIds?: number[];
   rng?: () => number;
+  preference?: PreferenceSelector[];
+  classifierPolicy?: ClassifierTokenPolicy;
+}
+
+export interface MatchedToken {
+  token: string;
+  source: TokenSource;
 }
 
 export interface ResolutionSelected {
@@ -22,6 +37,8 @@ export interface ResolutionSelected {
   tool_name: string;
   tool_type: string;
   command: string;
+  token_source: TokenSource;
+  matched_tokens: MatchedToken[];
 }
 
 export interface ResolutionAlternative {
@@ -29,12 +46,12 @@ export interface ResolutionAlternative {
   tool_name: string;
   tool_type: string;
   classification_source: "command" | "name_fallback";
+  token_source: TokenSource;
 }
 
 export interface Resolution {
   selected: ResolutionSelected;
   classification_source: "command" | "name_fallback";
-  matched_tokens: string[];
   alternatives: ResolutionAlternative[];
   diagnostics: ResolverDiagnostics;
 }
@@ -43,22 +60,6 @@ interface Candidate {
   tool: SoloAgentTool;
   classification: Classification;
 }
-
-interface SelectionStrategyImpl {
-  select(candidates: readonly Candidate[], rng: () => number): Candidate;
-}
-
-const randomStrategy: SelectionStrategyImpl = {
-  select(candidates, rng) {
-    const idx = Math.floor(rng() * candidates.length);
-    const safeIdx = Math.min(Math.max(idx, 0), candidates.length - 1);
-    return candidates[safeIdx]!;
-  },
-};
-
-const STRATEGIES: Readonly<Record<SelectionStrategy, SelectionStrategyImpl>> = {
-  random: randomStrategy,
-};
 
 const isTier = (value: string): value is Tier =>
   (TIER_LABELS as readonly string[]).includes(value);
@@ -71,6 +72,44 @@ const cloneTool = (tool: SoloAgentTool): SoloAgentTool => ({
   enabled: tool.enabled,
 });
 
+const matchesSelector = (
+  selector: PreferenceSelector,
+  tool: SoloAgentTool,
+): boolean => {
+  if (selector.tool_type !== undefined && selector.tool_type !== tool.tool_type) {
+    return false;
+  }
+  if (selector.tool_name !== undefined && selector.tool_name !== tool.name) {
+    return false;
+  }
+  return true;
+};
+
+const computeRank = (
+  tool: SoloAgentTool,
+  preference: readonly PreferenceSelector[],
+): number => {
+  const idx = preference.findIndex((sel) => matchesSelector(sel, tool));
+  return idx === -1 ? Number.POSITIVE_INFINITY : idx;
+};
+
+const buildMatchedTokens = (classification: Classification): MatchedToken[] => {
+  const tier = classification.tier;
+  if (tier === null) return [];
+
+  if (classification.source === "command") {
+    return classification.diagnostics.commandTokensSeen
+      .filter((m) => m.tier === tier)
+      .map((m) => ({ token: m.token, source: m.source ?? "built_in" }));
+  }
+  if (classification.source === "name_fallback") {
+    return classification.diagnostics.nameTokensSeen
+      .filter((m) => m.tier === tier)
+      .map((m) => ({ token: m.token, source: "built_in" as TokenSource }));
+  }
+  return [];
+};
+
 export const resolveAgentTool = (
   tools: readonly SoloAgentTool[],
   tier: string,
@@ -81,9 +120,16 @@ export const resolveAgentTool = (
   }
 
   const strategyName: SelectionStrategy = options.strategy ?? "random";
-  const strategy = STRATEGIES[strategyName];
+  if (strategyName === "custom" && options.preference === undefined) {
+    throw new InvalidResolverOptionsError(
+      "custom strategy requires a non-empty preference list",
+    );
+  }
+
   const rng = options.rng ?? Math.random;
   const excludeIds = new Set(options.excludeIds ?? []);
+  const classifierPolicy = options.classifierPolicy;
+  const preference = options.preference;
 
   const total_tools = tools.length;
 
@@ -102,7 +148,7 @@ export const resolveAgentTool = (
 
   const classified: Candidate[] = afterExclude.map((tool) => ({
     tool: cloneTool(tool),
-    classification: classify(tool),
+    classification: classify(tool, classifierPolicy),
   }));
 
   let ambiguous_count = 0;
@@ -141,9 +187,22 @@ export const resolveAgentTool = (
         reason: "wrong_tier",
         detected_tier: c.classification.tier,
         matched_tokens: [...c.classification.matchedTokens],
+        match_source: c.classification.matchSource,
       });
     }
   }
+
+  const ranks = new Map<number, number>();
+  for (const c of candidates) {
+    const rank = strategyName === "custom" && preference !== undefined
+      ? computeRank(c.tool, preference)
+      : 0;
+    ranks.set(c.tool.id, rank);
+  }
+
+  const preference_applied =
+    strategyName === "custom" &&
+    candidates.some((c) => Number.isFinite(ranks.get(c.tool.id)!));
 
   if (candidates.length === 0) {
     const diagnostics: TierUnavailableDiagnostics = {
@@ -155,16 +214,38 @@ export const resolveAgentTool = (
       unclassifiable_count,
       candidates_considered: 0,
       strategy: strategyName,
+      override_token_count: 0,
+      preference_applied: false,
       ignored_tools: ignored,
     };
     throw new TierUnavailableError(diagnostics);
   }
 
-  const selected = strategy.select(candidates, rng);
+  let topBucket: Candidate[];
+  if (strategyName === "custom") {
+    const minRank = candidates.reduce(
+      (min, c) => Math.min(min, ranks.get(c.tool.id)!),
+      Number.POSITIVE_INFINITY,
+    );
+    topBucket = candidates.filter((c) => ranks.get(c.tool.id) === minRank);
+  } else {
+    topBucket = candidates;
+  }
+
+  const idx = Math.floor(rng() * topBucket.length);
+  const safeIdx = Math.min(Math.max(idx, 0), topBucket.length - 1);
+  const selected = topBucket[safeIdx]!;
+
+  const compareAlternatives = (a: Candidate, b: Candidate): number => {
+    const rankA = ranks.get(a.tool.id)!;
+    const rankB = ranks.get(b.tool.id)!;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.tool.id - b.tool.id;
+  };
 
   const alternatives = candidates
     .filter((c) => c.tool.id !== selected.tool.id)
-    .sort((a, b) => a.tool.id - b.tool.id)
+    .sort(compareAlternatives)
     .map<ResolutionAlternative>((c) => ({
       agent_tool_id: c.tool.id,
       tool_name: c.tool.name,
@@ -172,7 +253,13 @@ export const resolveAgentTool = (
       classification_source: c.classification.source as
         | "command"
         | "name_fallback",
+      token_source: c.classification.matchSource,
     }));
+
+  const matchedTokens = buildMatchedTokens(selected.classification);
+  const override_token_count = matchedTokens.filter(
+    (m) => m.source === "override",
+  ).length;
 
   const diagnostics: ResolverDiagnostics = {
     requested_tier: tier,
@@ -183,6 +270,8 @@ export const resolveAgentTool = (
     unclassifiable_count,
     candidates_considered: candidates.length,
     strategy: strategyName,
+    override_token_count,
+    preference_applied,
   };
 
   return {
@@ -191,11 +280,12 @@ export const resolveAgentTool = (
       tool_name: selected.tool.name,
       tool_type: selected.tool.tool_type,
       command: selected.tool.command,
+      token_source: selected.classification.matchSource,
+      matched_tokens: matchedTokens,
     },
     classification_source: selected.classification.source as
       | "command"
       | "name_fallback",
-    matched_tokens: [...selected.classification.matchedTokens],
     alternatives,
     diagnostics,
   };
