@@ -303,3 +303,69 @@ Use this for each shipped step.
 - Coordinator context scratchpad (step-04-context) archived post-boundary; all builders/researcher closed cleanly.
 
 ---
+
+### Step 5 Retro — 2026-05-02
+
+**Duration**: ~1 hour 10 minutes elapsed (6 tasks, 4 batches, 2 commits — omnibus + follow-up)
+
+**What worked**:
+- Batch A parallelism (T1 + T2): package.json metadata and build config completed in ~9m; npm pack validation confirmed correct tarball structure; shebang + source maps verified.
+- Batch B (T3 README): tier-label-only examples enforced via workplan spec; grep checks (zero Hypomnema, ≥3 tier mentions, matched_tokens shape post-Step-4) all passing; 11 sections per outline, 382 lines.
+- Batch C (T4 CI workflows): ci.yml matrix [22, 24, 25, 26] + release.yml tag-triggered with version-equality bash check and OIDC permissions — all acceptance items verified inline, no CI dry-run needed yet (awaiting first tag).
+- Batch D parallelism (T5 + T6): docs/PUBLISHING.md 8-step bootstrap guide (298 lines, no hardcoded secrets, references user credentials) + scripts/smoke-pack.sh (59 lines, 8 checks, all passing locally with exit code 0).
+- Git artifact cleanup (follow-up commit): ESM import extensions (.js), build artifact excludes (vitest.config.*, *.tgz), egg-info untracking — all reconciled in single follow-up commit.
+- Idle-based timer orchestration (fire_when_idle_all) again performant; both Batch B/C and Batch D pairs completed within expected windows.
+
+**What didn't**:
+- /tmp permission-prompt stall in builder-03 (Task 3): attempted scratch shell script to /tmp for grep checks; Solo sandbox denied; builder output truncated; recovery required inline grep instead of shell. Lesson: avoid /tmp writes from sandboxed agents; do verification inline with grep or delegate to orchestrator.
+- Builder cleanup drift: Batch A builders (272, 273) remained live ~1h after task completion; required explicit process close at round boundary. Recurring pattern from Step 4 → Step 5. Lesson: document explicit "await close" on processes post-task to prevent stale handles.
+- Working-tree artifact leakage recurrence: vitest.config.js, *.tgz, egg-info edits still uncommitted post-omnibus. Step 4 git-mv pattern fixed; Step 5 required manual .gitignore + .npmignore updates + cleanup commit. Pattern now documented for future steps.
+
+**Metrics**:
+- Tests: 229 passing (12 files, unchanged from Step 4; no new test files added in Step 5).
+- Commits: 2 (omnibus b2fe143 with 1369 lines added + follow-up 783705d with 22 insertions, 34 deletions)
+- Builders spawned: 6 (T1 medium, T2 medium, T3 medium, T4 medium, T5 medium, T6 medium; no large tiers needed for packaging/docs work)
+- Researcher: 0 (no Phase 1 role; coordinator only)
+- Tier assignments: small (0), medium (6), large (0)
+
+**Shipping criteria verified**:
+- [x] Package named @procrastivity/duo, scoped, public-ready, unclaimed on npm registry
+- [x] MIT LICENSE file at repo root (2025, The Duo Authors)
+- [x] .npmignore excludes src/, tests, dev files; .gitignore excludes build artifacts, *.tgz, egg-info
+- [x] README.md 11 sections: installation (npx, global, local), MCP client setup, configuration, three tools with tier-label-only inputs, policy overrides, logging (3 events), spawn_process continuation, versioning, license
+- [x] ci.yml matrix [22, 24, 25, 26] on push/PR
+- [x] release.yml tag-triggered with version-equality check, OIDC, --provenance --access public
+- [x] docs/PUBLISHING.md 8-step bootstrap (prerequisites, login, verify, trusted publishers, publish v0.1.0, revoke, CI, provenance)
+- [x] scripts/smoke-pack.sh executable, 8 checks, all passing
+
+**Next step readiness**:
+- Packaging complete; ready for manual bootstrap (docs/PUBLISHING.md).
+- CI pipeline wired; first release.yml run pending first v0.1.1+ tag after bootstrap.
+- Round 1 complete; proposals/intake ready for Round 2.
+
+---
+
+## Round 1 Retro — Roadmap 1 shipped 2026-05-02
+
+**Round duration**: 2026-05-02 04:20 UTC (Step 1 start) → 2026-05-02 ~21:30 UTC (Step 5 boundary close) ≈ **17 hours 10 minutes**
+
+**Test progression**: 0 → 134 → 177 → 229 → 229 tests (Steps 1–5)
+
+**Builders spawned**: ~23 total across all steps (6 Step-1, 7 Step-2, 4 Step-3, 6 Step-4, 6 Step-5)
+
+**Tier assignments**: small (2–3), medium (~18–19), large (1–2)
+
+**Compounding lessons**:
+1. Git source-path leakage (Steps 2–4): Solved via single-commit `git mv` pattern in Step 4; applied consistently Step 5.
+2. Builder cleanup drift (Steps 1–5): Persistent; fire_when_idle_all signals but doesn't auto-close. Explicit `solo_close_process` needed; documented for Round 2.
+3. Phase 1 silent-completion (Step 4): Orchestrator active polling + idle timers together provide reliable "done" signal.
+4. /tmp permission-prompt anti-pattern (Step 5): Avoid /tmp writes from sandboxed agents; do verification inline.
+5. Working-tree artifact leakage (all steps): Comprehensive .gitignore + .npmignore entries pre-build. Applied Step 5 follow-up.
+
+**Status: Round 1 shipped**:
+- Tier-based MCP companion complete (229 tests, 12 files).
+- Packaging ready for manual bootstrap (@procrastivity/duo, docs/PUBLISHING.md runbook).
+- CI/Release wired (GitHub Actions OIDC).
+- Documentation complete (README, PUBLISHING.md, smoke-pack.sh).
+- Proposal intake empty; Round 2 intake natural next move.
+
