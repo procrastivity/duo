@@ -26,17 +26,21 @@ Build a fuller driver that also exercises tools:
 ```bash
 cat > /tmp/duo-logs.sh <<'BASH'
 #!/usr/bin/env bash
+# `sleep` keeps stdin open long enough for Duo to write responses;
+# `timeout` bounds the run (Duo does not self-exit).
 {
   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"runbook","version":"0"}}}'
   echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_agent_tiers","arguments":{}}}'
   echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"resolve_agent_tool","arguments":{"tier":"medium"}}}'
   echo '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resolve_agent_tool","arguments":{"tier":"purple"}}}'
-  sleep 1
-} | node ./dist/index.js
+  sleep 5
+} | timeout 10 node ./dist/index.js
 BASH
 chmod +x /tmp/duo-logs.sh
 /tmp/duo-logs.sh 2>/tmp/duo.err >/tmp/duo.out
+# exit 124 from `timeout` is the success case; anything else means
+# Duo exited on its own (likely an error before the window closed).
 ```
 
 Then:

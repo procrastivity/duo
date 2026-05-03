@@ -75,12 +75,15 @@ In one shell, prepare a tiny driver script:
 cat > /tmp/duo-driver.sh <<'BASH'
 #!/usr/bin/env bash
 # Pipe a sequence of JSON-RPC lines into Duo and print stdout.
+# `sleep` keeps stdin open long enough for Duo to write responses
+# before we EOF; `timeout` bounds the run because Duo does not
+# self-exit (its Solo child keeps the event loop alive).
 {
   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"runbook","version":"0"}}}'
   echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
-  sleep 1
-} | node ./dist/index.js
+  sleep 5
+} | timeout 10 node ./dist/index.js
 BASH
 chmod +x /tmp/duo-driver.sh
 ```
@@ -90,6 +93,8 @@ Run it from the Duo repo root (so `./duo.config.yaml` is found):
 ```bash
 /tmp/duo-driver.sh
 ```
+
+Expect exit code `124` (the timeout firing on a healthy process).
 
 Expected on stdout, line by line:
 
@@ -126,5 +131,17 @@ cat /tmp/duo.err       # operational logs
   tools registered, or the tools it has don't classify into any
   tier. Either is fine for `tools/list` (Duo's surface is static)
   but blocks step 02.
+- **`initialize` and `tools/list` respond, but any tool call into
+  Solo (`list_agent_tiers`, `resolve_agent_tool`, `spawn_agent`)
+  hangs with no response** — known Duo bug as of current `main`:
+  `SoloClient.connect()` (`src/solo-client.ts:34-45`) starts the
+  stdio transport but never performs an MCP `initialize` handshake
+  with Solo. Solo waits for the handshake forever, so any
+  `tools/call` Duo proxies to Solo never returns. Surface in step
+  02 will not produce live responses until Duo sends `initialize`
+  + `notifications/initialized` to Solo before its first
+  `tools/call`. Until that's fixed, Option A (driving from Claude
+  Code) hits the same wall — the handshake gap is upstream of the
+  transport choice.
 
 You're ready for [`02-tier-tools.md`](./02-tier-tools.md).
