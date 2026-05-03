@@ -114,12 +114,13 @@ Now publish the package to the npm registry for the first time.
 2. Verify `package.json` version: `node -p "require('./package.json').version"` → `0.1.0`.
 3. Install dependencies: `npm ci`.
 4. Run tests: `npm test` → all tests pass.
-5. Build: `npm run build` → `dist/` created with no errors.
+5. Build: `npm run build` → `dist/duo.mjs` created with no errors.
 6. Verify tarball contents:
    ```bash
    npm pack --dry-run
    ```
-   Should list: `dist/`, `README.md`, `LICENSE`, `package.json`.
+   Should list exactly: `dist/duo.mjs`, `LICENSE`, `README.md`, `package.json` (four files).
+   (`README.md` is npm-mandated; npm always includes a root README regardless of the `files` allowlist.)
    Should **NOT** list: `src/`, `node_modules/`, `notes/`, test files.
 
 **Perform the publish**:
@@ -217,7 +218,7 @@ npx @procrastivity/duo
 
 **Expected behavior**:
 - `npx` downloads and caches `@procrastivity/duo`.
-- The `duo` bin entrypoint (from `dist/index.js`) is invoked.
+- The `duo` bin entrypoint (from `dist/duo.mjs`) is invoked.
 - With no `duo.config.yaml`, the process exits non-zero with a structured error message (e.g., "config not found" in JSON or plain text).
 - The exit code is **not** 127 (file not found) or a syntax/parse error; it is a normal application error, which is correct.
 
