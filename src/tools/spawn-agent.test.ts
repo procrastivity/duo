@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   spawnAgentHandler,
-  resolveProjectId,
   SpawnAgentInputSchema,
 } from "./spawn-agent.js";
 import { SoloClient, SoloClientError } from "../solo-client.js";
-import type { SoloConfig } from "../config.js";
 import type { Logger } from "../logger.js";
 import {
   enabledRuntimes,
@@ -23,33 +21,23 @@ import {
 } from "../__fixtures__/spawn-results.js";
 import type { SoloAgentTool, SoloSpawnResult } from "../types/solo.js";
 
-const baseTransport = {
-  type: "stdio" as const,
-  command: "solo",
-  args: [],
-};
-
-const makeConfig = (projectId?: string): SoloConfig => ({
-  solo: {
-    transport: baseTransport,
-    ...(projectId !== undefined && { projectId }),
-  },
-});
-
 interface MockClient {
   listAgentTools: ReturnType<typeof vi.fn>;
   spawnProcess: ReturnType<typeof vi.fn>;
+  projectId?: number;
 }
 
 const makeClient = (
   tools: SoloAgentTool[],
   spawnResult: SoloSpawnResult | Error,
+  projectId?: number,
 ): MockClient => ({
   listAgentTools: vi.fn().mockResolvedValue(tools),
   spawnProcess:
     spawnResult instanceof Error
       ? vi.fn().mockRejectedValue(spawnResult)
       : vi.fn().mockResolvedValue(spawnResult),
+  projectId,
 });
 
 const makeListFailingClient = (err: Error): MockClient => ({
@@ -62,9 +50,6 @@ const parse = (result: { content: Array<{ text: string }> }) =>
 
 const asClient = (m: MockClient) => m as unknown as SoloClient;
 
-// Restrict resolver randomness so misleading-name fixture tests can assert specific id selection.
-// enabledRuntimes has medium tier ids 2 (opencode-ghc-sonnet) and 4 (codex-standard).
-// We pick id 2 (opencode-ghc-sonnet) by passing input lists with only that tool when needed.
 const justSonnetMedium: SoloAgentTool[] = [
   {
     id: 2,
@@ -75,9 +60,6 @@ const justSonnetMedium: SoloAgentTool[] = [
   },
 ];
 
-/**
- * Fake Logger that records all calls for assertion in tests.
- */
 const makeFakeLogger = () => {
   const calls: Array<{ method: string; fields: unknown }> = [];
 
@@ -96,32 +78,12 @@ const makeFakeLogger = () => {
   return { logger, calls };
 };
 
-describe("resolveProjectId helper", () => {
-  it("returns caller-supplied project_id when only caller provides one", () => {
-    expect(resolveProjectId({ project_id: "proj-A" }, makeConfig())).toBe("proj-A");
-  });
-
-  it("returns config project_id when only config provides one", () => {
-    expect(resolveProjectId({}, makeConfig("proj-B"))).toBe("proj-B");
-  });
-
-  it("caller wins when both caller and config provide a value", () => {
-    expect(resolveProjectId({ project_id: "proj-A" }, makeConfig("proj-B"))).toBe(
-      "proj-A",
-    );
-  });
-
-  it("returns undefined when neither caller nor config has a value", () => {
-    expect(resolveProjectId({}, makeConfig())).toBeUndefined();
-  });
-});
-
 describe("spawnAgentHandler", () => {
   describe("happy path, named", () => {
     it("calls spawnProcess with name and no project_id, returns success shape", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
@@ -149,7 +111,7 @@ describe("spawnAgentHandler", () => {
     it("calls spawnProcess without a name key; result name comes from Solo", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessUnnamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
       });
 
@@ -163,49 +125,44 @@ describe("spawnAgentHandler", () => {
     });
   });
 
-  describe("project_id precedence", () => {
-    it("caller project_id wins over config", async () => {
+  describe("project_id propagation", () => {
+    it("caller-supplied project_id is passed through to spawnProcess", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessWithProjectId);
-      const result = await spawnAgentHandler(
-        asClient(client),
-        makeConfig("proj-env-xyz"),
-        logger,
-        { tier: "medium", name: "my-helper", project_id: "proj-caller-abc" },
-      );
+      const result = await spawnAgentHandler(asClient(client), logger, {
+        tier: "medium",
+        name: "my-helper",
+        project_id: 7,
+      });
 
       expect(result.isError).toBeFalsy();
       const data = parse(result);
-      expect(data.project_id).toBe("proj-caller-abc");
+      expect(data.project_id).toBe(7);
 
-      expect(client.spawnProcess.mock.calls[0][0].project_id).toBe(
-        "proj-caller-abc",
-      );
+      expect(client.spawnProcess.mock.calls[0][0].project_id).toBe(7);
     });
 
-    it("config project_id used when caller omits it", async () => {
+    it("client.projectId surfaces in result when caller omits project_id", async () => {
       const { logger } = makeFakeLogger();
-      const client = makeClient(justSonnetMedium, spawnSuccessFromEnvProjectId);
-      const result = await spawnAgentHandler(
-        asClient(client),
-        makeConfig("proj-env-xyz"),
-        logger,
-        { tier: "medium" },
-      );
+      const client = makeClient(justSonnetMedium, spawnSuccessFromEnvProjectId, 6);
+      const result = await spawnAgentHandler(asClient(client), logger, {
+        tier: "medium",
+      });
 
       expect(result.isError).toBeFalsy();
       const data = parse(result);
-      expect(data.project_id).toBe("proj-env-xyz");
-
-      expect(client.spawnProcess.mock.calls[0][0].project_id).toBe(
-        "proj-env-xyz",
+      expect(data.project_id).toBe(6);
+      // Tool handler does NOT thread project_id into the call args anymore;
+      // SoloClient.spawnProcess injects it from client.projectId.
+      expect(client.spawnProcess.mock.calls[0][0]).not.toHaveProperty(
+        "project_id",
       );
     });
 
     it("no project_id anywhere → omitted from call args and from result", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessUnnamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
       });
 
@@ -219,10 +176,18 @@ describe("spawnAgentHandler", () => {
   });
 
   describe("schema rejection", () => {
-    it("empty-string project_id rejected by schema", () => {
+    it("non-integer project_id rejected by schema", () => {
       const parsed = SpawnAgentInputSchema.safeParse({
         tier: "medium",
-        project_id: "",
+        project_id: 1.5,
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("string project_id rejected by schema", () => {
+      const parsed = SpawnAgentInputSchema.safeParse({
+        tier: "medium",
+        project_id: "6",
       });
       expect(parsed.success).toBe(false);
     });
@@ -240,7 +205,7 @@ describe("spawnAgentHandler", () => {
     it("unknown tier returns unsupported_tier and does not call spawnProcess", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(enabledRuntimes, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "huge",
       });
 
@@ -261,7 +226,7 @@ describe("spawnAgentHandler", () => {
         },
       ];
       const client = makeClient(largeOnly, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "small",
       });
 
@@ -285,14 +250,14 @@ describe("spawnAgentHandler", () => {
       expect(data.data.requested_tier).toBe(expected.tier);
     };
 
-    it("name in use → spawn_rejected with solo_code -32602 and request echo (single call)", async () => {
+    it("name in use → spawn_rejected with solo_code -32602 and request echo", async () => {
       const { logger } = makeFakeLogger();
       const err = new SoloClientError(
         spawnRejectionNameInUse.message,
         spawnRejectionNameInUse.code,
       );
       const client = makeClient(justSonnetMedium, err);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
@@ -316,7 +281,7 @@ describe("spawnAgentHandler", () => {
         spawnRejectionInvalidAgentToolId.code,
       );
       const client = makeClient(justSonnetMedium, err);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
       });
 
@@ -330,19 +295,17 @@ describe("spawnAgentHandler", () => {
       expect(client.spawnProcess).toHaveBeenCalledTimes(1);
     });
 
-    it("permission denied → spawn_rejected (project-scope error, not re-categorized)", async () => {
+    it("permission denied with caller project_id → spawn_rejected echoes requested_project_id", async () => {
       const { logger } = makeFakeLogger();
       const err = new SoloClientError(
         spawnRejectionPermissionDenied.message,
         spawnRejectionPermissionDenied.code,
       );
       const client = makeClient(justSonnetMedium, err);
-      const result = await spawnAgentHandler(
-        asClient(client),
-        makeConfig(),
-        logger,
-        { tier: "medium", project_id: "proj-other" },
-      );
+      const result = await spawnAgentHandler(asClient(client), logger, {
+        tier: "medium",
+        project_id: 99,
+      });
 
       expect(result.isError).toBe(true);
       const data = parse(result);
@@ -351,7 +314,7 @@ describe("spawnAgentHandler", () => {
         messageContains: "permission denied",
         tier: "medium",
       });
-      expect(data.data.requested_project_id).toBe("proj-other");
+      expect(data.data.requested_project_id).toBe(99);
     });
   });
 
@@ -360,7 +323,7 @@ describe("spawnAgentHandler", () => {
       const { logger } = makeFakeLogger();
       const err = new SoloClientError("MCP error -32000: Server error", -32000);
       const client = makeListFailingClient(err);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
       });
 
@@ -371,21 +334,16 @@ describe("spawnAgentHandler", () => {
   });
 
   describe("resolver receives full tools list incl. disabled", () => {
-    it("diagnostics reflect enabled_count from the full mixedRealistic payload", async () => {
+    it("listAgentTools called once with no filtering before resolver", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(mixedRealistic, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
 
       expect(result.isError).toBeFalsy();
-      // listAgentTools was called once and received no filtering before the resolver.
       expect(client.listAgentTools).toHaveBeenCalledTimes(1);
-      // mixedRealistic has 5 enabled runtimes + 4 enabled edge-cases (10, 11, 12, 13)
-      // and 2 disabled variants (21, 22). The resolver's enabled_count should be 9.
-      // We can't read diagnostics directly on success but we asserted the resolver
-      // saw the list; the explicit-enabled_count check is exercised in tier_unavailable.
     });
   });
 
@@ -393,7 +351,7 @@ describe("spawnAgentHandler", () => {
     it("includes tool_name, tool_type, command, and classification_source from resolution", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
@@ -413,7 +371,7 @@ describe("spawnAgentHandler", () => {
         ...spawnSuccessNamed,
         agent_tool_id: 10,
       });
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "large",
         name: "my-helper",
       });
@@ -431,7 +389,7 @@ describe("spawnAgentHandler", () => {
     it("happy path — one resolutionSuccess followed by one spawnSuccess (assert order)", async () => {
       const { logger, calls } = makeFakeLogger();
       const client = makeClient(justSonnetMedium, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
@@ -441,7 +399,6 @@ describe("spawnAgentHandler", () => {
       expect(calls[0].method).toBe("resolutionSuccess");
       expect(calls[1].method).toBe("spawnSuccess");
 
-      // Verify resolutionSuccess fields
       const resFields = calls[0].fields as Record<string, unknown>;
       expect(resFields).toHaveProperty("requested_tier", "medium");
       expect(resFields).toHaveProperty("selected_tool_id");
@@ -452,14 +409,12 @@ describe("spawnAgentHandler", () => {
       expect(resFields).toHaveProperty("strategy");
       expect(resFields).toHaveProperty("preference_applied");
 
-      // Verify spawnSuccess fields
       const spawnFields = calls[1].fields as Record<string, unknown>;
       expect(spawnFields).toHaveProperty("requested_tier", "medium");
       expect(spawnFields).toHaveProperty("selected_tool_id");
       expect(spawnFields).toHaveProperty("solo_process_id");
       expect(spawnFields).toHaveProperty("process_name");
 
-      // Ensure no forbidden fields in either call
       expect(resFields).not.toHaveProperty("requested_name");
       expect(resFields).not.toHaveProperty("requested_project_id");
       expect(resFields).not.toHaveProperty("prompt");
@@ -471,7 +426,7 @@ describe("spawnAgentHandler", () => {
     it("resolver fails (unsupported tier) — one resolutionFailure, no spawnSuccess", async () => {
       const { logger, calls } = makeFakeLogger();
       const client = makeClient(enabledRuntimes, spawnSuccessNamed);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "huge",
       });
 
@@ -484,7 +439,6 @@ describe("spawnAgentHandler", () => {
       expect(fields).toHaveProperty("error_code", "unsupported_tier");
       expect(fields).toHaveProperty("available_tiers");
 
-      // Ensure no forbidden fields
       expect(fields).not.toHaveProperty("requested_name");
       expect(fields).not.toHaveProperty("requested_project_id");
       expect(fields).not.toHaveProperty("prompt");
@@ -497,7 +451,7 @@ describe("spawnAgentHandler", () => {
         spawnRejectionNameInUse.code,
       );
       const client = makeClient(justSonnetMedium, err);
-      const result = await spawnAgentHandler(asClient(client), makeConfig(), logger, {
+      const result = await spawnAgentHandler(asClient(client), logger, {
         tier: "medium",
         name: "my-helper",
       });
@@ -506,7 +460,6 @@ describe("spawnAgentHandler", () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("resolutionSuccess");
 
-      // Ensure resolutionSuccess has all expected fields and no forbidden fields
       const fields = calls[0].fields as Record<string, unknown>;
       expect(fields).toHaveProperty("requested_tier", "medium");
       expect(fields).toHaveProperty("selected_tool_id");
@@ -518,13 +471,12 @@ describe("spawnAgentHandler", () => {
     it("sweeps all log calls: no requested_name, requested_project_id, or prompt in any log", async () => {
       const { logger: logger1, calls: calls1 } = makeFakeLogger();
       const client1 = makeClient(justSonnetMedium, spawnSuccessNamed);
-      await spawnAgentHandler(asClient(client1), makeConfig(), logger1, {
+      await spawnAgentHandler(asClient(client1), logger1, {
         tier: "medium",
         name: "my-helper",
-        project_id: "proj-123",
+        project_id: 123,
       });
 
-      // Verify no forbidden fields in happy path
       for (const call of calls1) {
         const fields = call.fields as Record<string, unknown>;
         expect(fields).not.toHaveProperty("requested_name");
@@ -532,13 +484,12 @@ describe("spawnAgentHandler", () => {
         expect(fields).not.toHaveProperty("prompt");
       }
 
-      // Test with tier unavailable
       const { logger: logger2, calls: calls2 } = makeFakeLogger();
       const largeOnly: SoloAgentTool[] = [
         { id: 5, name: "codex-flagship", command: "codex --profile flagship", tool_type: "codex", enabled: true },
       ];
       const client2 = makeClient(largeOnly, spawnSuccessNamed);
-      await spawnAgentHandler(asClient(client2), makeConfig(), logger2, {
+      await spawnAgentHandler(asClient(client2), logger2, {
         tier: "small",
       });
 

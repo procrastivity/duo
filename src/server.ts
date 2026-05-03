@@ -91,7 +91,6 @@ export class DuoServer implements MCPServer {
       },
       (async (input: unknown) => spawnAgentHandler(
         soloClient,
-        this._config,
         this._logger,
         input as SpawnAgentInput,
         classifierPolicy,

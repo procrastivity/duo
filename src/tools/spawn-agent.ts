@@ -6,7 +6,6 @@ import {
   UnsupportedTierError,
   TIER_LABELS,
 } from "../errors.js";
-import type { SoloConfig } from "../config.js";
 import type { Logger } from "../logger.js";
 import type { ClassifierTokenPolicy } from "../classifier.js";
 import type { PreferenceSelector } from "../types/policy.js";
@@ -15,7 +14,7 @@ export const SpawnAgentInputSchema = z
   .object({
     tier: z.string().min(1, "tier is required"),
     name: z.string().min(1).optional(),
-    project_id: z.string().min(1).optional(),
+    project_id: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -30,11 +29,11 @@ export interface SpawnAgentToolSummary {
 }
 
 export interface SpawnAgentResult {
-  process_id: string;
+  process_id: number;
   name: string;
   tier: "small" | "medium" | "large";
   tool: SpawnAgentToolSummary;
-  project_id?: string;
+  project_id?: number;
 }
 
 interface TextContent {
@@ -62,18 +61,8 @@ const mcpError = (
   isError: true,
 });
 
-export const resolveProjectId = (
-  input: { project_id?: string },
-  config: SoloConfig,
-): string | undefined => {
-  if (input.project_id !== undefined) return input.project_id;
-  if (config.solo.projectId !== undefined) return config.solo.projectId;
-  return undefined;
-};
-
 export async function spawnAgentHandler(
   soloClient: SoloClient,
-  config: SoloConfig,
   logger: Logger,
   input: SpawnAgentInput,
   classifierPolicy?: ClassifierTokenPolicy,
@@ -123,7 +112,6 @@ export async function spawnAgentHandler(
     throw err;
   }
 
-  // Log successful resolution (before spawn attempt)
   const tier = input.tier as "small" | "medium" | "large";
   logger.resolutionSuccess({
     requested_tier: tier,
@@ -136,19 +124,17 @@ export async function spawnAgentHandler(
     preference_applied: resolution.diagnostics.preference_applied,
   });
 
-  const effectiveProjectId = resolveProjectId(input, config);
-
   const spawnArgs: {
     kind: "agent";
     agent_tool_id: number;
     name?: string;
-    project_id?: string;
+    project_id?: number;
   } = {
     kind: "agent",
     agent_tool_id: resolution.selected.agent_tool_id,
   };
   if (input.name !== undefined) spawnArgs.name = input.name;
-  if (effectiveProjectId !== undefined) spawnArgs.project_id = effectiveProjectId;
+  if (input.project_id !== undefined) spawnArgs.project_id = input.project_id;
 
   let spawnResult;
   try {
@@ -161,20 +147,21 @@ export async function spawnAgentHandler(
         agent_tool_id: resolution.selected.agent_tool_id,
       };
       if (input.name !== undefined) data.requested_name = input.name;
-      if (effectiveProjectId !== undefined)
-        data.requested_project_id = effectiveProjectId;
+      if (input.project_id !== undefined)
+        data.requested_project_id = input.project_id;
       return mcpError("spawn_rejected", err.message, { data });
     }
     throw err;
   }
 
-  // Log successful spawn
   logger.spawnSuccess({
     requested_tier: tier,
     selected_tool_id: resolution.selected.agent_tool_id,
-    solo_process_id: spawnResult.process_id,
+    solo_process_id: String(spawnResult.process_id),
     process_name: spawnResult.name,
   });
+
+  const effectiveProjectId = input.project_id ?? soloClient.projectId;
 
   const result: SpawnAgentResult = {
     process_id: spawnResult.process_id,

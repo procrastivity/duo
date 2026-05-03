@@ -467,8 +467,8 @@ describe("spawn_agent tool", () => {
       expect(result.success).toBe(false);
     });
 
-    it("rejects empty-string project_id", () => {
-      const result = SpawnAgentInputSchema.safeParse({ tier: "small", project_id: "" });
+    it("rejects string project_id (must be number)", () => {
+      const result = SpawnAgentInputSchema.safeParse({ tier: "small", project_id: "6" });
       expect(result.success).toBe(false);
     });
   });
@@ -495,10 +495,10 @@ describe("spawn_agent tool", () => {
       expect(mockClient.spawnProcess).toHaveBeenCalled();
     });
 
-    it("passes config.solo.projectId to spawnProcess when caller omits project_id", async () => {
-      const configWithProjectId = parseConfig(validRawConfig, { SOLO_PROJECT_ID: "proj-env-xyz" });
+    it("does not thread project_id from tool input when caller omits it (SoloClient injects scope)", async () => {
+      const config = parseConfig(validRawConfig);
       const mockClient = makeClient(enabledRuntimes, spawnSuccessFromEnvProjectId);
-      const server = new DuoServer(configWithProjectId, mockClient);
+      const server = new DuoServer(config, mockClient);
 
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
 
@@ -513,9 +513,8 @@ describe("spawn_agent tool", () => {
       await server.start();
 
       await capturedHandler?.({ tier: "medium" });
-      expect(mockClient.spawnProcess).toHaveBeenCalledWith(
-        expect.objectContaining({ project_id: "proj-env-xyz" }),
-      );
+      const args = mockClient.spawnProcess.mock.calls[0][0];
+      expect(args).not.toHaveProperty("project_id");
     });
   });
 });
