@@ -10,3 +10,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
 ]
+
+[dependency-groups]
+dev = [
+    "mcp2cli>=3.0.2",
+]
