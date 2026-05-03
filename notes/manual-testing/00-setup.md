@@ -149,10 +149,22 @@ any client attached:
 node ./dist/index.js < /dev/null
 ```
 
-`stdin` closes immediately, so Duo will exit shortly after — but
-any **config / policy / Solo-spawn** error surfaces on stderr
-before exit. Expect either silence (clean shutdown) or, if Solo's
-path is wrong, an `execa` error naming the missing command. Fix
-the config and rerun until the smoke check is silent.
+Duo will **not exit on its own** — even with stdin closed, the
+spawned Solo child process keeps Node's event loop alive. The
+smoke check is therefore: wait ~2 seconds, confirm nothing prints
+on stderr, then Ctrl+C. Any **config / policy / Solo-spawn** error
+surfaces on stderr almost immediately; if Solo's path is wrong
+you'll see an `execa` error naming the missing command. Fix the
+config and rerun until the first couple of seconds are silent.
+
+For a scriptable form, bound the run with `timeout`:
+
+```bash
+timeout 2 node ./dist/index.js < /dev/null; echo "exit=$?"
+```
+
+Exit code `124` means `timeout` killed a healthy process — that's
+the success case. Any other non-zero exit accompanied by stderr
+output is the failure case.
 
 You're ready for [`01-running-duo.md`](./01-running-duo.md).
