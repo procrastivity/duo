@@ -17,9 +17,20 @@ This doc verifies Duo's structured-log contract:
 
 ## 1. Capture a stderr stream
 
-The simplest capture: drive Duo via the raw JSON-RPC harness from
-[`01-running-duo.md`](./01-running-duo.md), redirect stderr to a
-file, and inspect.
+The simplest capture: use the committed driver, which fires a
+representative call sequence and splits stdout/stderr into files
+for you:
+
+```sh
+./notes/manual-testing/scripts/04-log-walkthrough.sh
+# → /tmp/duo.out (stdout) and /tmp/duo.err (stderr)
+```
+
+Override the success-tier ($1) or capture paths
+(`DUO_OUT` / `DUO_ERR`) per the script's header comments.
+
+The hand-rolled equivalent is below — useful when you want a
+different sequence of calls or a different timeout window.
 
 Build a fuller driver that also exercises tools:
 

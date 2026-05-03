@@ -59,6 +59,12 @@ Exercise:
 mcp__duo__resolve_agent_tool { "tier": "large" }
 ```
 
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-resolve-agent-tool.sh large
+```
+
 Acceptance:
 
 - The new `claude-pro` tool appears as a candidate (either as
@@ -90,6 +96,12 @@ Exercise:
 
 ```
 mcp__duo__list_agent_tiers
+```
+
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-list-agent-tiers.sh
 ```
 
 Acceptance:
@@ -126,6 +138,12 @@ Exercise repeatedly:
 
 ```
 mcp__duo__resolve_agent_tool { "tier": "medium" }
+```
+
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-resolve-agent-tool.sh medium
 ```
 
 Acceptance:

@@ -96,6 +96,13 @@ Run it from the Duo repo root (so `./duo.config.yaml` is found):
 
 Expect exit code `124` (the timeout firing on a healthy process).
 
+Or use the committed driver — same payload, parameterizable
+through `lib.sh`:
+
+```sh
+./notes/manual-testing/scripts/01-tools-list.sh
+```
+
 Expected on stdout, line by line:
 
 1. `initialize` response — `result.serverInfo.name` is `duo`,

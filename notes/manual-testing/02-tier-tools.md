@@ -22,6 +22,12 @@ Ask Claude:
 > Call `mcp__duo__list_agent_tiers` with no arguments and show me
 > the response.
 
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-list-agent-tiers.sh
+```
+
 Expected response shape (abbreviated, exact contents depend on what
 Solo has registered):
 
@@ -53,6 +59,14 @@ For each available tier from step 1, ask Claude:
 
 > Call `mcp__duo__resolve_agent_tool` with `tier: "<tier>"` and show
 > me the response.
+
+Or via driver, parameterized by tier (default `medium`):
+
+```sh
+./notes/manual-testing/scripts/02-resolve-agent-tool.sh small
+./notes/manual-testing/scripts/02-resolve-agent-tool.sh medium
+./notes/manual-testing/scripts/02-resolve-agent-tool.sh large
+```
 
 Expected response shape:
 
@@ -91,10 +105,17 @@ Acceptance per tier:
 
 > Call `mcp__duo__resolve_agent_tool` with `tier: "purple"`.
 
-Expected: an MCP tool-call error whose payload (after the JSON-RPC
-envelope) contains `error_code: "unsupported_tier"` and
-`available_tiers: ["small","medium","large"]`. A
-`resolution.failure` event is also written to stderr (see
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-resolve-unsupported.sh
+```
+
+Expected: an MCP tool-call response with `result.isError: true`
+whose `result.content[0].text` parses to JSON containing
+`code: "unsupported_tier"`. A `resolution.failure` event is also
+written to stderr with the matching `error_code` and the
+`available_tiers: ["small","medium","large"]` list (see
 [`04-logging.md`](./04-logging.md)).
 
 ## 3. `spawn_agent`
@@ -104,6 +125,14 @@ Pick a tier from step 1 that's `available: true`. Ask Claude:
 > Call `mcp__duo__spawn_agent` with
 > `{ "tier": "<tier>", "name": "duo-runbook-test" }` and show me
 > the response.
+
+Or via driver, parameterized as `[tier] [name] [project_id]`:
+
+```sh
+./notes/manual-testing/scripts/02-spawn-agent.sh medium
+./notes/manual-testing/scripts/02-spawn-agent.sh medium my-helper
+./notes/manual-testing/scripts/02-spawn-agent.sh medium my-helper proj-A
+```
 
 Expected response shape:
 
@@ -169,6 +198,12 @@ Repeat the spawn three ways and confirm what comes back:
 ### Failure case — unsupported tier
 
 > Call `mcp__duo__spawn_agent` with `tier: "purple"`.
+
+Or via driver:
+
+```sh
+./notes/manual-testing/scripts/02-spawn-unsupported.sh
+```
 
 Expected: same `unsupported_tier` error as in step 2, plus a
 `spawn.failure` event on stderr.

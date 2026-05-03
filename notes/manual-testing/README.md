@@ -35,6 +35,16 @@ Compared to a project like Hypomnema, the heavy prereq here is
    `spawn.success`, `spawn.failure`); confirm stdout stays clean
    (MCP protocol only).
 
+## Driver scripts
+
+POSIX `/bin/sh` drivers under [`scripts/`](./scripts/) — one per
+documented exercise. Each section in the docs below pairs the
+"Ask Claude" / "Call X" prose with a corresponding
+`./notes/manual-testing/scripts/NN-thing.sh` invocation. Run them
+directly when you want to reproduce a check fast or wire one into
+CI. See [`scripts/README.md`](./scripts/README.md) for the index
+and the tunables (`DUO_TIMEOUT`, `DUO_SLEEP`, etc.).
+
 ## Fixtures
 
 Tiny by design — Duo doesn't ship test data, it operates against

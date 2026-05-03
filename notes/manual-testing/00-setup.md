@@ -167,4 +167,10 @@ Exit code `124` means `timeout` killed a healthy process — that's
 the success case. Any other non-zero exit accompanied by stderr
 output is the failure case.
 
+Or use the matching driver:
+
+```sh
+./notes/manual-testing/scripts/00-smoke.sh
+```
+
 You're ready for [`01-running-duo.md`](./01-running-duo.md).
