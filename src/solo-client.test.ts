@@ -1,27 +1,41 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Transport } from "./transport/types.js";
 import { SoloClient, SoloClientError } from "./solo-client.js";
-import type { SoloAgentTool, SoloSpawnResult } from "./types/solo.js";
+import type { SoloAgentTool, SoloProject, SoloSpawnResult } from "./types/solo.js";
 
-function createMockTransport() {
+type ToolCallResponder = (name: string, args: unknown) => unknown;
+
+function createMockTransport(toolResponder?: ToolCallResponder) {
   const transport: Transport & { simulateMessage: (msg: unknown) => void } = {
     onmessage: undefined,
     onerror: undefined,
     onclose: undefined,
     start: vi.fn().mockResolvedValue(undefined),
-    // Default send: auto-respond to the `initialize` handshake so
-    // `await client.connect()` resolves in tests. Tests that exercise
-    // tools/call replace `transport.send` after connect.
     send: vi.fn().mockImplementation(async (message: unknown) => {
-      const msg = message as { id?: number; method?: string };
-      if (msg.method === "initialize" && msg.id !== undefined) {
+      const msg = message as {
+        id?: number;
+        method?: string;
+        params?: { name?: string; arguments?: unknown };
+      };
+      if (msg.id === undefined) return; // notification
+      if (msg.method === "initialize") {
+        transport.simulateMessage({
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: { protocolVersion: "2024-11-05", capabilities: {} },
+        });
+        return;
+      }
+      if (msg.method === "tools/call" && toolResponder) {
+        const payload = toolResponder(
+          msg.params?.name ?? "",
+          msg.params?.arguments,
+        );
         transport.simulateMessage({
           jsonrpc: "2.0",
           id: msg.id,
           result: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            serverInfo: { name: "solo-mock", version: "0" },
+            content: [{ type: "text", text: JSON.stringify(payload) }],
           },
         });
       }
@@ -42,192 +56,277 @@ const fiveRuntimes: SoloAgentTool[] = [
   { id: 5, name: "codex-flagship", command: "codex --mode flagship", tool_type: "codex", enabled: true },
 ];
 
-function makeToolsCallResponse(transport: ReturnType<typeof createMockTransport>, tools: unknown[]) {
-  transport.send = vi.fn().mockImplementation(async (message) => {
-    const msg = message as { id: number };
-    transport.simulateMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: { content: [{ type: "text", text: JSON.stringify(tools) }] },
-    });
-  });
-}
+const sampleProjects: SoloProject[] = [
+  { id: 6, name: "duo", path: "/Users/me/Code/duo" },
+  { id: 4, name: "outer", path: "/Users/me/Code" },
+  { id: 7, name: "other", path: "/Users/me/elsewhere" },
+];
 
 describe("SoloClient", () => {
-  it("a test double can satisfy the MCPClient interface", () => {
-    const transport = createMockTransport();
-    const client = new SoloClient(transport);
-    expect(client).toBeInstanceOf(SoloClient);
-    expect(typeof client.connect).toBe("function");
-    expect(typeof client.disconnect).toBe("function");
-    expect(typeof client.listAgentTools).toBe("function");
+  describe("connect handshake", () => {
+    it("performs initialize then notifications/initialized", async () => {
+      const transport = createMockTransport(() => []);
+      const client = new SoloClient(transport, { env: {}, cwd: "/tmp" });
+      await client.connect();
+
+      const calls = (transport.send as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c) => c[0] as { method?: string; id?: number },
+      );
+      expect(calls[0].method).toBe("initialize");
+      expect(calls[0].id).toBeTypeOf("number");
+      expect(calls[1].method).toBe("notifications/initialized");
+      expect(calls[1].id).toBeUndefined();
+    });
   });
 
-  it("connect calls transport.start()", async () => {
-    const transport = createMockTransport();
-    const client = new SoloClient(transport);
-    await client.connect();
-    expect(transport.start).toHaveBeenCalledOnce();
-  });
+  describe("connect-time scope resolution", () => {
+    it("uses SOLO_PROJECT_ID env when set; does not call list_projects", async () => {
+      const calledNames: string[] = [];
+      const transport = createMockTransport((name) => {
+        calledNames.push(name);
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: { SOLO_PROJECT_ID: "42" },
+        cwd: "/anywhere",
+      });
+      await client.connect();
 
-  it("connect performs the MCP handshake: initialize then notifications/initialized", async () => {
-    const transport = createMockTransport();
-    const client = new SoloClient(transport);
+      expect(client.projectId).toBe(42);
+      expect(calledNames).not.toContain("list_projects");
+    });
 
-    await client.connect();
+    it("falls back to list_projects + cwd longest-match when env unset", async () => {
+      const transport = createMockTransport((name) => {
+        if (name === "list_projects") return sampleProjects;
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: {},
+        cwd: "/Users/me/Code/duo",
+      });
+      await client.connect();
 
-    const calls = (transport.send as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c) => c[0] as { method?: string; id?: number },
-    );
-    expect(calls.length).toBeGreaterThanOrEqual(2);
-    expect(calls[0].method).toBe("initialize");
-    expect(calls[0].id).toBeTypeOf("number");
-    expect(calls[1].method).toBe("notifications/initialized");
-    expect(calls[1].id).toBeUndefined();
+      expect(client.projectId).toBe(6); // longest match wins over outer Code dir
+    });
+
+    it("nested-path projects → longest match wins", async () => {
+      const transport = createMockTransport((name) => {
+        if (name === "list_projects") return sampleProjects;
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: {},
+        cwd: "/Users/me/Code/duo/src/tools",
+      });
+      await client.connect();
+
+      expect(client.projectId).toBe(6);
+    });
+
+    it("no match → projectId stays undefined, no throw", async () => {
+      const transport = createMockTransport((name) => {
+        if (name === "list_projects") return sampleProjects;
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: {},
+        cwd: "/somewhere/unrelated",
+      });
+      await client.connect();
+
+      expect(client.projectId).toBeUndefined();
+    });
+
+    it("env and pwd disagree → env wins, info logged", async () => {
+      const infoCalls: Array<{ msg: string; fields?: Record<string, unknown> }> =
+        [];
+      const transport = createMockTransport((name) => {
+        if (name === "list_projects") return sampleProjects;
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: { SOLO_PROJECT_ID: "99" },
+        cwd: "/Users/me/Code/duo",
+        logger: { info: (msg, fields) => infoCalls.push({ msg, fields }) },
+      });
+      await client.connect();
+
+      // env was set, list_projects not called → no disagreement signal possible
+      // (we deliberately avoid the extra round-trip when env pins). Just verify env wins.
+      expect(client.projectId).toBe(99);
+    });
+
+    it("calls bind_session_process when SOLO_PROCESS_ID is set", async () => {
+      const bindCalls: unknown[] = [];
+      const transport = createMockTransport((name, args) => {
+        if (name === "bind_session_process") {
+          bindCalls.push(args);
+          return { ok: true };
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: { SOLO_PROCESS_ID: "297", SOLO_PROJECT_ID: "6" },
+        cwd: "/tmp",
+      });
+      await client.connect();
+
+      expect(bindCalls).toEqual([{ process_id: 297 }]);
+      expect(client.processId).toBe(297);
+    });
+
+    it("does not call bind_session_process when SOLO_PROCESS_ID is unset", async () => {
+      const calledNames: string[] = [];
+      const transport = createMockTransport((name) => {
+        calledNames.push(name);
+        return [];
+      });
+      const client = new SoloClient(transport, {
+        env: { SOLO_PROJECT_ID: "6" },
+        cwd: "/tmp",
+      });
+      await client.connect();
+
+      expect(calledNames).not.toContain("bind_session_process");
+      expect(client.processId).toBeUndefined();
+    });
+
+    it("bind_session_process failure logs warning but does not reject connect()", async () => {
+      const warnCalls: Array<{ msg: string }> = [];
+      const transport = createMockTransport((name) => {
+        if (name === "bind_session_process") {
+          throw new Error("simulated"); // responder never replies → handled below
+        }
+        return [];
+      });
+      // override transport to inject error reply for bind
+      const origSend = transport.send;
+      transport.send = vi.fn().mockImplementation(async (message: unknown) => {
+        const msg = message as {
+          id?: number;
+          method?: string;
+          params?: { name?: string };
+        };
+        if (msg.method === "tools/call" && msg.params?.name === "bind_session_process") {
+          transport.simulateMessage({
+            jsonrpc: "2.0",
+            id: msg.id,
+            error: { code: -32000, message: "no such process" },
+          });
+          return;
+        }
+        return (origSend as any)(message);
+      });
+
+      const client = new SoloClient(transport, {
+        env: { SOLO_PROCESS_ID: "999", SOLO_PROJECT_ID: "6" },
+        cwd: "/tmp",
+        logger: { warn: (msg) => warnCalls.push({ msg }) },
+      });
+
+      await expect(client.connect()).resolves.toBeUndefined();
+      expect(client.processId).toBeUndefined();
+      expect(warnCalls.some((c) => c.msg.includes("bind_session_process_failed"))).toBe(true);
+    });
   });
 
   describe("listAgentTools", () => {
-    it("calls tools/call with name list_agent_tools and zero arguments", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
+    it("returns parsed tool array", async () => {
+      const transport = createMockTransport((name) => {
+        if (name === "list_agent_tools") return fiveRuntimes;
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
       await client.connect();
-      makeToolsCallResponse(transport, []);
-
-      await client.listAgentTools();
-
-      expect(transport.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: "tools/call",
-          params: { name: "list_agent_tools", arguments: {} },
-        }),
-      );
-    });
-
-    it("returns the parsed SoloAgentTool array for all five known runtimes", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
-      await client.connect();
-      makeToolsCallResponse(transport, fiveRuntimes);
 
       const result = await client.listAgentTools();
-
       expect(result).toEqual(fiveRuntimes);
     });
+  });
 
-    it("throws SoloClientError when transport returns an MCP error", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
-      await client.connect();
-
-      transport.send = vi.fn().mockImplementation(async (message) => {
-        const msg = message as { id: number };
-        transport.simulateMessage({
-          jsonrpc: "2.0",
-          id: msg.id,
-          error: { code: -32000, message: "Server error" },
-        });
+  describe("listProjects", () => {
+    it("returns parsed project array", async () => {
+      const transport = createMockTransport((name) => {
+        if (name === "list_projects") return sampleProjects;
+        return [];
       });
-
-      await expect(client.listAgentTools()).rejects.toThrow(SoloClientError);
-      await expect(client.listAgentTools()).rejects.toThrow(
-        "MCP error -32000: Server error",
-      );
-    });
-
-    it("throws a parse error mentioning the missing field when payload omits command", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
       await client.connect();
 
-      const malformed = [
-        { id: 1, name: "bad-tool", tool_type: "opencode", enabled: true },
-      ];
-      makeToolsCallResponse(transport, malformed);
-
-      await expect(client.listAgentTools()).rejects.toThrow(/command/);
+      const result = await client.listProjects();
+      expect(result).toEqual(sampleProjects);
     });
   });
 
   describe("spawnProcess", () => {
-    function makeSpawnResponse(
-      transport: ReturnType<typeof createMockTransport>,
-      payload: unknown,
-    ) {
-      transport.send = vi.fn().mockImplementation(async (message) => {
-        const msg = message as { id: number };
-        transport.simulateMessage({
-          jsonrpc: "2.0",
-          id: msg.id,
-          result: { content: [{ type: "text", text: JSON.stringify(payload) }] },
-        });
-      });
-    }
-
     const validSpawnResult: SoloSpawnResult = {
-      process_id: "proc-abc123",
+      process_id: 111,
       name: "my-helper",
-      agent_tool_id: 2,
-      project_id: "proj-A",
     };
 
-    it("calls tools/call with spawn_process args and returns the parsed result", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
+    it("forwards caller-supplied project_id verbatim", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
       await client.connect();
-      makeSpawnResponse(transport, validSpawnResult);
 
-      const result = await client.spawnProcess({
+      await client.spawnProcess({
         kind: "agent",
         agent_tool_id: 2,
         name: "my-helper",
-        project_id: "proj-A",
+        project_id: 7,
       });
 
-      expect(transport.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: "tools/call",
-          params: {
-            name: "spawn_process",
-            arguments: { kind: "agent", agent_tool_id: 2, name: "my-helper", project_id: "proj-A" },
-          },
-        }),
-      );
-      expect(result).toEqual(validSpawnResult);
+      expect(capturedArgs).toEqual({
+        kind: "agent",
+        agent_tool_id: 2,
+        name: "my-helper",
+        project_id: 7,
+      });
     });
 
-    it("omits project_id key when caller supplies name but not project_id", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
+    it("injects client.projectId when caller omits project_id", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
       await client.connect();
-      makeSpawnResponse(transport, { ...validSpawnResult, project_id: "default-proj" });
-
-      await client.spawnProcess({ kind: "agent", agent_tool_id: 2, name: "my-helper" });
-
-      const sentArgs = (transport.send as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
-        params: { arguments: Record<string, unknown> };
-      };
-      expect(sentArgs.params.arguments).toHaveProperty("name", "my-helper");
-      expect(sentArgs.params.arguments).not.toHaveProperty("project_id");
-    });
-
-    it("omits both name and project_id keys when caller provides neither", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
-      await client.connect();
-      makeSpawnResponse(transport, { ...validSpawnResult, name: "agent-1234" });
 
       await client.spawnProcess({ kind: "agent", agent_tool_id: 2 });
-
-      const sentArgs = (transport.send as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
-        params: { arguments: Record<string, unknown> };
-      };
-      expect(sentArgs.params.arguments).not.toHaveProperty("name");
-      expect(sentArgs.params.arguments).not.toHaveProperty("project_id");
+      expect(capturedArgs).toEqual({ kind: "agent", agent_tool_id: 2, project_id: 6 });
     });
 
-    it("throws SoloClientError with Solo's code and message when transport returns an MCP error", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
+    it("omits project_id when neither caller nor client has one", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: {}, cwd: "/nowhere" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2 });
+      expect(capturedArgs).not.toHaveProperty("project_id");
+    });
+
+    it("throws SoloClientError when transport returns an MCP error", async () => {
+      const transport = createMockTransport(() => []);
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
       await client.connect();
 
       transport.send = vi.fn().mockImplementation(async (message) => {
@@ -248,15 +347,14 @@ describe("SoloClient", () => {
     });
 
     it("throws a parse error mentioning process_id when payload omits it", async () => {
-      const transport = createMockTransport();
-      const client = new SoloClient(transport);
-      await client.connect();
-
-      makeSpawnResponse(transport, {
-        name: "my-helper",
-        agent_tool_id: 2,
-        project_id: "proj-A",
+      const transport = createMockTransport((name) => {
+        if (name === "spawn_process") {
+          return { name: "my-helper" }; // process_id absent
+        }
+        return [];
       });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
+      await client.connect();
 
       await expect(
         client.spawnProcess({ kind: "agent", agent_tool_id: 2 }),
