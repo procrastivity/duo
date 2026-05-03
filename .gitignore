@@ -14,3 +14,6 @@ vitest.config.js.map
 # Local dev configs — fixtures live under notes/manual-testing/fixtures/
 duo.config.yaml
 duo.policy.yaml
+
+# Per-user Claude Code config (skills/ are project-shareable and committed)
+.claude/settings.local.json

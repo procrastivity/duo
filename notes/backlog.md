@@ -29,3 +29,8 @@ Use this file for candidate items not yet committed to an active roadmap step.
 - Candidate: duo packaging — install UX (GitHub Releases / curl|sh / Homebrew tap) (Channel 4)
   - Why now / why later: depends on Channel 2 binary artifacts existing with stable filenames; staged rollout (a) Releases polish → (b) curl|sh → (c) Homebrew tap, ordered by maintenance cost
   - Links: notes/proposals/duo-packaging-install-ux.md, ~/.claude/plans/i-want-to-better-peppy-shamir.md
+- ID: solo-todo-223
+  Candidate: Customizable grouping names and selection criteria for model tiers
+  - Why now / why later: extends the small/medium/large tier system from the prior (placeholder) Roadmap 1 step 2 work — users want to add tiers (e.g. `[xs,s,m,l,xl]`, `[cheap,standard,fancy]`) and customize which models map to each tier. Defer until packaging channels stabilize and a real adoption signal arrives; touches config schema design, validation, and backwards-compat with default tier names — risks becoming a config-file nightmare without that signal.
+  - Open questions (from todo): ordered vs unordered tier labels; migration/aliasing of existing `small/medium/large` references; expression complexity for selection criteria vs simple match-by-attribute.
+  - Links: solo://proj/6/todo/customizable-groupin--223
