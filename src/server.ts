@@ -119,3 +119,24 @@ export async function createServer(
   }
   return new DuoServer(config, undefined, logger);
 }
+
+export interface RunServerOptions {
+  cwd?: string;
+}
+
+/**
+ * Boot the Duo MCP server. Loads config + policy, constructs the server,
+ * and starts the stdio transport. Throws on any startup error.
+ */
+export async function runServer(opts: RunServerOptions = {}): Promise<void> {
+  const cwd = opts.cwd ?? process.cwd();
+  const { loadConfig } = await import("./cli/config-loader.js");
+  const loaded = loadConfig({ cwd });
+  const rawConfig: Record<string, unknown> = {
+    solo: loaded.config.solo,
+    ...(loaded.config.policy !== undefined && { policy: loaded.config.policy }),
+  };
+  const logger = createLogger();
+  const server = await createServer(rawConfig, logger);
+  await server.start();
+}

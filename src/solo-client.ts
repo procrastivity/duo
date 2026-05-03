@@ -170,6 +170,26 @@ export class SoloClient {
     return SoloProjectsSchema.parse(JSON.parse(text));
   }
 
+  /**
+   * Generic passthrough for tools/call. The CLI uses this for thin Solo
+   * wrappers (`get_process_status`, `stop_process`, etc.) where we don't want
+   * to bake schemas into the client. Returns the parsed text content (JSON or
+   * a string), or undefined if no text content was returned.
+   */
+  async callTool<T = unknown>(
+    name: string,
+    args: Record<string, unknown> = {},
+  ): Promise<T> {
+    const result = await this._request("tools/call", { name, arguments: args });
+    const text = this._extractTextOrEmpty(result);
+    if (text === undefined) return undefined as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as T;
+    }
+  }
+
   async spawnProcess(args: SoloSpawnArgs): Promise<SoloSpawnResult> {
     const projectId = args.project_id ?? this._projectId;
     const callArgs: Record<string, unknown> = {
@@ -194,14 +214,19 @@ export class SoloClient {
   }
 
   private _extractText(result: unknown): string {
+    const text = this._extractTextOrEmpty(result);
+    if (text === undefined) {
+      throw new Error("tools/call returned no text content");
+    }
+    return text;
+  }
+
+  private _extractTextOrEmpty(result: unknown): string | undefined {
     const response = result as {
       content?: Array<{ type: string; text?: string }>;
     };
     const textContent = response.content?.find((c) => c.type === "text");
-    if (!textContent?.text) {
-      throw new Error("tools/call returned no text content");
-    }
-    return textContent.text;
+    return textContent?.text;
   }
 
   private _handleMessage(message: unknown): void {

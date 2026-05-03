@@ -29,6 +29,11 @@ export class StdioTransport implements Transport {
       env: env ? { ...process.env, ...env } : undefined,
     });
 
+    // execa subprocesses double as a promise that rejects on non-zero exit
+    // or signal termination. We intentionally kill the child on close(), so
+    // swallow that rejection — surfaces via onerror/onclose instead.
+    void (subprocess as unknown as Promise<unknown>).catch(() => {});
+
     this._process = subprocess as unknown as ChildProcess;
 
     subprocess.stdout?.on("data", (chunk: Buffer | string) => {
