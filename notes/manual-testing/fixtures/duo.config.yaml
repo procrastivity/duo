@@ -1,0 +1,26 @@
+# Duo runbook fixture config.
+#
+# Copy to <repo-root>/duo.config.yaml and edit `command` / `args`
+# to match your local Solo install. The runbook (00-setup.md §4)
+# walks through the necessary changes.
+#
+# Note: the project README's flat `solo.transportType: "stdio"`
+# example does NOT validate against src/config.ts. Use the nested
+# shape below.
+
+solo:
+  transport:
+    type: stdio
+    # REPLACE with the absolute path to your Solo binary:
+    command: /absolute/path/to/solo
+    # REPLACE with whatever invocation Solo expects to start its
+    # MCP server. Common forms:
+    #   args: ["mcp", "serve"]
+    #   args: []                   # if the binary is the MCP server itself
+    args: ["mcp", "serve"]
+
+  # Optional: override SOLO_PROCESS_ID / SOLO_PROJECT_ID env vars.
+  # Leave commented for the runbook unless you specifically want
+  # every spawn to default into a project.
+  # processId: "12345"
+  # projectId: "42"

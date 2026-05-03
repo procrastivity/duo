@@ -1,0 +1,43 @@
+# Duo runbook fixture policy.
+#
+# Used by 03-policy-overrides.md. Every example below is commented
+# out — uncomment ONE block at a time, restart Duo, exercise, then
+# re-comment before moving to the next exercise.
+#
+# Default location Duo looks at: <cwd>/duo.policy.yaml.
+# Override with DUO_POLICY=/path/to/file.
+
+# -----------------------------------------------------------------
+# 03 §1 — command_tokens, extend mode (add a project token)
+# -----------------------------------------------------------------
+# command_tokens:
+#   large:
+#     mode: extend
+#     tokens:
+#       - pro
+
+# -----------------------------------------------------------------
+# 03 §2 — command_tokens, replace mode (discard built-in tokens)
+# -----------------------------------------------------------------
+# command_tokens:
+#   large:
+#     mode: replace
+#     tokens:
+#       - flagship
+
+# -----------------------------------------------------------------
+# 03 §3 — selection.preference (custom strategy, deterministic pick)
+# -----------------------------------------------------------------
+# selection:
+#   preference:
+#     - tool_type: opencode
+#     - tool_type: codex
+
+# -----------------------------------------------------------------
+# 03 §5 — schema rejection (this should FAIL to load)
+# -----------------------------------------------------------------
+# command_tokens:
+#   large:
+#     mode: replace_all
+#     tokens:
+#       - flagship
