@@ -4,17 +4,18 @@
   "description": "Solo MCP companion for agent tier-based selection and override-aware orchestration.",
   "type": "module",
   "bin": {
-    "duo": "./dist/index.js"
+    "duo": "./dist/duo.mjs"
   },
   "engines": {
     "node": ">=22.0.0"
   },
   "files": [
-    "dist",
+    "dist/duo.mjs",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:bundle",
+    "build:bundle": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/duo.mjs --banner:js='#!/usr/bin/env node' --legal-comments=none && chmod +x dist/duo.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test"
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
+    "esbuild": "^0.28.0",
     "typescript": "^5.8.3",
     "vitest": "^2.1.8"
   },
