@@ -12,21 +12,29 @@ export type SoloAgentTool = z.infer<typeof SoloAgentToolSchema>;
 
 export const SoloAgentToolsSchema = z.array(SoloAgentToolSchema);
 
+export const SoloProjectSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  path: z.string(),
+});
+
+export type SoloProject = z.infer<typeof SoloProjectSchema>;
+
+export const SoloProjectsSchema = z.array(SoloProjectSchema);
+
 export const SoloSpawnArgsSchema = z.object({
   kind: z.literal("agent"),
   agent_tool_id: z.number(),
   name: z.string().optional(),
-  project_id: z.string().optional(),
+  project_id: z.number().int().optional(),
 });
 
 export type SoloSpawnArgs = z.infer<typeof SoloSpawnArgsSchema>;
 
 export const SoloSpawnResultSchema = z
   .object({
-    process_id: z.string(),
+    process_id: z.number(),
     name: z.string(),
-    agent_tool_id: z.number(),
-    project_id: z.string(),
   })
   .passthrough();
 

@@ -18,6 +18,28 @@ describe("parseConfig", () => {
     expect(config.solo.transport.args).toEqual(["mcp", "serve"]);
   });
 
+  it("rejects deprecated solo.processId field (strict schema)", () => {
+    expect(() =>
+      parseConfig({
+        solo: {
+          transport: { type: "stdio", command: "solo" },
+          processId: "anything",
+        },
+      }),
+    ).toThrow(/processId|unrecognized/i);
+  });
+
+  it("rejects deprecated solo.projectId field (strict schema)", () => {
+    expect(() =>
+      parseConfig({
+        solo: {
+          transport: { type: "stdio", command: "solo" },
+          projectId: "anything",
+        },
+      }),
+    ).toThrow(/projectId|unrecognized/i);
+  });
+
   it("throws field-level error for missing required field", () => {
     expect(() =>
       parseConfig({

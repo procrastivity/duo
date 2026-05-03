@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PolicySchema, type Policy } from "./types/policy.js";
+import { PolicySchema } from "./types/policy.js";
 
 export const soloStdioTransportSchema = z
   .object({
@@ -16,8 +16,6 @@ export const soloConfigSchema = z
     solo: z
       .object({
         transport: soloStdioTransportSchema,
-        processId: z.string().min(1, "solo.processId cannot be empty").optional(),
-        projectId: z.string().min(1, "solo.projectId cannot be empty").optional(),
       })
       .strict(),
     policy: PolicySchema.optional(),
@@ -25,16 +23,6 @@ export const soloConfigSchema = z
   .strict();
 
 export type SoloConfig = z.infer<typeof soloConfigSchema>;
-
-type EnvSource = Record<string, string | undefined>;
-
-export const detectSoloEnv = (env: EnvSource = process.env): {
-  processId?: string;
-  projectId?: string;
-} => ({
-  processId: env.SOLO_PROCESS_ID,
-  projectId: env.SOLO_PROJECT_ID,
-});
 
 const formatZodError = (error: z.ZodError): string => {
   const first = error.issues[0];
@@ -47,29 +35,8 @@ const formatZodError = (error: z.ZodError): string => {
   return `${path}: ${first.message}`;
 };
 
-export const parseConfig = (
-  input: unknown,
-  env: EnvSource = process.env,
-): SoloConfig => {
-  const source = (input ?? {}) as Record<string, unknown>;
-  const detected = detectSoloEnv(env);
-
-  const merged = {
-    ...source,
-    solo: {
-      ...(source.solo as Record<string, unknown> | undefined),
-      processId:
-        ((source.solo as Record<string, unknown> | undefined)?.processId as
-          | string
-          | undefined) ?? detected.processId,
-      projectId:
-        ((source.solo as Record<string, unknown> | undefined)?.projectId as
-          | string
-          | undefined) ?? detected.projectId,
-    },
-  };
-
-  const result = soloConfigSchema.safeParse(merged);
+export const parseConfig = (input: unknown): SoloConfig => {
+  const result = soloConfigSchema.safeParse(input ?? {});
 
   if (!result.success) {
     throw new Error(formatZodError(result.error));
