@@ -106,10 +106,9 @@ When a step ships:
 2. Capture hardened design decisions (spec update and/or ADR as needed).
 3. Update roadmap if reality drifted.
 4. Append step retro in this file.
-5. Update `CHANGELOG.md` at round shipping gate.
+5. If this step closes a round, run the round-close steps in `notes/release-process.md` (CHANGELOG, version bump, tag, push — defined per project).
 6. Prepare next step workplan.
 7. Get human review before coding next step.
-8. Push `HEAD` and any new tag(s) to `origin` when the round closes (or per your team policy for intermediate steps).
 
 ---
 

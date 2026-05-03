@@ -32,6 +32,7 @@ FORCE=0
 PROTECTED_PATHS="
 notes/backlog.md
 notes/project-planning-workflow-notes.md
+notes/release-process.md
 notes/proposals/README.md
 notes/proposals/intake-output-template.md
 notes/roadmap/README.md
