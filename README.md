@@ -87,15 +87,18 @@ solo:
 **Configuration fields**:
 
 - `solo.transportType` — (required) set to `"stdio"` for standard stdio command-spawn transport
-- `solo.processId` — (optional) Solo process ID; overrides `SOLO_PROCESS_ID` environment variable if set
-- `solo.projectId` — (optional) Solo project ID; used as fallback for `spawn_agent` when `project_id` is not provided in the request
+
+Project and process scope are **not** YAML fields. They resolve once at server start:
+- `SOLO_PROJECT_ID` (env) is the hard override. If set, Duo uses it directly.
+- Otherwise Duo calls Solo's `list_projects` and picks the project whose `path` is the longest prefix of the current working directory.
+- If `SOLO_PROCESS_ID` is set, Duo calls Solo's `bind_session_process` once at connect; subsequent process-scoped calls are routed to that process automatically by Solo.
 
 ### Environment variables
 
 - `DUO_CONFIG` — path to the configuration file (default: `duo.config.yaml`)
 - `DUO_POLICY` — path to the policy file (default: `duo.policy.yaml`; silently ignored if not present unless explicitly set)
-- `SOLO_PROCESS_ID` — Solo process ID (used if not set in `duo.config.yaml`)
-- `SOLO_PROJECT_ID` — Solo project ID (used as fallback for spawn requests if not set in config or request)
+- `SOLO_PROJECT_ID` — Solo project ID (integer). Hard override; bypasses pwd→project lookup.
+- `SOLO_PROCESS_ID` — Solo process ID (integer). When set, Duo binds the MCP session to this process at connect.
 
 ## Tools
 

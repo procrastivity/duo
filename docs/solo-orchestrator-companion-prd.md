@@ -192,8 +192,8 @@ Context: Operators need to understand why a tier resolved to a specific tool wit
 **[P1] REQ-010 — The companion supports local YAML policy overrides for model token classification and ranking**  
 Context: Different installations may use custom agent tools before Solo exposes richer runtime metadata.
 
-**[P1] REQ-011 — The companion uses `SOLO_PROJECT_ID` and `SOLO_PROCESS_ID` as best-effort defaults when present**  
-Context: Solo-managed agents can provide useful context, but explicit config remains the primary path.
+**[P1] REQ-011 — The companion resolves Solo project and process scope once at MCP-session connect**
+Context: At connect, Duo determines its `project_id` from `SOLO_PROJECT_ID` (hard override) or, if unset, by calling Solo `list_projects` and selecting the longest path-prefix match against the cwd. If `SOLO_PROCESS_ID` is set, Duo calls Solo `bind_session_process` once at connect; Solo then injects that process into every subsequent process-scoped `tools/call` on the session. Project and process IDs are not configurable in YAML — the env-var + pwd-derive path is authoritative, since project IDs differ per Solo installation and process IDs are per-launch ephemeral.
 
 **[P1] REQ-012 — The companion exposes structured logs for resolution and spawn decisions**  
 Context: Local debugging needs machine-readable traces without requiring a full observability stack.
