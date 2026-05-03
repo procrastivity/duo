@@ -409,3 +409,45 @@ Use this for each shipped step.
 - Channel 2 (Bun binaries) remains independent and proposal-ready.
 - Channel 4 (Install UX) depends on Channel 2 — no change.
 - No carryover bugs or follow-up todos from this step. Optional refinement (CI guardrail for dynamic-import grep) deferred to builder discretion in the channel that introduces CI-relevant tooling.
+
+---
+
+### Step 1 Retro — Roadmap 2 (Nix flake `packages.duo`, Channel 3) — 2026-05-03
+
+**Round framing**: Project's second shipped round (Channel 3 of the duo packaging plan). Single-step round per intake recommendation; no decomposition. Unblocked because Round 1 (Channel 1, npm esbuild bundle) shipped `dist/duo.mjs` earlier the same day.
+
+**Duration**: ~30 minutes coordinator wall-clock from `build/go/approved` to step-shipped (Batch A spawn → Batch B Linux verification complete). Build phase itself was short — the dominant wait was the cold x86_64-linux Docker pull+build (2m24s).
+
+**What worked**:
+- Researcher-first Phase 1 resolved all four locked-open questions in one pass and produced a concrete `lib.fileset.toSource` allow-list and explicit `npmBuildScript = "build";` recommendation. Builder did not need any consult during build — the locked workplan was complete enough to execute straight through.
+- Batch A (Tasks 1+2: derivation + darwin verify) ran clean in a single builder pass. The `lib.fakeHash` → real-hash recompute flow worked exactly as documented in the proposal's comment block. Hash was reproducible across darwin and x86_64-linux on first try (no surprise drift).
+- Builder-02's clean escalation on Docker daemon down: it followed the spec ("escalate, do not attempt to start the daemon"), tagged `needs-human` on todo #243, and used the wait window to complete the parts of Task 4 that did not depend on Task 3 (npm pack sanity, draft PR body with TODO placeholder for the Linux block). When the human unblocked, the only remaining work was a single Docker run + comment patch.
+- `lib.fileset.toSource` allow-list approach handled significant repo noise (notes, .claude, .direnv, Python tooling, workflow-portable-stub) cleanly without enumerating exclusions.
+- `pkgs.buildNpmPackage` defaults handled esbuild's optionalDependencies postinstall correctly — the explicit recommendation to NOT pass `--ignore-scripts` proved correct on first build.
+
+**What didn't**:
+- Environmental dependency (Docker/OrbStack) wasn't validated at coordinator-bootstrap. Batch B builder discovered the daemon was down only after running `docker version`; a coordinator-side preflight of `docker info` before spawning Batch B would have caught this earlier and let the human start OrbStack while Batch A was still running. Net cost was small (~5 min wait), but worth noting.
+- Workplan's "Task 4 — PR description" assumed a single contiguous PR body composition; partial completion across the Docker blocker meant the builder split the work into "fill what I can now, leave a TODO for the Linux block" — workable but slightly awkward. Future workplans where one task depends on a flaky environment should structure verification artifacts as appendable sections from the start.
+
+**Lessons for Round 3+**:
+- Add an "environmental preflight" step to coordinator-bootstrap when a step requires external tooling (Docker, VMs, network endpoints): coordinator runs the smallest connectivity check (e.g., `docker info`) before spawning the dependent batch. Cheap insurance.
+- For builds that target multiple platforms via emulation (aarch64-darwin → x86_64-linux), include the emulation-overhead expectation in the workplan ("expect 5–25 min on cold cache"). Builder-02 did not hit this, but timer ceiling (50min) was sized for it correctly.
+- `lib.fileset.toSource` allow-list pattern is repeatable for any future Nix derivation in this repo — promote to a project-level recipe. Comment "extend allow-list if `npm run build` reads new top-level paths" should stay attached.
+
+**Metrics**:
+- Tests: not re-run this round (Round 1's 248 still passing; flake change is build-system, not runtime).
+- Commits (build): 1 — `8afbe01` (Tasks 1+2, Batch A; flake.nix only). Batch B was verification-only, no commits.
+- Commits (planning): pending — this close-out commit will be the second.
+- Builders spawned: 2 — step-01-builder-01 (Batch A, opus, completed cleanly), -02 (Batch B, opus, escalated on Docker daemon then closed; coordinator ran the unblocked Docker run directly rather than respawning).
+- Researcher: 1 long-lived (step-01-researcher, opus). Used only in Phase 1 (workplan refinement); zero consults during build.
+- Tier assignments: large (3 — coordinator, researcher, both builders all opus per orchestrator direction).
+- Build artifact: `result/bin/duo` (222 B makeWrapper script) + `result/lib/duo/duo.mjs` (1.5 MB esbuild bundle). Reproducible across darwin and linux.
+- `npmDepsHash`: `sha256-HJcKVcQlA7qwy+pW8dpCEmyHkQqheh6pA+yJBIkHt4Y=`.
+
+**Shipping criteria verified**: All 8 checked off (DoD in archived workplan; mirrored in todo #244 comment 189 PR body draft).
+
+**Next step readiness**:
+- Channel 3 (Nix flake) shipped locally; awaiting human-authorized push (`gh pr create` deferred to human signal per round constraint).
+- Channel 2 (Bun binaries) remains independent and proposal-ready.
+- Channel 4 (Install UX) depends on Channel 2 — no change.
+- No carryover bugs or follow-up todos. Optional refinement (CI job for `nix build .#duo` on `ubuntu-latest`) deferred per roadmap §"Open optional refinements" — backlog candidate when CI-tooling round is opened.
