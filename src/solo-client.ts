@@ -180,7 +180,15 @@ export class SoloClient {
     name: string,
     args: Record<string, unknown> = {},
   ): Promise<T> {
-    const result = await this._request("tools/call", { name, arguments: args });
+    // Auto-inject project_id when the client resolved one and the caller
+    // didn't supply it. Solo's bind_session_process covers process scope
+    // when SOLO_PROCESS_ID is set, but the pwd-derived project_id still
+    // needs to be threaded onto each call.
+    const merged: Record<string, unknown> =
+      args.project_id === undefined && this._projectId !== undefined
+        ? { ...args, project_id: this._projectId }
+        : args;
+    const result = await this._request("tools/call", { name, arguments: merged });
     const text = this._extractTextOrEmpty(result);
     if (text === undefined) return undefined as T;
     try {
