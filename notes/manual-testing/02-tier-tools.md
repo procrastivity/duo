@@ -126,19 +126,21 @@ Pick a tier from step 1 that's `available: true`. Ask Claude:
 > `{ "tier": "<tier>", "name": "duo-runbook-test" }` and show me
 > the response.
 
-Or via driver, parameterized as `[tier] [name] [project_id]`:
+Or via driver, parameterized as `[tier] [name] [project_id]`. The
+`project_id` argument, when supplied, must be an integer (Solo's
+`i64` project ID — find it via `mcp__solo__list_projects`):
 
 ```sh
 ./notes/manual-testing/scripts/02-spawn-agent.sh medium
 ./notes/manual-testing/scripts/02-spawn-agent.sh medium my-helper
-./notes/manual-testing/scripts/02-spawn-agent.sh medium my-helper proj-A
+./notes/manual-testing/scripts/02-spawn-agent.sh medium my-helper 6
 ```
 
 Expected response shape:
 
 ```json
 {
-  "process_id": "<string>",
+  "process_id": <number>,
   "name": "duo-runbook-test",
   "tier": "<tier>",
   "tool": {
@@ -148,18 +150,19 @@ Expected response shape:
     "command": "<string>",
     "classification_source": "command" | "name_fallback"
   },
-  "project_id": "<string>"   // present only if config or request supplied one
+  "project_id": <number>   // call override OR client-resolved scope
 }
 ```
 
 Acceptance:
 
-- `process_id` is a non-empty string (Solo's surrogate ID).
+- `process_id` is a positive integer (Solo's i64 surrogate ID).
 - `name` matches the request (Solo accepts the supplied name).
 - `tool` matches what `resolve_agent_tool` returned for the same
   tier on a representative call.
-- `project_id` reflects what was supplied or, if neither config nor
-  request supplied one, is omitted from the response.
+- `project_id` reflects either the per-call override or the scope
+  Duo resolved at connect (env var or pwd→`list_projects`
+  longest-match). If both are unset, the field is omitted.
 
 ### Confirm the spawn landed in Solo
 
@@ -177,23 +180,29 @@ agent tool. `status` should be `Running`.
 Stop it when you're done:
 
 ```
-mcp__solo__stop_process { "process_id": "<id>" }
+mcp__solo__stop_process { "process_id": <id> }
 ```
 
 ### `project_id` variants
 
 Repeat the spawn three ways and confirm what comes back:
 
-1. Config-provided default: set `solo.projectId` in
-   `duo.config.yaml`, restart Duo, call `spawn_agent` without
-   `project_id`. The response includes `project_id` matching the
-   config value.
-2. Per-call override: leave config as before, pass `project_id:
-   "<other>"` in the call. Response uses the call value, not the
-   config value.
-3. Neither: clear `solo.projectId` from config, restart Duo, call
-   without `project_id`. Response omits the field; Solo applies
-   whatever default scope the binary itself uses.
+1. **Auto-resolved scope (default).** Launch Duo from this repo root
+   with no `SOLO_PROJECT_ID` set. Call `spawn_agent` without
+   `project_id`. SoloClient's connect-time pwd→`list_projects`
+   lookup picks the matching project; the response's `project_id`
+   reflects that. Verify with `mcp__solo__list_projects`.
+2. **Env override.** Restart Duo with `SOLO_PROJECT_ID=<n>` set
+   (use the integer ID of a different Solo project). Call
+   `spawn_agent` without `project_id`. The env value wins over pwd;
+   response `project_id` matches the env.
+3. **Per-call override.** Leave env as before; pass
+   `project_id: <other>` in the request. The call value wins over
+   client-resolved scope. Response uses the call value.
+4. **Neither resolves.** Restart Duo from a directory unknown to
+   Solo (e.g. `/tmp`) with no `SOLO_PROJECT_ID`. Call without
+   `project_id`. Solo will reject the spawn with a clear error
+   (project required); Duo surfaces it as `spawn_rejected`.
 
 ### Failure case — unsupported tier
 

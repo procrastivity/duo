@@ -49,7 +49,7 @@ The `04-log-walkthrough.sh` script also honors `DUO_OUT` /
 | `02-list-agent-tiers.sh` | `list_agent_tiers` | 02-tier-tools.md §1; 03-policy-overrides.md §2 |
 | `02-resolve-agent-tool.sh [tier]` | `resolve_agent_tool` (default `medium`) | 02-tier-tools.md §2; 03-policy-overrides.md §1, §3 |
 | `02-resolve-unsupported.sh` | `resolve_agent_tool tier=purple` failure case | 02-tier-tools.md §2 |
-| `02-spawn-agent.sh [tier] [name] [project_id]` | `spawn_agent` | 02-tier-tools.md §3 |
+| `02-spawn-agent.sh [tier] [name] [project_id]` | `spawn_agent` (project_id is an integer) | 02-tier-tools.md §3 |
 | `02-spawn-unsupported.sh` | `spawn_agent tier=purple` failure case | 02-tier-tools.md §3 |
 | `04-log-walkthrough.sh [tier]` | multi-call sequence with split stdout/stderr capture | 04-logging.md §1 |
 

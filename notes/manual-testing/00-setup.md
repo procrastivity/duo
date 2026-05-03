@@ -114,10 +114,20 @@ solo:
 > `solo.transport.{type,command,args}` shape above (and in the
 > fixture).
 
-`solo.processId` and `solo.projectId` are optional. Leave them
-unset for the runbook unless you want every spawn to default into a
-specific Solo project — `02-tier-tools.md` exercises both the
-default and the per-call `project_id` paths.
+**Project / process scope is not a YAML field.** Duo resolves both
+at connect time:
+
+- `SOLO_PROJECT_ID` (env, integer) is a hard override. If unset, Duo
+  calls Solo's `list_projects` and selects the project whose `path` is
+  the longest prefix of the cwd Duo was launched from.
+- `SOLO_PROCESS_ID` (env, integer), if set, triggers a one-shot
+  `bind_session_process` at connect; Solo then routes process-scoped
+  calls to that process for the rest of the session.
+
+For the runbook, leaving both unset and launching Duo from this repo
+root (`/.../duo`) is the easiest path — pwd derivation will pick the
+matching Solo project. `02-tier-tools.md` exercises both the
+auto-resolved scope and the per-call `project_id` override.
 
 ## 5. duo.policy.yaml (optional, runbook step 03)
 
