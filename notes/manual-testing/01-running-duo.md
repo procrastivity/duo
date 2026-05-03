@@ -133,15 +133,10 @@ cat /tmp/duo.err       # operational logs
   but blocks step 02.
 - **`initialize` and `tools/list` respond, but any tool call into
   Solo (`list_agent_tiers`, `resolve_agent_tool`, `spawn_agent`)
-  hangs with no response** — known Duo bug as of current `main`:
-  `SoloClient.connect()` (`src/solo-client.ts:34-45`) starts the
-  stdio transport but never performs an MCP `initialize` handshake
-  with Solo. Solo waits for the handshake forever, so any
-  `tools/call` Duo proxies to Solo never returns. Surface in step
-  02 will not produce live responses until Duo sends `initialize`
-  + `notifications/initialized` to Solo before its first
-  `tools/call`. Until that's fixed, Option A (driving from Claude
-  Code) hits the same wall — the handshake gap is upstream of the
-  transport choice.
+  hangs with no response** — earlier symptom of a missing
+  Duo→Solo MCP handshake. `SoloClient.connect()` now performs
+  `initialize` + `notifications/initialized` against Solo before
+  returning. If you still see this on a fresh build, confirm
+  `dist/index.js` was rebuilt after pulling — `npm run build`.
 
 You're ready for [`02-tier-tools.md`](./02-tier-tools.md).

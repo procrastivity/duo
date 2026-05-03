@@ -10,3 +10,7 @@ vitest.config.js
 vitest.config.d.ts
 vitest.config.d.ts.map
 vitest.config.js.map
+
+# Local dev configs — fixtures live under notes/manual-testing/fixtures/
+duo.config.yaml
+duo.policy.yaml

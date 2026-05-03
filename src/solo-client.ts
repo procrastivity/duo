@@ -42,6 +42,16 @@ export class SoloClient {
       this._pending.clear();
     };
     await this._transport.start();
+
+    await this._request("initialize", {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "duo", version: "0.1.0" },
+    });
+    await this._transport.send({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+    });
   }
 
   async disconnect(): Promise<void> {

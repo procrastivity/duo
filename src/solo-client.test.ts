@@ -9,7 +9,23 @@ function createMockTransport() {
     onerror: undefined,
     onclose: undefined,
     start: vi.fn().mockResolvedValue(undefined),
-    send: vi.fn().mockResolvedValue(undefined),
+    // Default send: auto-respond to the `initialize` handshake so
+    // `await client.connect()` resolves in tests. Tests that exercise
+    // tools/call replace `transport.send` after connect.
+    send: vi.fn().mockImplementation(async (message: unknown) => {
+      const msg = message as { id?: number; method?: string };
+      if (msg.method === "initialize" && msg.id !== undefined) {
+        transport.simulateMessage({
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            serverInfo: { name: "solo-mock", version: "0" },
+          },
+        });
+      }
+    }),
     close: vi.fn().mockResolvedValue(undefined),
     simulateMessage(msg: unknown) {
       transport.onmessage?.(msg);
@@ -52,6 +68,22 @@ describe("SoloClient", () => {
     const client = new SoloClient(transport);
     await client.connect();
     expect(transport.start).toHaveBeenCalledOnce();
+  });
+
+  it("connect performs the MCP handshake: initialize then notifications/initialized", async () => {
+    const transport = createMockTransport();
+    const client = new SoloClient(transport);
+
+    await client.connect();
+
+    const calls = (transport.send as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0] as { method?: string; id?: number },
+    );
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[0].method).toBe("initialize");
+    expect(calls[0].id).toBeTypeOf("number");
+    expect(calls[1].method).toBe("notifications/initialized");
+    expect(calls[1].id).toBeUndefined();
   });
 
   describe("listAgentTools", () => {
