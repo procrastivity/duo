@@ -368,3 +368,44 @@ Use this for each shipped step.
 - Documentation complete (README, PUBLISHING.md, smoke-pack.sh).
 - Proposal intake empty; Round 2 intake natural next move.
 
+
+---
+
+### Step 1 Retro — Roadmap 1 (npm esbuild bundle, Channel 1) — 2026-05-03
+
+**Round framing**: First round under the current roadmap-1 (npm bundle); single-step round per intake recommendation.
+
+**Duration**: ~22 minutes coordinator wall-clock from `build/go/approved` to step-shipped report (Batch A 21:21 → Batch C commit `deef948` 21:43 ≈).
+
+**What worked**:
+- Researcher-first Phase 1 caught the `npm pack` README criterion gap before any code landed; orchestrator amendment took ~minutes vs. discovering it post-build.
+- Batch ordering (A audit → B rewire → C verify) stayed correct under the build defects discovered in Batch C — failures were contained to the verification batch and self-fixable.
+- Single-bundled commit for Batch B (Tasks 2+3) prevented an intermediate-broken `npm run build` state.
+- Builder-03 self-diagnosed both the duplicate-shebang and the cross-spawn `createRequire` issues without escalation; restructured to a programmatic `scripts/build.mjs` build script and proceeded. Coordinator did not need to intervene with research.
+
+**What didn't**:
+- Permission-prompt thrash: every `npm`, `git`, `node`, and bash invocation halted the builder for an approval. Coordinator paid ~5 round-trips per builder. Pre-approving common toolchain commands at builder spawn (e.g., via project `.claude/settings.json` allowlist or telling the builder to take "always allow" on first prompt) would cut wall-clock noticeably.
+- Proposal §Implementation notes underspecified the bundle invocation: the inline `--banner:js="#!/usr/bin/env node"` flag both clashed with the source-file shebang and didn't accommodate the `createRequire` shim required by `cross-spawn` (CJS dep transitively pulled in by `@modelcontextprotocol/sdk` and `execa`). Researcher's pre-build flag review didn't catch this — the failure mode only surfaces under `node dist/duo.mjs` runtime, not under `npm run typecheck`.
+- README/`npm pack` shipping criterion needed amending mid-Phase 1 (recoverable, but a sign the proposal didn't pre-check `npm pack --dry-run` against the proposed `files` array).
+
+**Lessons for Round 2**:
+- For any proposal that touches a build pipeline, include a "minimal repro" section that lists the exact post-build smoke command and its expected first-line output. Would have caught the shebang collision at intake.
+- For ESM bundling proposals where any transitive dep might be CJS, add a "dynamic require" check to the negative-fingerprint grep family (e.g., `grep -rln "require(" node_modules/.../dist`). Would have flagged cross-spawn.
+- Builder spawn prompts should explicitly say "press Shift+Tab early to enable accept-edits, and choose 'always allow' on first npm/git/node prompt" — the prompt I wrote for builder-03 included this and it still hit ~6 prompts. Worth promoting to the playbook builder-bootstrap section, or pre-allowlisting in `.claude/settings.json` as part of project setup.
+
+**Metrics**:
+- Tests: 248 passing (`npm run test`).
+- Commits (build): 2 — `c286f3d` (Tasks 2+3, Batch B), `deef948` (Tasks 4+6, Batch C).
+- Commits (planning): 1 — `9e73e94` (roadmap-1, step-01-workplan, backlog #223), produced by orchestrator/human after step-shipped.
+- Builders spawned: 3 — step-01-builder-01 (Batch A audit, sonnet), -02 (Batch B rewire, sonnet), -03 (Batch C verify+commit, sonnet).
+- Researcher: 1 long-lived (step-01-researcher, opus) for the full step.
+- Tier assignments: small (0), medium (3 builders), large (2 — coordinator + researcher per orchestrator direction).
+- Bundle size: 288.9 kB packed / 1.5 MB unpacked / 4 files (vs pre-rewire 51.7 kB / 246.4 kB / 131 files).
+
+**Shipping criteria verified**: All 10 checked off (see Step 1 step-shipped report; mirrored in `notes/roadmap/roadmap-1.md`).
+
+**Next step readiness**:
+- Channel 1 (npm bundle) shipped. Channel 3 (Nix flake) is now unblocked — its derivation has a stable `dist/duo.mjs` artifact to wrap.
+- Channel 2 (Bun binaries) remains independent and proposal-ready.
+- Channel 4 (Install UX) depends on Channel 2 — no change.
+- No carryover bugs or follow-up todos from this step. Optional refinement (CI guardrail for dynamic-import grep) deferred to builder discretion in the channel that introduces CI-relevant tooling.
