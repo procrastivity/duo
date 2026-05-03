@@ -8,6 +8,54 @@
 
 Solo's `spawn_process` tool remains directly available. Use Duo when you want tier-based selection, alternative listing, override-aware diagnostics, and structured resolution logs. Reach for direct `spawn_process` only for explicit one-off tooling overrides that don't fit the tier model. Playbooks and interactive agents should prefer the companion.
 
+Duo also ships a CLI for driving its tools (and a curated set of Solo passthroughs) directly from a shell — see [Command-line interface](#command-line-interface).
+
+## Command-line interface
+
+The `duo` binary is a CLI router. **Bare `duo` prints help.** Use `duo mcp` to start the MCP server (this is the form MCP clients should invoke).
+
+```text
+duo                       # print help
+duo mcp                   # run the MCP server (stdio)
+duo doctor                # run setup health checks
+duo whoami                # show resolved project + bound process
+duo project ls|status     # list / inspect Solo projects
+duo agent list            # show tier defaults + alternatives
+duo agent resolve <tier>  # show which tool would be chosen
+duo agent spawn <tier>    # spawn an agent process by tier
+duo proc ls|logs|grep|status|stop|restart|kill <id|name>
+duo version               # version + git sha
+duo config show|path      # inspect effective config
+```
+
+`duo doctor` is the fastest way to verify your setup: it checks the binary version, that `duo.config.yaml` parses, that the Solo binary is on `$PATH`, that the MCP handshake succeeds, and that connect-time scope resolution + `bind_session_process` work as expected. It exits non-zero on any failed check.
+
+### Cross-cutting flags
+
+- `--json` — emit JSON instead of a human-readable table (read commands).
+- `-q` / `--quiet` — suppress connect logs and chrome; emit only the primary identifier (e.g. process id).
+- `--cwd <path>` — override `process.cwd()` (handy for testing).
+- `NO_COLOR=1` and `--no-color` (on `duo doctor`) disable ANSI color.
+
+### Exit codes
+
+- `0` — success
+- `1` — user error (bad args, validation, config not found)
+- `2` — Solo error (server returned an error response; `{code, message}` printed to stderr)
+- `3` — connection error (handshake failed, transport died, no Solo binary)
+
+### Examples
+
+```bash
+duo doctor                              # verify setup
+duo agent spawn large --name worker-1   # spawn a large-tier agent
+duo proc ls --json | jq '.[] | .name'   # script-friendly output
+duo proc logs 298 --follow              # tail a process
+SOLO_PROJECT_ID=6 duo whoami            # one-shot project override
+```
+
+Errors always go to stderr; data always goes to stdout, so `duo proc ls --json | jq` is safe.
+
 ## Requirements
 
 - **Node.js**: ≥ 22.0.0
@@ -49,7 +97,7 @@ Register Duo as an MCP server in your MCP client configuration. Below is an exam
   "mcpServers": {
     "duo": {
       "command": "npx",
-      "args": ["-y", "@procrastivity/duo"],
+      "args": ["-y", "@procrastivity/duo", "mcp"],
       "env": {
         "DUO_CONFIG": "./duo.config.yaml"
       }
@@ -67,6 +115,7 @@ mcpServers:
     args:
       - -y
       - @procrastivity/duo
+      - mcp
     env:
       DUO_CONFIG: ./duo.config.yaml
 ```
