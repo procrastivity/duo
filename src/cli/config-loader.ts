@@ -9,7 +9,12 @@ export interface LoadedConfig {
   config: SoloConfig;
   configPath: string;
   policyPath: string | null;
+  usedDefaults: boolean;
 }
+
+const DEFAULT_RAW_CONFIG = {
+  solo: { transport: { type: "stdio" } },
+} as const;
 
 export interface LoadConfigOptions {
   cwd?: string;
@@ -47,12 +52,41 @@ export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
   const cwd = opts.cwd ?? process.cwd();
   const configPath = resolveConfigPath();
   let raw: unknown;
-  try {
-    raw = parseYaml(readFileSync(configPath, "utf8"));
-  } catch (err) {
-    throw new Error(
-      `Failed to read config from ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+  let usedDefaults = false;
+  if (!existsSync(configPath)) {
+    raw = structuredClone(DEFAULT_RAW_CONFIG) as Record<string, unknown>;
+    usedDefaults = true;
+  } else {
+    let fileContents: string;
+    try {
+      fileContents = readFileSync(configPath, "utf8");
+    } catch (err) {
+      throw new Error(
+        `Failed to read config from ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = parseYaml(fileContents);
+    } catch (err) {
+      throw new Error(
+        `Failed to parse config at ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const isEmptyObject =
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Object.keys(parsed as object).length === 0;
+    if (parsed === null || parsed === undefined || isEmptyObject) {
+      throw new Error(
+        `Config at ${configPath} is empty. Minimum required keys:\n  solo:\n    transport:\n      type: stdio\nOr delete the file to use defaults.`,
+      );
+    }
+
+    raw = parsed;
   }
 
   const policyPath = resolvePolicyPath(cwd);
@@ -77,5 +111,5 @@ export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
   }
 
   const config = parseConfig(raw);
-  return { config, configPath, policyPath: usedPolicyPath };
+  return { config, configPath, policyPath: usedPolicyPath, usedDefaults };
 };

@@ -89,10 +89,11 @@ export const doctorCommand = defineCommand({
       config = loaded.config;
       configPath = loaded.configPath;
       policyPath = loaded.policyPath;
+      const base = loaded.usedDefaults ? `${configPath} (defaults — file not found)` : configPath;
       checks.push({
         name: "duo config",
         status: "ok",
-        detail: policyPath ? `${configPath} (+ policy: ${policyPath})` : configPath,
+        detail: policyPath ? `${base} (+ policy: ${policyPath})` : base,
       });
     } catch (err) {
       checks.push({
