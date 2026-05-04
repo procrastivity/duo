@@ -360,5 +360,120 @@ describe("SoloClient", () => {
         client.spawnProcess({ kind: "agent", agent_tool_id: 2 }),
       ).rejects.toThrow(/process_id/);
     });
+
+    it("does not call send_input when no prompt is supplied", async () => {
+      const calledNames: string[] = [];
+      const transport = createMockTransport((name, args) => {
+        calledNames.push(name);
+        if (name === "spawn_process") return validSpawnResult;
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2 });
+      expect(calledNames).not.toContain("send_input");
+    });
+
+    it("calls send_input with prompt when prompt is provided (no agent_instructions)", async () => {
+      let sendInputArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") return validSpawnResult;
+        if (name === "send_input") {
+          sendInputArgs = args as Record<string, unknown>;
+          return {};
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2, prompt: "Do the thing" });
+
+      expect(sendInputArgs).toBeDefined();
+      expect(sendInputArgs?.process_id).toBe(111);
+      expect(sendInputArgs?.input).toBe("Do the thing");
+      expect(sendInputArgs?.project_id).toBe(6);
+    });
+
+    it("prepends agent_instructions to prompt when both are present", async () => {
+      let sendInputArgs: Record<string, unknown> | undefined;
+      const spawnResultWithInstructions: SoloSpawnResult = {
+        process_id: 111,
+        name: "my-helper",
+        agent_instructions: "You are running in project Duo.",
+      };
+      const transport = createMockTransport((name) => {
+        if (name === "spawn_process") return spawnResultWithInstructions;
+        if (name === "send_input") {
+          sendInputArgs = undefined; // will be set below
+          return {};
+        }
+        return [];
+      });
+      // Override to capture send_input args
+      const origSend = transport.send;
+      transport.send = vi.fn().mockImplementation(async (message: unknown) => {
+        const msg = message as {
+          id?: number;
+          method?: string;
+          params?: { name?: string; arguments?: unknown };
+        };
+        if (msg.method === "tools/call" && msg.params?.name === "send_input") {
+          sendInputArgs = msg.params.arguments as Record<string, unknown>;
+          transport.simulateMessage({
+            jsonrpc: "2.0",
+            id: msg.id,
+            result: { content: [{ type: "text", text: "{}" }] },
+          });
+          return;
+        }
+        return (origSend as any)(message);
+      });
+
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2, prompt: "Do the thing" });
+
+      expect(sendInputArgs).toBeDefined();
+      expect(sendInputArgs?.input).toBe("You are running in project Duo.\n\nDo the thing");
+    });
+
+    it("send_input uses caller-supplied project_id over client.projectId", async () => {
+      let sendInputArgs: Record<string, unknown> | undefined;
+      const origSend = createMockTransport((name) => {
+        if (name === "spawn_process") return validSpawnResult;
+        return [];
+      });
+      origSend.send = vi.fn().mockImplementation(async (message: unknown) => {
+        const msg = message as {
+          id?: number;
+          method?: string;
+          params?: { name?: string; arguments?: unknown };
+        };
+        if (msg.id === undefined) return;
+        if (msg.method === "initialize") {
+          origSend.simulateMessage({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2024-11-05", capabilities: {} } });
+          return;
+        }
+        if (msg.method === "tools/call") {
+          const name = (msg.params as any)?.name;
+          if (name === "send_input") {
+            sendInputArgs = (msg.params as any)?.arguments;
+            origSend.simulateMessage({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "{}" }] } });
+            return;
+          }
+          origSend.simulateMessage({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify(validSpawnResult) }] } });
+        }
+      });
+
+      const client = new SoloClient(origSend, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2, project_id: 99, prompt: "Go!" });
+
+      expect(sendInputArgs?.project_id).toBe(99);
+    });
   });
 });

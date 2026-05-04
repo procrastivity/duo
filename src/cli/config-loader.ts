@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseConfig, type SoloConfig } from "../config.js";
 import { loadPolicy } from "../policy.js";
@@ -14,15 +15,37 @@ export interface LoadConfigOptions {
   cwd?: string;
 }
 
-export const resolveConfigPath = (cwd: string = process.cwd()): string =>
-  process.env.DUO_CONFIG ?? resolve(cwd, "duo.config.yaml");
+/**
+ * Resolve the Duo config file path.
+ *
+ * Resolution order:
+ * 1. DUO_CONFIG env var — verbatim path (highest priority, existing behaviour)
+ * 2. $XDG_CONFIG_HOME/duo/config.yaml — if XDG_CONFIG_HOME is set
+ * 3. ~/.config/duo/config.yaml — unconditional XDG default fallback
+ *
+ * Note: cwd-relative lookup has been intentionally removed. Users previously
+ * relying on `duo.config.yaml` in cwd should move it to ~/.config/duo/config.yaml
+ * or set the DUO_CONFIG environment variable.
+ */
+export const resolveConfigPath = (): string => {
+  if (process.env.DUO_CONFIG) {
+    return process.env.DUO_CONFIG;
+  }
+
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+  if (xdgConfigHome) {
+    return join(xdgConfigHome, "duo", "config.yaml");
+  }
+
+  return join(homedir(), ".config", "duo", "config.yaml");
+};
 
 export const resolvePolicyPath = (cwd: string = process.cwd()): string =>
   process.env.DUO_POLICY ?? resolve(cwd, "duo.policy.yaml");
 
 export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
   const cwd = opts.cwd ?? process.cwd();
-  const configPath = resolveConfigPath(cwd);
+  const configPath = resolveConfigPath();
   let raw: unknown;
   try {
     raw = parseYaml(readFileSync(configPath, "utf8"));

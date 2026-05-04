@@ -40,16 +40,15 @@ describe("parseConfig", () => {
     ).toThrow(/projectId|unrecognized/i);
   });
 
-  it("throws field-level error for missing required field", () => {
-    expect(() =>
-      parseConfig({
-        solo: {
-          transport: {
-            type: "stdio",
-          },
+  it("accepts config without command (command is optional)", () => {
+    const config = parseConfig({
+      solo: {
+        transport: {
+          type: "stdio",
         },
-      }),
-    ).toThrow("solo.transport.command");
+      },
+    });
+    expect(config.solo.transport.command).toBeUndefined();
   });
 
   it("throws field-level error for invalid field type", () => {

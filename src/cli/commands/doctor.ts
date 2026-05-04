@@ -5,8 +5,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig, resolveConfigPath } from "../config-loader.js";
 import { StdioTransport } from "../../transport/stdio.js";
+import { resolveTransportCommand } from "../../transport/resolve-command.js";
 import { SoloClient } from "../../solo-client.js";
-import { writeJson, writeOut, writeErr, green, red, dim, yellow } from "../output.js";
+import { writeJson, writeOut, green, red, dim, yellow } from "../output.js";
 import type { SoloConfig } from "../../config.js";
 
 interface CheckResult {
@@ -81,7 +82,7 @@ export const doctorCommand = defineCommand({
 
     // 2. duo.config.yaml discovered + parses cleanly
     let config: SoloConfig | null = null;
-    let configPath = resolveConfigPath(cwd);
+    let configPath = resolveConfigPath();
     let policyPath: string | null = null;
     try {
       const loaded = loadConfig({ cwd });
@@ -102,14 +103,27 @@ export const doctorCommand = defineCommand({
     }
 
     // 3. Solo binary discoverable
+    let resolvedCommand: string | undefined;
     if (config) {
-      const cmd = config.solo.transport.command;
-      const resolved = which(cmd) ?? (existsSync(cmd) ? cmd : undefined);
-      checks.push({
-        name: "solo binary",
-        status: resolved ? "ok" : "fail",
-        detail: resolved ?? `${cmd} not found in PATH`,
-      });
+      const configured = config.solo.transport.command;
+      try {
+        resolvedCommand = resolveTransportCommand(configured);
+        const source = configured ? "configured" : "auto-detected";
+        const resolved = which(resolvedCommand) ?? (existsSync(resolvedCommand) ? resolvedCommand : undefined);
+        checks.push({
+          name: "solo binary",
+          status: resolved ? "ok" : "fail",
+          detail: resolved
+            ? `${resolved} (${source})`
+            : `${resolvedCommand} not found (${source})`,
+        });
+      } catch (err) {
+        checks.push({
+          name: "solo binary",
+          status: "fail",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
     } else {
       checks.push({ name: "solo binary", status: "skip", detail: "no config" });
     }
@@ -117,8 +131,8 @@ export const doctorCommand = defineCommand({
     // 4-9. Solo handshake + scope resolution
     let connectErr: unknown;
     let client: SoloClient | undefined;
-    if (config) {
-      const transport = new StdioTransport(config.solo.transport);
+    if (config && resolvedCommand) {
+      const transport = new StdioTransport({ ...config.solo.transport, command: resolvedCommand });
       const log = {
         info: () => {},
         warn: () => {},

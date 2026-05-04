@@ -1,4 +1,5 @@
 import { StdioTransport } from "../transport/stdio.js";
+import { resolveTransportCommand } from "../transport/resolve-command.js";
 import { SoloClient, SoloClientError } from "../solo-client.js";
 import { loadConfig, type LoadedConfig } from "./config-loader.js";
 import { writeErr } from "./output.js";
@@ -29,7 +30,15 @@ export const connectSolo = async (opts: ConnectOptions = {}): Promise<ConnectedS
     process.exit(EXIT_USER_ERROR);
   }
 
-  const transport = new StdioTransport(loaded.config.solo.transport);
+  let command: string;
+  try {
+    command = resolveTransportCommand(loaded.config.solo.transport.command);
+  } catch (err) {
+    writeErr(err instanceof Error ? err.message : String(err));
+    process.exit(EXIT_USER_ERROR);
+  }
+
+  const transport = new StdioTransport({ ...loaded.config.solo.transport, command });
   const logger = opts.quiet
     ? undefined
     : {

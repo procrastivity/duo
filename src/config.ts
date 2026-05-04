@@ -4,7 +4,7 @@ import { PolicySchema } from "./types/policy.js";
 export const soloStdioTransportSchema = z
   .object({
     type: z.literal("stdio"),
-    command: z.string().min(1, "solo.transport.command is required"),
+    command: z.string().min(1).optional(),
     args: z.array(z.string()).optional().default([]),
     cwd: z.string().min(1, "solo.transport.cwd cannot be empty").optional(),
     env: z.record(z.string(), z.string()).optional(),

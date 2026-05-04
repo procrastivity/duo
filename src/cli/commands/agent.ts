@@ -106,6 +106,7 @@ const spawnCommand = defineCommand({
     tier: { type: "positional", required: true, description: "Tier (small | medium | large)" },
     name: { type: "string", description: "Process name" },
     "project-id": { type: "string", description: "Override Solo project ID" },
+    prompt: { type: "string", description: "Bootstrap prompt delivered as the agent's first message" },
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
@@ -135,12 +136,14 @@ const spawnCommand = defineCommand({
         agent_tool_id: number;
         name?: string;
         project_id?: number;
+        prompt?: string;
       } = {
         kind: "agent",
         agent_tool_id: resolution.selected.agent_tool_id,
       };
       if (args.name) spawnArgs.name = args.name;
       if (projectId !== undefined) spawnArgs.project_id = projectId;
+      if (args.prompt) spawnArgs.prompt = args.prompt;
 
       const spawned = await client.spawnProcess(spawnArgs);
       const result = {

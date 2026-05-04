@@ -3,7 +3,9 @@ import { execa } from "execa";
 import type { SoloConfig } from "../config.js";
 import type { Transport } from "./types.js";
 
-type StdioConfig = SoloConfig["solo"]["transport"];
+type StdioConfigBase = SoloConfig["solo"]["transport"];
+/** Transport config with a resolved (non-optional) command string. */
+export type StdioConfig = Omit<StdioConfigBase, "command"> & { command: string };
 
 export class StdioTransport implements Transport {
   onmessage?: (message: unknown) => void;

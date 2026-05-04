@@ -27,6 +27,7 @@ export const SoloSpawnArgsSchema = z.object({
   agent_tool_id: z.number(),
   name: z.string().optional(),
   project_id: z.number().int().optional(),
+  prompt: z.string().optional(),
 });
 
 export type SoloSpawnArgs = z.infer<typeof SoloSpawnArgsSchema>;
@@ -35,6 +36,7 @@ export const SoloSpawnResultSchema = z
   .object({
     process_id: z.number(),
     name: z.string(),
+    agent_instructions: z.string().optional(),
   })
   .passthrough();
 

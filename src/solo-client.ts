@@ -211,7 +211,33 @@ export class SoloClient {
       arguments: callArgs,
     });
     const text = this._extractText(result);
-    return SoloSpawnResultSchema.parse(JSON.parse(text));
+    const spawned = SoloSpawnResultSchema.parse(JSON.parse(text));
+
+    if (args.prompt !== undefined) {
+      const parts: string[] = [];
+      if (spawned.agent_instructions) parts.push(spawned.agent_instructions);
+      parts.push(args.prompt);
+      await this.sendInput(spawned.process_id, parts.join("\n\n"), projectId);
+    }
+
+    return spawned;
+  }
+
+  async sendInput(
+    processId: number,
+    input: string,
+    projectId?: number,
+  ): Promise<void> {
+    const effectiveProjectId = projectId ?? this._projectId;
+    const callArgs: Record<string, unknown> = {
+      process_id: processId,
+      input,
+      ...(effectiveProjectId !== undefined && { project_id: effectiveProjectId }),
+    };
+    await this._request("tools/call", {
+      name: "send_input",
+      arguments: callArgs,
+    });
   }
 
   private async _bindSessionProcess(processId: number): Promise<void> {
