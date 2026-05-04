@@ -80,7 +80,7 @@ export const doctorCommand = defineCommand({
       detail: sha ? `${version} (${sha})` : version,
     });
 
-    // 2. duo.config.yaml discovered + parses cleanly
+    // 2. duo config discovered + parses cleanly
     let config: SoloConfig | null = null;
     let configPath = resolveConfigPath();
     let policyPath: string | null = null;
@@ -90,13 +90,13 @@ export const doctorCommand = defineCommand({
       configPath = loaded.configPath;
       policyPath = loaded.policyPath;
       checks.push({
-        name: "duo.config.yaml",
+        name: "duo config",
         status: "ok",
         detail: policyPath ? `${configPath} (+ policy: ${policyPath})` : configPath,
       });
     } catch (err) {
       checks.push({
-        name: "duo.config.yaml",
+        name: "duo config",
         status: "fail",
         detail: err instanceof Error ? err.message : String(err),
       });
