@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { MCPServer } from "./server.js";
-import { DuoServer, createServer, ServerConfigError } from "./server.js";
+import {
+  DuoServer,
+  createServer,
+  createUnavailableServer,
+  ServerConfigError,
+} from "./server.js";
 import { parseConfig } from "./config.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
@@ -146,8 +151,66 @@ describe("DuoServer", () => {
 
       await expect(server.start()).resolves.not.toThrow();
 
-      // Verify SoloClient was instantiated and connect was called
-      expect(SoloClient.prototype.connect).toBeDefined();
+      expect(SoloClient.prototype.connect).not.toHaveBeenCalled();
+    });
+
+    it("connects to Solo lazily when a tool handler first needs it", async () => {
+      const config = parseConfig(validRawConfig);
+      const server = new DuoServer(config);
+
+      vi.spyOn(SoloClient.prototype, "connect").mockResolvedValue(undefined);
+      vi.spyOn(SoloClient.prototype, "listAgentTools").mockResolvedValue(enabledRuntimes);
+      vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
+
+      let listAgentTiersHandler: (() => Promise<unknown>) | undefined;
+      vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
+        (toolName: string, _config: unknown, handler: () => Promise<unknown>) => {
+          if (toolName === "list_agent_tiers") {
+            listAgentTiersHandler = handler;
+          }
+          return undefined as unknown;
+        },
+      );
+
+      await server.start();
+      expect(SoloClient.prototype.connect).not.toHaveBeenCalled();
+
+      await listAgentTiersHandler?.();
+      expect(SoloClient.prototype.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns structured tool errors when startup config failed", async () => {
+      const server = createUnavailableServer(
+        new ServerConfigError("Failed to read config from /missing/config.yaml"),
+      );
+
+      vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
+
+      let listAgentTiersHandler: (() => Promise<unknown>) | undefined;
+      vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
+        (toolName: string, _config: unknown, handler: () => Promise<unknown>) => {
+          if (toolName === "list_agent_tiers") {
+            listAgentTiersHandler = handler;
+          }
+          return undefined as unknown;
+        },
+      );
+
+      await server.start();
+      const result = await listAgentTiersHandler?.();
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              code: "solo_connection_failed",
+              message: "Failed to read config from /missing/config.yaml",
+            }),
+          },
+        ],
+        isError: true,
+      });
     });
   });
 

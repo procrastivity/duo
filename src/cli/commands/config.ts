@@ -44,7 +44,7 @@ const pathCommand = defineCommand({
   },
   async run({ args }) {
     const cwd = args.cwd ?? process.cwd();
-    let configPath = resolveConfigPath(cwd);
+    let configPath = resolveConfigPath();
     let policyPath: string | null = null;
     try {
       const loaded = loadConfig({ cwd });

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { parseConfig, type SoloConfig } from "./config.js";
 import { StdioTransport } from "./transport/stdio.js";
+import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
 import { buildClassifierPolicy, defaultPolicy } from "./classifier.js";
@@ -21,6 +22,16 @@ export interface MCPServer {
   start(): Promise<void>;
 }
 
+interface TextContent {
+  type: "text";
+  text: string;
+}
+
+interface ToolResult {
+  content: TextContent[];
+  isError?: boolean;
+}
+
 export class ServerConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -28,32 +39,84 @@ export class ServerConfigError extends Error {
   }
 }
 
+const toolError = (
+  code: string | number,
+  message: string,
+  extra?: Record<string, unknown>,
+): ToolResult => ({
+  content: [{ type: "text", text: JSON.stringify({ code, message, ...extra }) }],
+  isError: true,
+});
+
+const startupErrorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
 export class DuoServer implements MCPServer {
-  private readonly _config: SoloConfig;
+  private readonly _config: SoloConfig | null;
   private readonly _mcpServer: McpServer;
   private readonly _soloClient: SoloClient | null;
   private readonly _logger: Logger;
+  private readonly _startupError: Error | null;
+  private _soloClientPromise?: Promise<SoloClient>;
 
-  constructor(config: SoloConfig, soloClient?: SoloClient, logger?: Logger) {
+  constructor(
+    config: SoloConfig | null,
+    soloClient?: SoloClient,
+    logger?: Logger,
+    startupError?: Error,
+  ) {
     this._config = config;
     this._mcpServer = new McpServer({ name: "duo", version: "0.1.0" });
     this._soloClient = soloClient || null;
     this._logger = logger || createLogger();
+    this._startupError = startupError || null;
+  }
+
+  private async _getSoloClient(): Promise<SoloClient> {
+    if (this._startupError) {
+      throw this._startupError;
+    }
+    if (this._soloClient) {
+      return this._soloClient;
+    }
+    if (!this._config) {
+      throw new ServerConfigError("Duo server started without Solo configuration");
+    }
+    if (!this._soloClientPromise) {
+      const config = this._config;
+      this._soloClientPromise = (async () => {
+        const transport = new StdioTransport({
+          ...config.solo.transport,
+          command: resolveTransportCommand(config.solo.transport.command),
+        });
+        const soloClient = new SoloClient(transport);
+        await soloClient.connect();
+        return soloClient;
+      })();
+      this._soloClientPromise.catch(() => {
+        this._soloClientPromise = undefined;
+      });
+    }
+    return this._soloClientPromise;
+  }
+
+  private async _withSoloClient<T>(
+    run: (soloClient: SoloClient) => Promise<T>,
+  ): Promise<T | ToolResult> {
+    try {
+      return await run(await this._getSoloClient());
+    } catch (err) {
+      return toolError("solo_connection_failed", startupErrorMessage(err));
+    }
   }
 
   async start(): Promise<void> {
-    const transport = new StdioTransport(this._config.solo.transport);
-    const soloClient = this._soloClient || new SoloClient(transport);
-    if (!this._soloClient) {
-      await soloClient.connect();
-    }
-
     // Build classifier policy from config
-    const classifierPolicy = this._config.policy
+    const classifierPolicy = this._config?.policy
       ? buildClassifierPolicy(this._config.policy)
       : defaultPolicy();
 
-    const selectionPreference = this._config.policy?.selection?.preference;
+    const selectionPreference = this._config?.policy?.selection?.preference;
 
     // Register tools
     this._mcpServer.registerTool(
@@ -63,7 +126,8 @@ export class DuoServer implements MCPServer {
           "List available agent tools grouped by tier (small, medium, large) with default selection and alternatives",
         inputSchema: ListAgentTiersInputSchema,
       },
-      (async () => listAgentTiers(soloClient)) as any,
+      (async () =>
+        this._withSoloClient((soloClient) => listAgentTiers(soloClient))) as any,
     );
 
     this._mcpServer.registerTool(
@@ -73,13 +137,14 @@ export class DuoServer implements MCPServer {
           "Resolve and select an agent tool for a specific tier (small, medium, or large)",
         inputSchema: ResolveAgentToolInputSchema,
       },
-      (async (input: unknown) => resolveAgentToolHandler(
-        soloClient,
-        this._logger,
-        input as ResolveAgentToolInput,
-        classifierPolicy,
-        selectionPreference,
-      )) as any,
+      (async (input: unknown) =>
+        this._withSoloClient((soloClient) => resolveAgentToolHandler(
+          soloClient,
+          this._logger,
+          input as ResolveAgentToolInput,
+          classifierPolicy,
+          selectionPreference,
+        ))) as any,
     );
 
     this._mcpServer.registerTool(
@@ -89,13 +154,14 @@ export class DuoServer implements MCPServer {
           "Spawn a new agent process for a given tier with optional name and project scope",
         inputSchema: SpawnAgentInputSchema,
       },
-      (async (input: unknown) => spawnAgentHandler(
-        soloClient,
-        this._logger,
-        input as SpawnAgentInput,
-        classifierPolicy,
-        selectionPreference,
-      )) as any,
+      (async (input: unknown) =>
+        this._withSoloClient((soloClient) => spawnAgentHandler(
+          soloClient,
+          this._logger,
+          input as SpawnAgentInput,
+          classifierPolicy,
+          selectionPreference,
+        ))) as any,
     );
 
     const serverTransport = new StdioServerTransport();
@@ -120,6 +186,15 @@ export async function createServer(
   return new DuoServer(config, undefined, logger);
 }
 
+export function createUnavailableServer(
+  err: unknown,
+  logger?: Logger,
+): DuoServer {
+  const startupError =
+    err instanceof Error ? err : new ServerConfigError(String(err));
+  return new DuoServer(null, undefined, logger, startupError);
+}
+
 export interface RunServerOptions {
   cwd?: string;
 }
@@ -131,12 +206,17 @@ export interface RunServerOptions {
 export async function runServer(opts: RunServerOptions = {}): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
   const { loadConfig } = await import("./cli/config-loader.js");
-  const loaded = loadConfig({ cwd });
-  const rawConfig: Record<string, unknown> = {
-    solo: loaded.config.solo,
-    ...(loaded.config.policy !== undefined && { policy: loaded.config.policy }),
-  };
   const logger = createLogger();
-  const server = await createServer(rawConfig, logger);
+  let server: DuoServer;
+  try {
+    const loaded = loadConfig({ cwd });
+    const rawConfig: Record<string, unknown> = {
+      solo: loaded.config.solo,
+      ...(loaded.config.policy !== undefined && { policy: loaded.config.policy }),
+    };
+    server = await createServer(rawConfig, logger);
+  } catch (err) {
+    server = createUnavailableServer(err, logger);
+  }
   await server.start();
 }
