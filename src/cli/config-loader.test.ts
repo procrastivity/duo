@@ -88,6 +88,13 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ cwd: tmp })).toThrow(/is empty/);
   });
 
+  it("throws a clear error when config file is an empty mapping ({})", () => {
+    const path = join(tmp, "config.yaml");
+    writeFileSync(path, "{}\n");
+    process.env.DUO_CONFIG = path;
+    expect(() => loadConfig({ cwd: tmp })).toThrow(/is empty/);
+  });
+
   it("loads a populated config file as usedDefaults=false", () => {
     const path = join(tmp, "config.yaml");
     writeFileSync(path, "solo:\n  transport:\n    type: stdio\n");

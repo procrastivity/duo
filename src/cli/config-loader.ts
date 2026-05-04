@@ -75,7 +75,12 @@ export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
       );
     }
 
-    if (parsed === null || parsed === undefined) {
+    const isEmptyObject =
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Object.keys(parsed as object).length === 0;
+    if (parsed === null || parsed === undefined || isEmptyObject) {
       throw new Error(
         `Config at ${configPath} is empty. Minimum required keys:\n  solo:\n    transport:\n      type: stdio\nOr delete the file to use defaults.`,
       );
