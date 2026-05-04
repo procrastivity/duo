@@ -64,11 +64,11 @@ describe("resolveTransportCommand", () => {
     );
   });
 
-  it("does not use auto-detection when configured path is provided (even if empty string is not truthy)", () => {
-    // undefined → auto-detect; empty string is falsy → also auto-detect
+  it("treats empty string and undefined as unconfigured (falls through to auto-detection)", () => {
+    // undefined → auto-detect; empty string is also falsy → also auto-detect
     mockExistsSync.mockImplementation((p) => p === "/Applications/Solo.app/Contents/MacOS/mcp");
 
-    const result = resolveTransportCommand(undefined);
-    expect(result).toBe("/Applications/Solo.app/Contents/MacOS/mcp");
+    expect(resolveTransportCommand(undefined)).toBe("/Applications/Solo.app/Contents/MacOS/mcp");
+    expect(resolveTransportCommand("")).toBe("/Applications/Solo.app/Contents/MacOS/mcp");
   });
 });
