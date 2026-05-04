@@ -1,6 +1,6 @@
 {
   "name": "@procrastivity/duo",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Solo MCP companion for agent tier-based selection and override-aware orchestration.",
   "type": "module",
   "bin": {
