@@ -61,6 +61,7 @@
             jq
             nodejs_24
             bun
+            git-cliff
           ];
 
           shellHook = ''

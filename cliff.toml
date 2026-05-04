@@ -1,0 +1,63 @@
+# git-cliff ~ configuration file
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """
+# Changelog\n
+All notable changes to this project will be documented in this file.\n
+"""
+body = """
+{%- macro remote_url() -%}
+  https://github.com/procrastivity/duo
+{%- endmacro -%}
+
+{% if version -%}
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+    ## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {{ commit.message | split(pat="\n") | first | trim }}\
+            {% if commit.remote.username %} by @{{ commit.remote.username }}{%- endif -%}
+            {% if commit.remote.pr_number %} in \
+              [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }})\
+            {%- endif -%}
+    {%- endfor %}
+{% endfor %}
+"""
+footer = "\n"
+trim = true
+
+[git]
+# Don't require conventional commits — parse all commits with keyword matching
+conventional_commits = false
+filter_unconventional = false
+commit_parsers = [
+    # Skip noise
+    { message = "^Merge ", skip = true },
+    { message = "^(release: v|chore\\(release\\))", skip = true },
+
+    # Group by keywords you'd naturally write
+    { message = "(?i)\\b(shfmt|shellcheck|lint|fmt|format|tidy|cleanup|chore|housekeep|minor)\\b", group = "Maintenance" },
+    { message = "(?i)^(maint|bump|reorder|shuffle|reorganize)", group = "Maintenance" },
+    { message = "(?i)\\b(add|support|new|feat|implement)\\b", group = "Added" },
+    { message = "(?i)\\b(fix|bug|patch|correct|resolve)\\b", group = "Fixed" },
+    { message = "(?i)\\b(change|update|rename|refactor|move|rework|improve)\\b", group = "Changed" },
+    { message = "(?i)\\b(remove|delete|drop|deprecat)\\b", group = "Removed" },
+    { message = "(?i)\\b(doc|readme|comment)\\b", group = "Documentation" },
+    { message = "(?i)\\b(test|spec|bats)\\b", group = "Testing" },
+    { message = "(?i)\\b(ci|workflow|action|release|deploy|docker|nix|flake)\\b", group = "Infrastructure" },
+
+    # Everything else lands here
+    { message = ".*", group = "Other" },
+]
+filter_commits = false
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
+
+[remote.github]
+owner = "procrastivity"
+repo = "duo"

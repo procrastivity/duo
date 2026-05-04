@@ -20,7 +20,8 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test",
     "build:bin:darwin-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/duo-darwin-arm64",
-    "build:bin:darwin-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/duo-darwin-x64"
+    "build:bin:darwin-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/duo-darwin-x64",
+    "release": "release-it"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^22.15.21",
     "esbuild": "^0.28.0",
+    "release-it": "^17.10.0",
     "typescript": "^5.8.3",
     "vitest": "^2.1.8"
   },
