@@ -60,6 +60,7 @@
             curl
             jq
             nodejs_24
+            bun
           ];
 
           shellHook = ''

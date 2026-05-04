@@ -18,7 +18,9 @@
     "build:bundle": "node scripts/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test"
+    "prepublishOnly": "npm run build && npm run test",
+    "build:bin:darwin-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/duo-darwin-arm64",
+    "build:bin:darwin-x64": "bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/duo-darwin-x64"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
