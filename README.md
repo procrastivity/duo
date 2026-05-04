@@ -47,11 +47,12 @@ duo config show|path      # inspect effective config
 ### Examples
 
 ```bash
-duo doctor                              # verify setup
-duo agent spawn large --name worker-1   # spawn a large-tier agent
-duo proc ls --json | jq '.[] | .name'   # script-friendly output
-duo proc logs 298 --follow              # tail a process
-SOLO_PROJECT_ID=6 duo whoami            # one-shot project override
+duo doctor                                                    # verify setup
+duo agent spawn large --name worker-1                         # spawn a large-tier agent
+duo agent spawn small --prompt "Analyze the codebase"         # spawn with bootstrap prompt
+duo proc ls --json | jq '.[] | .name'                         # script-friendly output
+duo proc logs 298 --follow                                    # tail a process
+SOLO_PROJECT_ID=6 duo whoami                                  # one-shot project override
 ```
 
 Errors always go to stderr; data always goes to stdout, so `duo proc ls --json | jq` is safe.
@@ -305,11 +306,14 @@ Resolves a tier and spawns a Solo agent process using the selected tool.
 {
   "tier": "large",
   "name": "step-05-coordinator",
-  "project_id": "42"
+  "project_id": "42",
+  "prompt": "Analyze the codebase and generate a summary"
 }
 ```
 
-(Optional fields: `name` and `project_id` can be omitted.)
+(Optional fields: `name`, `project_id`, and `prompt` can be omitted.)
+
+**Bootstrap Prompt**: The optional `prompt` field delivers a message to the spawned agent's first turn, enabling direct task assignment. The prompt is combined with any agent instructions from Solo and delivered as the agent's initial input.
 
 **Example response** (success):
 
@@ -336,6 +340,7 @@ Resolves a tier and spawns a Solo agent process using the selected tool.
 - `tier` — the tier that was resolved (`"small"`, `"medium"`, or `"large"`)
 - `tool` — summary of the selected agent tool
 - `project_id` — the project scope (included if provided or configured)
+- **Bootstrap behavior**: If a `prompt` was provided in the request, it is delivered to the spawned agent as its first input message (combined with any Solo-provided agent instructions)
 
 ## Tier Policy Overrides
 
