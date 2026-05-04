@@ -89,6 +89,18 @@ npm install @procrastivity/duo
 
 Then reference it in your MCP client config or import its types in a TypeScript project.
 
+### macOS Gatekeeper (unsigned binary)
+
+Downloaded binaries are not codesigned. On first run, macOS may block execution with a Gatekeeper dialog. Remove the quarantine attribute before running:
+
+```bash
+xattr -d com.apple.quarantine ./duo-darwin-arm64
+# or
+xattr -d com.apple.quarantine ./duo-darwin-x64
+```
+
+Alternatively, right-click the binary in Finder → **Open** → **Open** to approve it once via the GUI.
+
 ## MCP Client Setup
 
 Register Duo as an MCP server in your MCP client configuration. Below is an example for **Claude Desktop**:
