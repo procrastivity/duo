@@ -1,0 +1,49 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-bin:
+    name: Build binary (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+            asset_name: duo-darwin-arm64
+            build_script: build:bin:darwin-arm64
+          - os: macos-13
+            arch: x64
+            asset_name: duo-darwin-x64
+            build_script: build:bin:darwin-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build binary
+        run: npm run ${{ matrix.build_script }}
+
+      - name: Smoke test
+        run: bash scripts/smoke-bin.sh dist/bin/${{ matrix.asset_name }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/bin/${{ matrix.asset_name }}
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
+          fail_on_unmatched_files: true
