@@ -34,7 +34,14 @@ chmod +x ./duo-darwin-arm64   # or duo-darwin-x64
 ./duo-darwin-arm64 --help
 ```
 
-You should see Duo's help output. From here, rename or move the binary onto your `PATH` (e.g. `mv ./duo-darwin-arm64 /usr/local/bin/duo`) however you prefer.
+You should see Duo's help output. From here, rename or move the binary onto your `PATH` however you prefer. A user-writable location like `~/.local/bin/duo` avoids needing `sudo`:
+
+```sh
+mkdir -p ~/.local/bin
+mv ./duo-darwin-arm64 ~/.local/bin/duo
+```
+
+If `~/.local/bin` is not on your `PATH`, add it (e.g. `export PATH="$HOME/.local/bin:$PATH"` in your shell rc). Installing to `/usr/local/bin` also works but typically requires `sudo`.
 
 ## What's coming next
 

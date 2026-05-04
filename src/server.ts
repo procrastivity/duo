@@ -201,7 +201,10 @@ export interface RunServerOptions {
 
 /**
  * Boot the Duo MCP server. Loads config + policy, constructs the server,
- * and starts the stdio transport. Throws on any startup error.
+ * and starts the stdio transport. If config load or server construction
+ * fails, falls back to an unavailable server that surfaces the error
+ * via structured tool responses rather than throwing — the stdio
+ * transport still starts so clients see actionable error payloads.
  */
 export async function runServer(opts: RunServerOptions = {}): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
