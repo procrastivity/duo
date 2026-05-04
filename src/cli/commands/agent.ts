@@ -146,13 +146,19 @@ const spawnCommand = defineCommand({
       if (args.prompt) spawnArgs.prompt = args.prompt;
 
       const spawned = await client.spawnProcess(spawnArgs);
+      const effectiveProjectId = projectId ?? client.projectId;
+      const url =
+        effectiveProjectId !== undefined
+          ? `solo://proj/${effectiveProjectId}/process/duo-agent--${spawned.process_id}`
+          : undefined;
       const result = {
         process_id: spawned.process_id,
         name: spawned.name,
         tier,
         agent_tool_id: resolution.selected.agent_tool_id,
         agent_tool_name: resolution.selected.tool_name,
-        project_id: projectId ?? client.projectId,
+        project_id: effectiveProjectId,
+        ...(url !== undefined && { url }),
       };
       if (args.json) {
         writeJson(result);
@@ -165,6 +171,7 @@ const spawnCommand = defineCommand({
         writeOut(`tool:        ${result.agent_tool_name} (#${result.agent_tool_id})`);
         if (result.project_id !== undefined)
           writeOut(`project_id:  ${result.project_id}`);
+        if (url !== undefined) writeOut(`url:         ${url}`);
       }
     } catch (err) {
       handleSoloError(err);
