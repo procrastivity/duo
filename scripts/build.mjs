@@ -15,7 +15,7 @@ await esbuild.build({
   bundle: true,
   platform: "node",
   format: "esm",
-  target: "node22",
+  target: "node24",
   outfile: "dist/duo.mjs",
   banner: { js: banner },
   legalComments: "none",
