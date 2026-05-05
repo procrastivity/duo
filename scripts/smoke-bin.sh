@@ -11,18 +11,31 @@ if [[ ! -x "$BIN" ]]; then
   exit 1
 fi
 
-echo "=== smoke-bin.sh: testing $BIN ==="
+# Stage the binary in a hermetic tmpdir with no package.json and no .git
+# above it. Running version/git_sha checks from that CWD defeats the runtime
+# fallbacks (the package.json walk anchored on `import.meta.url`, and
+# `git rev-parse` using CWD), so a passing assertion can only come from the
+# build-time `--define __DUO_VERSION__/__DUO_GIT_SHA__` substitutions.
+HERMETIC="$(mktemp -d)"
+trap 'rm -rf "$HERMETIC"' EXIT
+HERMETIC_BIN_NAME="$(basename "$BIN")"
+HERMETIC_BIN="$HERMETIC/$HERMETIC_BIN_NAME"
+cp "$BIN" "$HERMETIC_BIN"
+chmod +x "$HERMETIC_BIN"
+
+echo "=== smoke-bin.sh: testing $BIN (hermetic CWD: $HERMETIC) ==="
 
 # 1. --help
 echo "--- --help"
-"$BIN" --help
+"$HERMETIC_BIN" --help
 echo "PASS: --help"
 
-# 2. version — must match package.json (guards against the compiled binary
-# losing its injected version and falling back to "unknown").
+# 2. version — must match package.json. Runs from the hermetic CWD so a
+# broken `--define __DUO_VERSION__=...` cannot be masked by the runtime
+# package.json walk.
 echo "--- version"
 expected=$(cd "$REPO_ROOT" && node -p "require('./package.json').version")
-actual=$("$BIN" version --quiet)
+actual=$(cd "$HERMETIC" && "./$HERMETIC_BIN_NAME" version --quiet)
 actual=${actual%$'\n'}
 if [[ "$actual" != "$expected" ]]; then
   echo "FAIL: '$BIN version --quiet' returned '$actual', expected '$expected'" >&2
@@ -30,12 +43,13 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 echo "PASS: version ($actual)"
 
-# 3. git_sha — must match HEAD when smoke-testing inside a git checkout
-# (guards against the build-time `--define __DUO_GIT_SHA__=...` wiring
-# silently breaking and shipping binaries with no commit metadata).
+# 3. git_sha — must match HEAD when smoke-testing inside a git checkout.
+# Same hermetic-CWD reasoning as the version check: a missing
+# `--define __DUO_GIT_SHA__=...` cannot fall back to the runtime
+# `git rev-parse` because there is no git repo at or above the CWD.
 echo "--- git_sha"
 if expected_sha=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null); then
-  actual_sha=$("$BIN" version | awk '/^git_sha/ {print $2}')
+  actual_sha=$(cd "$HERMETIC" && "./$HERMETIC_BIN_NAME" version | awk '/^git_sha/ {print $2}')
   if [[ "$actual_sha" != "$expected_sha" ]]; then
     echo "FAIL: '$BIN version' reported git_sha '$actual_sha', expected '$expected_sha'" >&2
     exit 1
@@ -45,17 +59,25 @@ else
   echo "SKIP: git_sha (no git checkout at $REPO_ROOT)"
 fi
 
-# 4. MCP stdio handshake. Use a deliberately missing config path so this
-# stays hermetic; initialize and tools/list must still work without Solo.
+# 4. MCP stdio handshake. Writes a real config that points at a non-existent
+# Solo binary so the connection deterministically fails — `solo_connection_failed`
+# is the path under test. Without this, `loadConfig()` would treat a missing
+# config as "use defaults" and `resolveTransportCommand()` would auto-detect
+# any host-installed Solo, making pass/fail depend on the runner image.
 echo "--- mcp stdio handshake"
-BIN="$BIN" node --input-type=module <<'EOF'
+BIN="$HERMETIC_BIN" node --input-type=module <<'EOF'
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const bin = process.env.BIN;
-const configPath = join(mkdtempSync(join(tmpdir(), "duo-smoke-")), "missing.yaml");
+const configDir = mkdtempSync(join(tmpdir(), "duo-smoke-"));
+const configPath = join(configDir, "duo.yaml");
+writeFileSync(
+  configPath,
+  "solo:\n  transport:\n    type: stdio\n    command: /nonexistent\n",
+);
 const child = spawn(bin, ["mcp"], {
   stdio: ["pipe", "pipe", "pipe"],
   env: { ...process.env, DUO_CONFIG: configPath },
@@ -105,7 +127,7 @@ const handleLine = (line) => {
       }
     }
     if (call.result?.isError !== true) {
-      finish(1, "tools/call should return isError when config is missing");
+      finish(1, "tools/call should return isError when Solo is unreachable");
     }
     const text = call.result.content?.[0]?.text;
     const payload = text ? JSON.parse(text) : {};
