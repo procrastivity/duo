@@ -11,6 +11,20 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
+
+        # Bun version pin — keep in sync with `bun-version` in
+        # .github/workflows/release-bin.yml. We assert here so a nixpkgs bump
+        # that drifts past this version is a hard error rather than silent
+        # version skew between dev shell and CI binary builds.
+        expectedBunVersion = "1.3.11";
+        bun = if pkgs.bun.version == expectedBunVersion
+          then pkgs.bun
+          else throw ''
+            flake.nix expects bun ${expectedBunVersion} but nixpkgs provides ${pkgs.bun.version}.
+            Either update expectedBunVersion (and the bun-version pin in
+            .github/workflows/release-bin.yml) or pin the nixpkgs input to a
+            revision that ships bun ${expectedBunVersion}.
+          '';
       in
       {
         packages.duo = pkgs.buildNpmPackage {
@@ -33,7 +47,7 @@
           #   1. Set npmDepsHash = lib.fakeHash;
           #   2. Run nix build .#duo
           #   3. Copy the "got: sha256-..." value from the failure output into npmDepsHash
-          npmDepsHash = "sha256-HJcKVcQlA7qwy+pW8dpCEmyHkQqheh6pA+yJBIkHt4Y=";
+          npmDepsHash = "sha256-ikMHRrrGSzCKR6Bzt/OxE8hTK3flsgTC8pk8foCvHbI=";
 
           npmBuildScript = "build";
 
@@ -54,15 +68,14 @@
         devShells.default = pkgs.mkShell {
           name = "duo";
 
-          buildInputs = with pkgs; [
+          buildInputs = (with pkgs; [
             python312
             uv
             curl
             jq
             nodejs_24
-            bun
             git-cliff
-          ];
+          ]) ++ [ bun ]; # `bun` enforces expectedBunVersion (see let-binding above)
 
           shellHook = ''
             export PROJECT_ROOT="$(pwd)"
