@@ -20,8 +20,8 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test",
     "build:bin:darwin-arm64": "bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/duo-darwin-arm64",
-    "build:bin:linux-x64":    "bun build src/index.ts --compile --target=bun-linux-x64    --outfile=dist/bin/duo-linux-x64",
-    "build:bin:linux-arm64":  "bun build src/index.ts --compile --target=bun-linux-arm64  --outfile=dist/bin/duo-linux-arm64",
+    "build:bin:linux-x64": "bun build src/index.ts --compile --target=bun-linux-x64    --outfile=dist/bin/duo-linux-x64",
+    "build:bin:linux-arm64": "bun build src/index.ts --compile --target=bun-linux-arm64  --outfile=dist/bin/duo-linux-arm64",
     "build:bin:all": "npm run build:bin:darwin-arm64 && npm run build:bin:linux-x64 && npm run build:bin:linux-arm64",
     "release": "release-it"
   },
@@ -29,16 +29,16 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "citty": "^0.2.2",
     "execa": "^9.6.0",
-    "pino": "^9.6.0",
-    "yaml": "^2.8.1",
+    "pino": "^10.3.1",
+    "yaml": "^2.8.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^22.15.21",
+    "@types/node": "^22.19.17",
     "esbuild": "^0.28.0",
-    "release-it": "^17.10.0",
-    "typescript": "^5.8.3",
-    "vitest": "^2.1.8"
+    "release-it": "^17.11.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   },
   "repository": {
     "type": "git",
