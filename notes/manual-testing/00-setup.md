@@ -24,8 +24,9 @@ npm --version
 If `node --version` reports anything older than 24, install a newer
 runtime (nvm, asdf, the Nix flake in this repo, etc.) before
 continuing — Duo's `package.json` declares `"engines": { "node":
-">=24.0.0" }` and uses ESM-only `node:` imports that older runtimes
-won't load.
+">=24.0.0" }` and the bundle is built with esbuild's `node24` target,
+so older runtimes are unsupported and may not run the published
+output.
 
 ## 2. Build the binary
 
