@@ -31,6 +31,11 @@
           pname = "duo";
           version = (lib.importJSON ./package.json).version;
 
+          # Pin the Node used for npm install/build to match the runtime
+          # wrapper below, so a future nixpkgs default-Node bump can't
+          # silently change the major version this package builds against.
+          nodejs = pkgs.nodejs_24;
+
           # allow-list — extend if `npm run build` starts reading new top-level paths.
           src = lib.fileset.toSource {
             root = ./.;
