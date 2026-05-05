@@ -15,10 +15,17 @@ echo "--- --help"
 "$BIN" --help
 echo "PASS: --help"
 
-# 2. version
+# 2. version — must match package.json (guards against the compiled binary
+# losing its injected version and falling back to "unknown").
 echo "--- version"
-"$BIN" version
-echo "PASS: version"
+expected=$(node -p "require('./package.json').version")
+actual=$("$BIN" version --quiet)
+actual=${actual%$'\n'}
+if [[ "$actual" != "$expected" ]]; then
+  echo "FAIL: '$BIN version --quiet' returned '$actual', expected '$expected'" >&2
+  exit 1
+fi
+echo "PASS: version ($actual)"
 
 # 3. MCP stdio handshake. Use a deliberately missing config path so this
 # stays hermetic; initialize and tools/list must still work without Solo.

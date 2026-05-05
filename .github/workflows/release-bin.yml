@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release-bin.yml'
+      - 'scripts/build-bin.mjs'
       - 'scripts/smoke-bin.sh'
       - 'src/**'
       - 'package.json'
