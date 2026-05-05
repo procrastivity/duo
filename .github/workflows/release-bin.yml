@@ -6,7 +6,7 @@ on:
       - 'v*'
   pull_request:
     paths:
-      - '.github/workflows/release-binaries.yml'
+      - '.github/workflows/release-bin.yml'
       - 'scripts/smoke-bin.sh'
       - 'src/**'
       - 'package.json'
