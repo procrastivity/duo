@@ -30,7 +30,10 @@ export const getVersion = (): string => {
 };
 
 export const getGitSha = (): string | undefined => {
-  if (typeof __DUO_GIT_SHA__ !== "undefined" && __DUO_GIT_SHA__) return __DUO_GIT_SHA__;
+  // When `__DUO_GIT_SHA__` is injected at build time it's authoritative,
+  // even when empty: an empty value means "build had no SHA available",
+  // not "fall back to whatever git repo the user happens to be in".
+  if (typeof __DUO_GIT_SHA__ !== "undefined") return __DUO_GIT_SHA__ || undefined;
   try {
     return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
       .toString()

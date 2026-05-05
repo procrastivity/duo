@@ -41,6 +41,11 @@ describe("getGitSha", () => {
     expect(getGitSha()).toBe("deadbeef");
   });
 
+  it("returns undefined when __DUO_GIT_SHA__ is injected as an empty string (build outside a git checkout)", () => {
+    globalAsRecord.__DUO_GIT_SHA__ = "";
+    expect(getGitSha()).toBeUndefined();
+  });
+
   it("returns undefined when run outside a git checkout and no SHA is injected", () => {
     const dir = mkdtempSync(join(tmpdir(), "duo-no-git-"));
     const orig = process.cwd();
