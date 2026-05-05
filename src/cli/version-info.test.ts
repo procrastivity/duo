@@ -1,9 +1,19 @@
 import { afterEach, describe, it, expect } from "vitest";
+import { execSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getGitSha, getVersion } from "./version-info.js";
+
+const inGitCheckout = (() => {
+  try {
+    execSync("git rev-parse --git-dir", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(here, "../../package.json"), "utf8")) as {
@@ -32,9 +42,12 @@ describe("getGitSha", () => {
     delete globalAsRecord.__DUO_GIT_SHA__;
   });
 
-  it("returns a short sha when run inside a git checkout (dev-mode fallback)", () => {
-    expect(getGitSha()).toMatch(/^[0-9a-f]{7,}$/);
-  });
+  it.skipIf(!inGitCheckout)(
+    "returns a short sha when run inside a git checkout (dev-mode fallback)",
+    () => {
+      expect(getGitSha()).toMatch(/^[0-9a-f]{7,}$/);
+    },
+  );
 
   it("returns the injected __DUO_GIT_SHA__ global when present (build-time path)", () => {
     globalAsRecord.__DUO_GIT_SHA__ = "deadbeef";

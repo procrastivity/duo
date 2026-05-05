@@ -15,6 +15,7 @@ import { enabledRuntimes } from "./__fixtures__/agent-tools.js";
 import { spawnSuccessFromEnvProjectId } from "./__fixtures__/spawn-results.js";
 import { SpawnAgentInputSchema } from "./tools/spawn-agent.js";
 import type { Policy } from "./types/policy.js";
+import { getVersion } from "./cli/version-info.js";
 
 const validRawConfig = {
   solo: {
@@ -78,6 +79,20 @@ describe("DuoServer", () => {
     const server = new DuoServer(config);
     expect(server).toBeInstanceOf(DuoServer);
     // Logger is constructed internally; we verify via behavior below
+  });
+
+  it("constructs the underlying McpServer with the package version in serverInfo", () => {
+    const config = parseConfig(validRawConfig);
+    const server = new DuoServer(config);
+    // Reach through MCP SDK internals to verify the value handed to the
+    // underlying Server's constructor — the same payload sent in the
+    // `initialize` response's `serverInfo`. Brittle if the SDK renames
+    // `_serverInfo`, but that is the trade-off for unit-level coverage
+    // of the wiring that previously hardcoded "0.1.0".
+    const internal = server["_mcpServer"] as unknown as {
+      server: { _serverInfo?: { name?: string; version?: string } };
+    };
+    expect(internal.server._serverInfo).toEqual({ name: "duo", version: getVersion() });
   });
 
   describe("tool registration", () => {

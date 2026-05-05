@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/release-bin.yml'
       - 'scripts/build-bin.mjs'
+      - 'scripts/build-defines.mjs'
       - 'scripts/smoke-bin.sh'
       - 'src/**'
       - 'package.json'
