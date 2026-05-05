@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getGitSha, getVersion } from "./version-info.js";
 
@@ -27,7 +28,28 @@ describe("getVersion", () => {
 });
 
 describe("getGitSha", () => {
-  it("returns a short sha when run inside a git checkout", () => {
+  afterEach(() => {
+    delete globalAsRecord.__DUO_GIT_SHA__;
+  });
+
+  it("returns a short sha when run inside a git checkout (dev-mode fallback)", () => {
     expect(getGitSha()).toMatch(/^[0-9a-f]{7,}$/);
+  });
+
+  it("returns the injected __DUO_GIT_SHA__ global when present (build-time path)", () => {
+    globalAsRecord.__DUO_GIT_SHA__ = "deadbeef";
+    expect(getGitSha()).toBe("deadbeef");
+  });
+
+  it("returns undefined when run outside a git checkout and no SHA is injected", () => {
+    const dir = mkdtempSync(join(tmpdir(), "duo-no-git-"));
+    const orig = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(getGitSha()).toBeUndefined();
+    } finally {
+      process.chdir(orig);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
