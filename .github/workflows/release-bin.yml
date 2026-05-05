@@ -7,9 +7,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release-bin.yml'
+      - 'scripts/build-bin.mjs'
+      - 'scripts/build-defines.mjs'
       - 'scripts/smoke-bin.sh'
       - 'src/**'
       - 'package.json'
+      - 'package-lock.json'
+      - 'flake.nix'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +55,17 @@ jobs:
 
       - name: Install npm deps
         run: npm ci
+
+      - name: Verify package.json version matches tag
+        if: github.event_name == 'push'
+        run: |
+          pkg_version="$(node -p "require('./package.json').version")"
+          tag_version="${{ github.ref_name }}"
+          tag_version="${tag_version#v}"
+          if [ "$pkg_version" != "$tag_version" ]; then
+            echo "package.json version ($pkg_version) does not match tag ($tag_version)" >&2
+            exit 1
+          fi
 
       - name: Build binary
         run: npm run ${{ matrix.build_script }}

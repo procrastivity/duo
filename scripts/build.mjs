@@ -1,5 +1,6 @@
 import * as esbuild from "esbuild";
-import { chmod } from "fs/promises";
+import { chmod } from "node:fs/promises";
+import { readBuildDefines } from "./build-defines.mjs";
 
 // The banner injects a createRequire shim so CJS dependencies (like cross-spawn,
 // pulled in by @modelcontextprotocol/sdk and execa) can resolve Node built-ins
@@ -10,6 +11,8 @@ const banner = [
   "var require = createRequire(import.meta.url);",
 ].join("\n");
 
+const { version, gitSha } = readBuildDefines();
+
 await esbuild.build({
   entryPoints: ["src/index.ts"],
   bundle: true,
@@ -19,6 +22,10 @@ await esbuild.build({
   outfile: "dist/duo.mjs",
   banner: { js: banner },
   legalComments: "none",
+  define: {
+    __DUO_VERSION__: JSON.stringify(version),
+    __DUO_GIT_SHA__: JSON.stringify(gitSha),
+  },
 });
 
 await chmod("dist/duo.mjs", 0o755);

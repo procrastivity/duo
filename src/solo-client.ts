@@ -12,6 +12,7 @@ import {
   resolveProjectIdAtConnect,
   resolveProcessIdFromEnv,
 } from "./solo-client/scope.js";
+import { getVersion } from "./cli/version-info.js";
 
 export type { SoloAgentTool, SoloProject, SoloSpawnArgs, SoloSpawnResult };
 
@@ -84,7 +85,7 @@ export class SoloClient {
     await this._request("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "duo", version: "0.1.0" },
+      clientInfo: { name: "duo", version: getVersion() },
     });
     await this._transport.send({
       jsonrpc: "2.0",

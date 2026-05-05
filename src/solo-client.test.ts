@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Transport } from "./transport/types.js";
 import { SoloClient, SoloClientError } from "./solo-client.js";
 import type { SoloAgentTool, SoloProject, SoloSpawnResult } from "./types/solo.js";
+import { getVersion } from "./cli/version-info.js";
 
 type ToolCallResponder = (name: string, args: unknown) => unknown;
 
@@ -70,10 +71,16 @@ describe("SoloClient", () => {
       await client.connect();
 
       const calls = (transport.send as ReturnType<typeof vi.fn>).mock.calls.map(
-        (c) => c[0] as { method?: string; id?: number },
+        (c) =>
+          c[0] as {
+            method?: string;
+            id?: number;
+            params?: { clientInfo?: { name?: string; version?: string } };
+          },
       );
       expect(calls[0].method).toBe("initialize");
       expect(calls[0].id).toBeTypeOf("number");
+      expect(calls[0].params?.clientInfo).toEqual({ name: "duo", version: getVersion() });
       expect(calls[1].method).toBe("notifications/initialized");
       expect(calls[1].id).toBeUndefined();
     });

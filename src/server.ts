@@ -6,6 +6,7 @@ import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
 import { buildClassifierPolicy, defaultPolicy } from "./classifier.js";
+import { getVersion } from "./cli/version-info.js";
 import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-tiers.js";
 import {
   resolveAgentToolHandler,
@@ -66,7 +67,7 @@ export class DuoServer implements MCPServer {
     startupError?: Error,
   ) {
     this._config = config;
-    this._mcpServer = new McpServer({ name: "duo", version: "0.1.0" });
+    this._mcpServer = new McpServer({ name: "duo", version: getVersion() });
     this._soloClient = soloClient || null;
     this._logger = logger || createLogger();
     this._startupError = startupError || null;
