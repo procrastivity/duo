@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BIN="${1:-./dist/bin/duo-darwin-arm64}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+BIN="${1:-$REPO_ROOT/dist/bin/duo-darwin-arm64}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "ERROR: binary not found or not executable: $BIN" >&2
@@ -18,7 +21,7 @@ echo "PASS: --help"
 # 2. version — must match package.json (guards against the compiled binary
 # losing its injected version and falling back to "unknown").
 echo "--- version"
-expected=$(node -p "require('./package.json').version")
+expected=$(node -p "require('$REPO_ROOT/package.json').version")
 actual=$("$BIN" version --quiet)
 actual=${actual%$'\n'}
 if [[ "$actual" != "$expected" ]]; then
