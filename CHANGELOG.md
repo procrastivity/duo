@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2026-05-05
+
+### Changed
+
+- ci: pin GitHub Actions to commit SHAs and bump majors (#13) by @simensen in [#13](https://github.com/procrastivity/duo/pull/13)
+
+### Maintenance
+
+- chore: release process upgrade (#4) by @simensen in [#4](https://github.com/procrastivity/duo/pull/4)
+- chore: upgrade deps (#5) by @simensen in [#5](https://github.com/procrastivity/duo/pull/5)
+- chore: add dependabot config for npm and github-actions by @simensen
+- chore: modernize deps and toolchain (Node 24 LTS + Bun pin) (#14) by @simensen in [#14](https://github.com/procrastivity/duo/pull/14)
+- chore: drop Node 22 support (#15) by @simensen in [#15](https://github.com/procrastivity/duo/pull/15)
+- chore: Update .gitignore by @simensen
 ## [0.1.5] - 2026-05-04
 
 ### Maintenance
