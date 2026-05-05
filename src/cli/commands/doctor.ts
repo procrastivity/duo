@@ -1,13 +1,12 @@
 import { defineCommand } from "citty";
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { loadConfig, resolveConfigPath } from "../config-loader.js";
 import { StdioTransport } from "../../transport/stdio.js";
 import { resolveTransportCommand } from "../../transport/resolve-command.js";
 import { SoloClient } from "../../solo-client.js";
 import { writeJson, writeOut, green, red, dim, yellow } from "../output.js";
+import { getGitSha, getVersion } from "../version-info.js";
 import type { SoloConfig } from "../../config.js";
 
 interface CheckResult {
@@ -15,33 +14,6 @@ interface CheckResult {
   status: "ok" | "fail" | "skip";
   detail?: string;
 }
-
-const findVersion = (): string => {
-  const here = dirname(fileURLToPath(import.meta.url));
-  for (const path of [
-    resolve(here, "../../../package.json"),
-    resolve(here, "../../package.json"),
-    resolve(here, "../package.json"),
-  ]) {
-    try {
-      const pkg = JSON.parse(readFileSync(path, "utf8"));
-      if (pkg.name && pkg.version) return pkg.version;
-    } catch {
-      // try next
-    }
-  }
-  return "unknown";
-};
-
-const findGitSha = (): string | undefined => {
-  try {
-    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
-      .toString()
-      .trim();
-  } catch {
-    return undefined;
-  }
-};
 
 const symbol = (status: CheckResult["status"], opts: { noColor?: boolean }): string => {
   if (status === "ok") return green("✓", opts);
@@ -72,8 +44,8 @@ export const doctorCommand = defineCommand({
     const checks: CheckResult[] = [];
 
     // 1. Duo binary version + git sha
-    const version = findVersion();
-    const sha = findGitSha();
+    const version = getVersion();
+    const sha = getGitSha();
     checks.push({
       name: "duo version",
       status: "ok",
