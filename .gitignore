@@ -1,4 +1,5 @@
 /.direnv
+result
 *.egg-info/
 mcp-server-config.json
 node_modules/
@@ -17,3 +18,4 @@ duo.policy.yaml
 
 # Per-user Claude Code config (skills/ are project-shareable and committed)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
