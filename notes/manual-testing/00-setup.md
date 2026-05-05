@@ -1,7 +1,7 @@
 # 00 · Setup
 
 > Applies to: Duo current `main`.
-> Prereqs: a clone of this repo, Node ≥ 22, a working **Solo**
+> Prereqs: a clone of this repo, Node ≥ 24, a working **Solo**
 > install, and an MCP client to drive Duo (Claude Code recommended;
 > raw JSON-RPC also covered in `01-running-duo.md`).
 
@@ -17,15 +17,16 @@ unless noted.
 ## 1. Toolchain
 
 ```bash
-node --version    # expect v22 or newer
+node --version    # expect v24 or newer
 npm --version
 ```
 
-If `node --version` reports anything older than 22, install a newer
+If `node --version` reports anything older than 24, install a newer
 runtime (nvm, asdf, the Nix flake in this repo, etc.) before
 continuing — Duo's `package.json` declares `"engines": { "node":
-">=22.0.0" }` and uses ESM-only `node:` imports that older runtimes
-won't load.
+">=24.0.0" }` and the bundle is built with esbuild's `node24` target,
+so older runtimes are unsupported and may not run the published
+output.
 
 ## 2. Build the binary
 
