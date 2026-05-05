@@ -30,7 +30,22 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 echo "PASS: version ($actual)"
 
-# 3. MCP stdio handshake. Use a deliberately missing config path so this
+# 3. git_sha — must match HEAD when smoke-testing inside a git checkout
+# (guards against the build-time `--define __DUO_GIT_SHA__=...` wiring
+# silently breaking and shipping binaries with no commit metadata).
+echo "--- git_sha"
+if expected_sha=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null); then
+  actual_sha=$("$BIN" version | awk '/^git_sha/ {print $2}')
+  if [[ "$actual_sha" != "$expected_sha" ]]; then
+    echo "FAIL: '$BIN version' reported git_sha '$actual_sha', expected '$expected_sha'" >&2
+    exit 1
+  fi
+  echo "PASS: git_sha ($actual_sha)"
+else
+  echo "SKIP: git_sha (no git checkout at $REPO_ROOT)"
+fi
+
+# 4. MCP stdio handshake. Use a deliberately missing config path so this
 # stays hermetic; initialize and tools/list must still work without Solo.
 echo "--- mcp stdio handshake"
 BIN="$BIN" node --input-type=module <<'EOF'

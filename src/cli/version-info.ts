@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 // `--define` so the compiled binary and Node bundle report the version and
 // commit they were built from — not whatever package.json or git repo the
 // user happens to be running them inside. Synthetic globals (rather than
-// `process.env`) so they can't be spoofed at runtime.
+// `process.env`) so a stray env var can't change the output. They can still
+// be overridden by deliberately writing to `globalThis` (which the unit
+// tests in `version-info.test.ts` rely on); this is not a security boundary.
 declare const __DUO_VERSION__: string | undefined;
 declare const __DUO_GIT_SHA__: string | undefined;
 

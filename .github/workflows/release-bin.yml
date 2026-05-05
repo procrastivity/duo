@@ -12,6 +12,7 @@ on:
       - 'src/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'flake.nix'
   workflow_dispatch:
 
 permissions:
