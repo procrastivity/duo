@@ -25,11 +25,11 @@ Confirm that you own or have owner access to the `@procrastivity` npm organizati
 
 **Other prerequisites**:
 1. **2FA enabled** on your npm account (verify at npmjs.com account settings).
-2. **Node.js ≥ 22.0.0** installed locally:
+2. **Node.js ≥ 24.0.0** installed locally:
    ```bash
    node --version
    ```
-   Should output `v22.x.x` or higher.
+   Should output `v24.x.x` or higher.
 3. **Git working directory is clean**:
    ```bash
    git status
