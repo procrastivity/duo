@@ -10,6 +10,7 @@ on:
       - 'scripts/smoke-bin.sh'
       - 'src/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'flake.nix'
   workflow_dispatch:
 
