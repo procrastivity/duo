@@ -4,26 +4,34 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    paths:
+      - '.github/workflows/release-binaries.yml'
+      - 'scripts/smoke-bin.sh'
+      - 'src/**'
+      - 'package.json'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   build-bin:
-    name: Build binary (${{ matrix.os }})
+    name: Build binary (${{ matrix.asset_name }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            arch: arm64
+          - os: macos-15
             asset_name: duo-darwin-arm64
             build_script: build:bin:darwin-arm64
-          - os: macos-13
-            arch: x64
-            asset_name: duo-darwin-x64
-            build_script: build:bin:darwin-x64
+          - os: ubuntu-latest
+            asset_name: duo-linux-x64
+            build_script: build:bin:linux-x64
+          - os: ubuntu-24.04-arm
+            asset_name: duo-linux-arm64
+            build_script: build:bin:linux-arm64
 
     steps:
       - name: Checkout
@@ -31,6 +39,12 @@ jobs:
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Install npm deps
         run: npm ci
@@ -42,8 +56,17 @@ jobs:
         run: bash scripts/smoke-bin.sh dist/bin/${{ matrix.asset_name }}
 
       - name: Upload to GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/bin/${{ matrix.asset_name }}
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
           fail_on_unmatched_files: true
+
+      - name: Upload artifact (dry-run)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/bin/${{ matrix.asset_name }}
+          retention-days: 7

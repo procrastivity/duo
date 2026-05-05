@@ -1,59 +1,80 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Lightweight smoke test for npm pack output.
 # Run locally or in CI to catch packaging issues before publishing.
 
-# Step 1: Run npm pack --dry-run and extract tarball info
 echo "=== Smoke Test: npm pack ==="
-pack_output=$(npm pack --dry-run 2>&1)
 
-# Step 2: Validate key files are present in tarball
-echo "$pack_output" | grep -q "package.json" || { echo "✗ package.json missing"; exit 1; }
-echo "✓ package.json"
-
-echo "$pack_output" | grep -q "LICENSE" || { echo "✗ LICENSE missing"; exit 1; }
-echo "✓ LICENSE"
-
-# Step 3: Validate dist/ artifacts exist
-echo "$pack_output" | grep -q "dist/index.js" || { echo "✗ dist/index.js missing"; exit 1; }
-echo "✓ dist/index.js"
-
-echo "$pack_output" | grep -q "dist/index.d.ts" || { echo "✗ dist/index.d.ts missing"; exit 1; }
-echo "✓ dist/index.d.ts"
-
-echo "$pack_output" | grep -q "dist/__fixtures__" || { echo "✗ dist/__fixtures__ missing"; exit 1; }
-echo "✓ dist/__fixtures__ present"
-
-# Step 4: Validate README is included
-echo "$pack_output" | grep -q "README.md" || { echo "✗ README.md missing"; exit 1; }
-echo "✓ README.md"
-
-# Step 5: Validate dev files are NOT included
-if echo "$pack_output" | grep -E "(src/|vitest.config|\.npmignore|tsconfig)" > /dev/null; then
-  echo "✗ Dev files leaked into tarball"
-  exit 1
-fi
-echo "✓ Dev files excluded"
-
-# Step 6: Validate bin entry is in package.json
-if grep -q '"bin"' package.json && grep -q '"duo"' package.json; then
-  echo "✓ Bin entry 'duo' in package.json"
-else
-  echo "✗ Bin entry 'duo' missing from package.json"
+# Bail early if the build hasn't run — npm pack will produce misleading output
+# (or fail outright) when files declared in `files:` don't exist on disk.
+if [[ ! -f dist/duo.mjs ]]; then
+  echo "✗ dist/duo.mjs not found. Run 'npm run build' first."
   exit 1
 fi
 
-# Step 7: Validate shebang in dist/index.js (if dist/ exists locally)
-if [ -f dist/index.js ]; then
-  if head -1 dist/index.js | grep -q "#!/usr/bin/env node"; then
-    echo "✓ Shebang present in dist/index.js"
+# Use --json for structured, parseable output. The shape is:
+#   [{ files: [{ path, size, mode }, ...], ... }]
+pack_json=$(npm pack --dry-run --json)
+files=$(node -e '
+  const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
+  for (const f of data[0].files) console.log(f.path);
+' <<<"$pack_json")
+
+check_present() {
+  local file="$1"
+  if grep -Fxq "$file" <<<"$files"; then
+    echo "✓ $file"
   else
-    echo "✗ Shebang missing from dist/index.js"
+    echo "✗ $file missing from tarball"
     exit 1
   fi
+}
+
+check_absent() {
+  local pattern="$1"
+  local label="$2"
+  if grep -Eq "$pattern" <<<"$files"; then
+    echo "✗ $label leaked into tarball:"
+    grep -E "$pattern" <<<"$files" | sed 's/^/    /'
+    exit 1
+  fi
+  echo "✓ $label excluded"
+}
+
+# --- Required files ---
+check_present "package.json"
+check_present "LICENSE"
+check_present "README.md"
+check_present "dist/duo.mjs"
+
+# --- Files that must not ship ---
+check_absent '^src/'               "src/"
+check_absent '^scripts/'           "scripts/"
+check_absent '^tests?/'            "tests/"
+check_absent '^\.github/'          ".github/"
+check_absent '\.test\.'            "test files"
+check_absent '__fixtures__'        "fixtures"
+check_absent 'tsconfig.*\.json$'   "tsconfig"
+check_absent 'vitest\.config\.'    "vitest config"
+check_absent '\.npmignore$'        ".npmignore"
+
+# --- Validate bin entry in package.json ---
+bin_target=$(node -p 'require("./package.json").bin?.duo ?? ""')
+if [[ "$bin_target" != "./dist/duo.mjs" ]]; then
+  echo "✗ bin.duo should be './dist/duo.mjs', got: '$bin_target'"
+  exit 1
+fi
+echo "✓ bin.duo → $bin_target"
+
+# --- Validate shebang in the entry point ---
+if head -1 dist/duo.mjs | grep -q '^#!/usr/bin/env node'; then
+  echo "✓ shebang present in dist/duo.mjs"
+else
+  echo "✗ shebang missing or wrong in dist/duo.mjs:"
+  head -1 dist/duo.mjs
+  exit 1
 fi
 
 echo ""
 echo "✅ All smoke tests passed."
-exit 0
