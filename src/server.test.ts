@@ -1,4 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// Mocked before any imports of `server.js` so DuoServer's `new McpServer(...)`
+// goes through a spy. Re-exports the real class so behavior is preserved.
+vi.mock("@modelcontextprotocol/sdk/server/mcp.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("@modelcontextprotocol/sdk/server/mcp.js")>(
+      "@modelcontextprotocol/sdk/server/mcp.js",
+    );
+  const McpServerSpy = vi.fn(function (...args: ConstructorParameters<typeof actual.McpServer>) {
+    return new actual.McpServer(...args);
+  }) as unknown as typeof actual.McpServer;
+  return { ...actual, McpServer: McpServerSpy };
+});
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MCPServer } from "./server.js";
 import {
   DuoServer,
@@ -82,17 +97,10 @@ describe("DuoServer", () => {
   });
 
   it("constructs the underlying McpServer with the package version in serverInfo", () => {
+    (McpServer as unknown as ReturnType<typeof vi.fn>).mockClear();
     const config = parseConfig(validRawConfig);
-    const server = new DuoServer(config);
-    // Reach through MCP SDK internals to verify the value handed to the
-    // underlying Server's constructor — the same payload sent in the
-    // `initialize` response's `serverInfo`. Brittle if the SDK renames
-    // `_serverInfo`, but that is the trade-off for unit-level coverage
-    // of the wiring that previously hardcoded "0.1.0".
-    const internal = server["_mcpServer"] as unknown as {
-      server: { _serverInfo?: { name?: string; version?: string } };
-    };
-    expect(internal.server._serverInfo).toEqual({ name: "duo", version: getVersion() });
+    new DuoServer(config);
+    expect(McpServer).toHaveBeenCalledWith({ name: "duo", version: getVersion() });
   });
 
   describe("tool registration", () => {

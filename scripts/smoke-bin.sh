@@ -21,7 +21,7 @@ echo "PASS: --help"
 # 2. version — must match package.json (guards against the compiled binary
 # losing its injected version and falling back to "unknown").
 echo "--- version"
-expected=$(node -p "require('$REPO_ROOT/package.json').version")
+expected=$(cd "$REPO_ROOT" && node -p "require('./package.json').version")
 actual=$("$BIN" version --quiet)
 actual=${actual%$'\n'}
 if [[ "$actual" != "$expected" ]]; then
