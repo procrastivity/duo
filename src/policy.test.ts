@@ -304,7 +304,7 @@ describe("loadPolicy", () => {
         const message = (error as Error).message;
         // Error format should be "path: message"
         expect(message).toMatch(/^command_tokens\.medium\.mode:/);
-        expect(message).toMatch(/extend|replace/);
+        expect(message).toContain("merge");
       }
     });
 
