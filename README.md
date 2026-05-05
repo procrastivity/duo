@@ -59,7 +59,7 @@ Errors always go to stderr; data always goes to stdout, so `duo proc ls --json |
 
 ## Requirements
 
-- **Node.js**: ≥ 22.0.0
+- **Node.js**: ≥ 24.0.0
 - **Solo MCP server**: reachable and configured for stdio command-spawn execution (Duo communicates with Solo as an MCP client, so Solo must be running or configured to spawn on demand)
 
 ## Installation
