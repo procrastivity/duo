@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 2026-05-06
+
+### Added
+
+- fix: inject version into bun-compiled binary (#16) by @simensen in [#16](https://github.com/procrastivity/duo/pull/16)
 ## [0.1.6] - 2026-05-05
 
 ### Changed
