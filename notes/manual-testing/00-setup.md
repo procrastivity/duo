@@ -5,8 +5,8 @@
 > install, and an MCP client to drive Duo (Claude Code recommended;
 > raw JSON-RPC also covered in `01-running-duo.md`).
 
-This doc gets you to a state where the `dist/index.js` entry exists,
-a `duo.config.yaml` points at your local Solo binary, Solo has at
+This doc gets you to a state where the `dist/duo.mjs` bundle exists,
+a Duo config file points at your local Solo binary, Solo has at
 least a couple of agent tools registered spanning two or more tiers,
 and Duo is ready to be wired into a client. Subsequent docs assume
 this is done.
@@ -35,10 +35,11 @@ npm install
 npm run build
 ```
 
-`npm run build` runs `tsc -p tsconfig.json` and writes
-`dist/index.js`. The `bin` entry in `package.json` points at that
-file, so `npx @procrastivity/duo` (once published) and a local
-`node ./dist/index.js` invocation are equivalent.
+`npm run build` runs `node scripts/build.mjs` (esbuild bundle,
+`node24` target) and writes a single ESM bundle to `dist/duo.mjs`.
+The `bin` entry in `package.json` points at that file, so
+`npx @procrastivity/duo` (once published) and a local
+`node ./dist/duo.mjs` invocation are equivalent.
 
 Optional sanity checks:
 
@@ -48,7 +49,7 @@ npm test            # vitest run — full unit suite
 ```
 
 The runbook does not require either to pass; it does require
-`dist/index.js` to exist.
+`dist/duo.mjs` to exist.
 
 ## 3. Solo prereqs
 
@@ -82,21 +83,38 @@ If your Solo install has only one or zero tools, register more
 before continuing — the runbook's tier-coverage steps depend on at
 least two distinct tiers being populated.
 
-## 4. duo.config.yaml
+## 4. Duo config file
 
-Default location: `./duo.config.yaml` in the working directory where
-Duo is launched. Override with `DUO_CONFIG`.
+Resolution order (see `src/cli/config-loader.ts`):
 
-Copy the runbook fixture as a starting point:
+1. `DUO_CONFIG` env var — verbatim path (highest priority).
+2. `$XDG_CONFIG_HOME/duo/config.yaml` — if `XDG_CONFIG_HOME` is set.
+3. `~/.config/duo/config.yaml` — unconditional XDG default fallback.
+
+Note: cwd-relative `./duo.config.yaml` lookup has been removed.
+Dropping a `duo.config.yaml` next to the repo no longer works on
+its own — point `DUO_CONFIG` at it, or move it to the XDG path.
+
+For the runbook, the simplest path is to point `DUO_CONFIG` at a
+local copy of the fixture so you can edit it in-tree:
 
 ```bash
 cp notes/manual-testing/fixtures/duo.config.yaml ./duo.config.yaml
+export DUO_CONFIG="$(pwd)/duo.config.yaml"
 ```
 
 Then edit `./duo.config.yaml` so `solo.transport.command` and
 `solo.transport.args` match your local Solo binary. The fixture
 ships with a placeholder you must replace; if you forget, Duo will
 log a stderr error from `execa` when it tries to spawn Solo.
+
+If you'd rather use the XDG default and skip `DUO_CONFIG` entirely:
+
+```bash
+mkdir -p ~/.config/duo
+cp notes/manual-testing/fixtures/duo.config.yaml ~/.config/duo/config.yaml
+$EDITOR ~/.config/duo/config.yaml
+```
 
 The full minimum looks like this:
 
@@ -157,7 +175,7 @@ Before wiring Duo into a client, confirm it boots cleanly without
 any client attached:
 
 ```bash
-node ./dist/index.js < /dev/null
+node ./dist/duo.mjs < /dev/null
 ```
 
 Duo will **not exit on its own** — even with stdin closed, the
@@ -171,7 +189,7 @@ config and rerun until the first couple of seconds are silent.
 For a scriptable form, bound the run with `timeout`:
 
 ```bash
-timeout 2 node ./dist/index.js < /dev/null; echo "exit=$?"
+timeout 2 node ./dist/duo.mjs < /dev/null; echo "exit=$?"
 ```
 
 Exit code `124` means `timeout` killed a healthy process — that's
