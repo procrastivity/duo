@@ -182,13 +182,17 @@ node ./dist/duo.mjs mcp < /dev/null
 Duo shuts down cleanly when stdin reaches EOF (here, immediately,
 because `< /dev/null` is empty). The smoke check is therefore:
 the command returns within a moment, exits `0`, and prints nothing
-on stderr. **Config-load and policy-load errors** surface here on
-stderr (config missing, policy YAML malformed, etc.); fix and
-rerun until stderr is silent. Solo-spawn errors are *not*
-exercised by this step — the Solo client connects lazily on the
-first tool call. To validate the Solo path, drive a `tools/list`
-or `list_agent_tiers` call (see `01-running-duo.md` Option B and
-the `01-tools-list.sh` driver).
+on stderr. This validates **stdio startup only** — process boots,
+binds the transport, exits cleanly. Config-load, policy-load, and
+Solo-spawn errors are **not** surfaced here: `runServer()` catches
+config/policy load failures and starts an "unavailable server"
+that reports the error via a structured `solo_connection_failed`
+tool response (see `src/server.ts` `runServer` /
+`createUnavailableServer`), and Solo itself spawns lazily on the
+first tool call. To exercise those paths, drive a real request
+sequence — see `01-running-duo.md` Option B and the
+`01-tools-list.sh` driver. A startup-error report will arrive in
+the `tools/call` response, not on stderr.
 
 For a scriptable form, bound the run with `timeout` as a safety
 net:

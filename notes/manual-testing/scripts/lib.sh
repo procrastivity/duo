@@ -72,8 +72,13 @@ duo_tools_call() {
 #   is not cwd-relative — see DUO_CONFIG / XDG paths.)
 # - Hold stdin open via `sleep` so Duo can flush async responses.
 # - Bound the run via `timeout` as a safety net. Duo exits cleanly
-#   on stdin EOF, so a healthy run returns 0; 124 means Duo failed
-#   to shut down on EOF and is a regression worth filing.
+#   on stdin EOF, so a healthy run returns 0. EOF only happens
+#   after `sleep $DUO_SLEEP` completes, so `DUO_TIMEOUT` must be
+#   larger than `DUO_SLEEP` (with margin) — otherwise `timeout`
+#   fires before EOF reaches Duo and you'll see a spurious 124.
+#   With defaults (`DUO_TIMEOUT=10`, `DUO_SLEEP=5`) the 5s margin
+#   is plenty. A 124 with that margin intact does mean Duo failed
+#   to shut down on EOF — file it.
 duo_drive() {
   cd "$DUO_REPO_ROOT" || {
     printf 'lib.sh: cannot cd to DUO_REPO_ROOT=%s\n' "$DUO_REPO_ROOT" >&2

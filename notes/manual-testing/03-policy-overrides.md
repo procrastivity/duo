@@ -164,28 +164,41 @@ Revert and restart.
 ## 4. Missing-but-explicit `DUO_POLICY` errors
 
 **Goal**: confirm the explicit-but-missing branch of policy
-loading fails fast at startup.
+loading is surfaced as an unavailable-server tool error.
+
+`runServer()` catches config/policy load failures and starts an
+"unavailable server" that reports the error via a structured
+`solo_connection_failed` tool response — *not* on stderr at boot
+(see `src/server.ts` `runServer` / `createUnavailableServer`).
+`tools/list` succeeds because Duo's tool surface is static; the
+error only appears on a `tools/call`. Use the
+`list_agent_tiers` driver to trigger one:
 
 ```bash
-DUO_POLICY=/tmp/does-not-exist.yaml node ./dist/duo.mjs mcp < /dev/null
+DUO_POLICY=/tmp/does-not-exist.yaml \
+  ./notes/manual-testing/scripts/02-list-agent-tiers.sh
 ```
 
 Acceptance:
 
-- Process exits with code 1.
-- Stderr contains `DUO_POLICY is set to "/tmp/does-not-exist.yaml"
-  but file does not exist`.
+- Boot itself does not error on stderr; exit code is `0` (or `124`
+  if `DUO_TIMEOUT <= DUO_SLEEP` — see `scripts/README.md`).
+- The `tools/call` response on stdout has `result.isError: true`,
+  with `result.content[0].text` containing the JSON
+  `{"code":"solo_connection_failed","message":"DUO_POLICY is set
+  to \"/tmp/does-not-exist.yaml\" but file does not exist"}`.
 
-For comparison, the silent-no-op branch:
+For comparison, the silent-no-op branch (no `DUO_POLICY`, default
+`./duo.policy.yaml` absent):
 
 ```bash
 rm -f duo.policy.yaml
-node ./dist/duo.mjs mcp < /dev/null
+node ./dist/duo.mjs mcp < /dev/null; echo "exit=$?"
 ```
 
-Acceptance: no policy-related stderr; Duo boots with built-in
-classifier rules. (Stdin is closed, so the process exits shortly
-after — that's expected.)
+Acceptance: no policy-related stderr; exit `0`; Duo boots with
+built-in classifier rules. (Stdin is closed, so the process exits
+shortly after — that's expected.)
 
 ## 5. Schema rejection
 

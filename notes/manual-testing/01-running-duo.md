@@ -133,14 +133,17 @@ cat /tmp/duo.err       # operational logs
 
 ## Common gotchas
 
-- **Duo exits silently with no stdout** — config file missing or
-  malformed. Run with `DUO_CONFIG=$(pwd)/duo.config.yaml node
-  ./dist/duo.mjs mcp < /dev/null` and watch stderr. The first line is
-  usually the cause.
-- **Duo logs `solo.transport.command is required`** — your config
-  uses the README's flat `solo.transportType` shape. Switch to the
-  nested `solo.transport.{type,command,args}` form per
-  [`00-setup.md`](./00-setup.md) §4.
+- **`tools/call` returns `solo_connection_failed`** — Duo started
+  but `runServer()` caught a config or policy load failure and
+  fell back to an "unavailable server" (see `src/server.ts`
+  `runServer` / `createUnavailableServer`). The error message in
+  the structured tool response names the cause: missing/malformed
+  config, missing `DUO_POLICY` file, malformed policy YAML, or the
+  flat `solo.transportType` shape (switch to the nested
+  `solo.transport.{type,command,args}` form per
+  [`00-setup.md`](./00-setup.md) §4). Drive `01-tools-list.sh` and
+  inspect the `tools/call` body — startup errors do **not** print
+  to stderr at boot.
 - **`tools/list` returns three tools but `resolve_agent_tool` later
   returns "no tools available"** — Solo is up but has zero agent
   tools registered, or the tools it has don't classify into any

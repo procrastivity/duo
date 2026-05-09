@@ -10,11 +10,14 @@ runbook. Each script:
   `./duo.policy.yaml` default resolves to your in-repo policy file.
   (Config loading is no longer cwd-relative — it comes from
   `DUO_CONFIG` or the XDG path; see `00-setup.md` §4.)
-- Holds stdin open via `sleep` so async responses flush before
-  EOF, then bounds the run with `timeout` as a safety net. Duo
-  exits cleanly on stdin EOF, so the expected exit code is `0`;
-  `124` (timeout firing) means Duo failed to shut down on EOF and
-  is a regression worth filing.
+- Holds stdin open via `sleep $DUO_SLEEP` so async responses flush
+  before EOF, then bounds the run with `timeout $DUO_TIMEOUT` as a
+  safety net. Duo exits cleanly on stdin EOF, so the expected exit
+  code is `0`. **`DUO_TIMEOUT` must be larger than `DUO_SLEEP`
+  (with margin)** — otherwise `timeout` fires before EOF reaches
+  Duo and you'll see a spurious `124`. Defaults (10 / 5) leave a
+  5-second margin; a `124` with the margin intact does mean Duo
+  failed to shut down on EOF and is a regression worth filing.
 
 ## Prerequisites
 
