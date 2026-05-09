@@ -38,8 +38,9 @@ npm run build
 `npm run build` runs `node scripts/build.mjs` (esbuild bundle,
 `node24` target) and writes a single ESM bundle to `dist/duo.mjs`.
 The `bin` entry in `package.json` points at that file, so
-`npx @procrastivity/duo` (once published) and a local
-`node ./dist/duo.mjs mcp` invocation are equivalent.
+`npx @procrastivity/duo mcp` (once published) and a local
+`node ./dist/duo.mjs mcp` invocation are equivalent — both
+dispatch through the same CLI bundle.
 
 Optional sanity checks:
 

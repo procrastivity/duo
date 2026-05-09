@@ -5,8 +5,11 @@ runbook. Each script:
 
 - Sources [`lib.sh`](./lib.sh) for the MCP handshake helpers and
   the `duo_drive` runner.
-- `cd`s into the repo root before invoking `node ./dist/duo.mjs`,
-  so your local `./duo.config.yaml` is what gets loaded.
+- `cd`s into the repo root before invoking
+  `node ./dist/duo.mjs mcp`, so the cwd-relative
+  `./duo.policy.yaml` default resolves to your in-repo policy file.
+  (Config loading is no longer cwd-relative — it comes from
+  `DUO_CONFIG` or the XDG path; see `00-setup.md` §4.)
 - Holds stdin open via `sleep` so async responses flush before
   EOF, then bounds the run with `timeout` as a safety net. Duo
   exits cleanly on stdin EOF, so the expected exit code is `0`;

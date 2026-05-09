@@ -64,8 +64,10 @@ duo_tools_call() {
     "$id" "$name" "$args"
 }
 
-# Run the JSON-RPC stream from stdin against `dist/duo.mjs`.
-# - cd to DUO_REPO_ROOT so duo.config.yaml resolves.
+# Run the JSON-RPC stream from stdin against `dist/duo.mjs mcp`.
+# - cd to DUO_REPO_ROOT so the cwd-relative `duo.policy.yaml`
+#   default resolves to the in-repo policy file. (Config loading
+#   is not cwd-relative — see DUO_CONFIG / XDG paths.)
 # - Hold stdin open via `sleep` so Duo can flush async responses.
 # - Bound the run via `timeout` as a safety net. Duo exits cleanly
 #   on stdin EOF, so a healthy run returns 0; 124 means Duo failed
