@@ -22,7 +22,9 @@ This is the path most testers will use.
 
 ### Register Duo with Claude Code
 
-From any directory:
+From the Duo repo root (the `$(pwd)` substitutions below assume
+that — adjust to absolute paths if you'd rather run this from
+elsewhere):
 
 ```bash
 claude mcp add duo \
@@ -88,7 +90,10 @@ BASH
 chmod +x /tmp/duo-driver.sh
 ```
 
-Run it from the Duo repo root (so `./duo.config.yaml` is found):
+Run it from the Duo repo root so the cwd-relative
+`./duo.policy.yaml` default resolves to your in-repo policy file.
+Config loading is not cwd-relative — set `DUO_CONFIG` to an
+absolute path or rely on the XDG default (see `00-setup.md` §4):
 
 ```bash
 /tmp/duo-driver.sh

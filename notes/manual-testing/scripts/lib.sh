@@ -2,8 +2,10 @@
 # sourced by every driver in this directory.
 #
 # Conventions:
-# - Drivers `cd` to the Duo repo root so `./duo.config.yaml` (the
-#   tester's local config, not the fixture) is what gets loaded.
+# - Drivers `cd` to the Duo repo root so the cwd-relative
+#   `./duo.policy.yaml` default resolves to the in-repo policy
+#   file. Config loading is not cwd-relative — it comes from
+#   `DUO_CONFIG` or the XDG path (see `00-setup.md` §4).
 # - Drivers emit a sequence of JSON-RPC lines on stdout, then pipe
 #   that into `duo_drive`, which holds stdin open for $DUO_SLEEP
 #   seconds (so Duo can flush all responses) and bounds the run

@@ -1,5 +1,6 @@
 #!/bin/sh
-# 00-smoke.sh — boot Duo with a closed stdin and confirm no early
+# 00-smoke.sh — boot Duo with no requests (stdin held open
+# briefly via `duo_drive`'s sleep, then EOF) and confirm no early
 # stderr errors. Referenced by 00-setup.md §6.
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
