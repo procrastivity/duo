@@ -1,9 +1,10 @@
 # 01 · Running Duo
 
 > Applies to: Duo current `main`.
-> Prereqs: [`00-setup.md`](./00-setup.md) complete; `dist/index.js`
-> built; `./duo.config.yaml` points at a real Solo binary; Solo has
-> agent tools registered.
+> Prereqs: [`00-setup.md`](./00-setup.md) complete; `dist/duo.mjs`
+> built; a Duo config reachable via `DUO_CONFIG` (absolute path) or
+> the XDG default points at a real Solo binary; Solo has agent
+> tools registered.
 
 This doc verifies that Duo comes up as an MCP stdio server, that an
 MCP client can complete the `initialize` handshake, and that
@@ -22,13 +23,15 @@ This is the path most testers will use.
 
 ### Register Duo with Claude Code
 
-From any directory:
+From the Duo repo root (the `$(pwd)` substitutions below assume
+that — adjust to absolute paths if you'd rather run this from
+elsewhere):
 
 ```bash
 claude mcp add duo \
   --scope user \
   --command node \
-  --args "$(pwd)/dist/index.js" \
+  --args "$(pwd)/dist/duo.mjs" --args mcp \
   --env DUO_CONFIG="$(pwd)/duo.config.yaml"
 ```
 
@@ -76,25 +79,30 @@ cat > /tmp/duo-driver.sh <<'BASH'
 #!/usr/bin/env bash
 # Pipe a sequence of JSON-RPC lines into Duo and print stdout.
 # `sleep` keeps stdin open long enough for Duo to write responses
-# before we EOF; `timeout` bounds the run because Duo does not
-# self-exit (its Solo child keeps the event loop alive).
+# before we EOF; `timeout` is a safety net so a hung run can't
+# block the shell.
 {
   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"runbook","version":"0"}}}'
   echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
   sleep 5
-} | timeout 10 node ./dist/index.js
+} | timeout 10 node ./dist/duo.mjs mcp
 BASH
 chmod +x /tmp/duo-driver.sh
 ```
 
-Run it from the Duo repo root (so `./duo.config.yaml` is found):
+Run it from the Duo repo root so the cwd-relative
+`./duo.policy.yaml` default resolves to your in-repo policy file.
+Config loading is not cwd-relative — set `DUO_CONFIG` to an
+absolute path or rely on the XDG default (see `00-setup.md` §4):
 
 ```bash
 /tmp/duo-driver.sh
 ```
 
-Expect exit code `124` (the timeout firing on a healthy process).
+Expect exit code `0` — Duo shuts down cleanly when stdin reaches
+EOF after the `sleep` ends. (Exit `124` indicates `timeout` had to
+kill a hung process; treat it as a regression.)
 
 Or use the committed driver — same payload, parameterizable
 through `lib.sh`:
@@ -125,14 +133,17 @@ cat /tmp/duo.err       # operational logs
 
 ## Common gotchas
 
-- **Duo exits silently with no stdout** — config file missing or
-  malformed. Run with `DUO_CONFIG=$(pwd)/duo.config.yaml node
-  ./dist/index.js < /dev/null` and watch stderr. The first line is
-  usually the cause.
-- **Duo logs `solo.transport.command is required`** — your config
-  uses the README's flat `solo.transportType` shape. Switch to the
-  nested `solo.transport.{type,command,args}` form per
-  [`00-setup.md`](./00-setup.md) §4.
+- **`tools/call` returns `solo_connection_failed`** — Duo started
+  but `runServer()` caught a config or policy load failure and
+  fell back to an "unavailable server" (see `src/server.ts`
+  `runServer` / `createUnavailableServer`). The error message in
+  the structured tool response names the cause: missing/malformed
+  config, missing `DUO_POLICY` file, malformed policy YAML, or the
+  flat `solo.transportType` shape (switch to the nested
+  `solo.transport.{type,command,args}` form per
+  [`00-setup.md`](./00-setup.md) §4). Drive `01-tools-list.sh` and
+  inspect the `tools/call` body — startup errors do **not** print
+  to stderr at boot.
 - **`tools/list` returns three tools but `resolve_agent_tool` later
   returns "no tools available"** — Solo is up but has zero agent
   tools registered, or the tools it has don't classify into any
@@ -144,6 +155,6 @@ cat /tmp/duo.err       # operational logs
   Duo→Solo MCP handshake. `SoloClient.connect()` now performs
   `initialize` + `notifications/initialized` against Solo before
   returning. If you still see this on a fresh build, confirm
-  `dist/index.js` was rebuilt after pulling — `npm run build`.
+  `dist/duo.mjs` was rebuilt after pulling — `npm run build`.
 
 You're ready for [`02-tier-tools.md`](./02-tier-tools.md).

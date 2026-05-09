@@ -5,16 +5,28 @@ runbook. Each script:
 
 - Sources [`lib.sh`](./lib.sh) for the MCP handshake helpers and
   the `duo_drive` runner.
-- `cd`s into the repo root before invoking `node ./dist/index.js`,
-  so your local `./duo.config.yaml` is what gets loaded.
-- Holds stdin open via `sleep` so async responses flush before
-  EOF, then bounds the run with `timeout` (Duo does not
-  self-exit). Exit code `124` = healthy completion.
+- `cd`s into the repo root before invoking
+  `node ./dist/duo.mjs mcp`, so the cwd-relative
+  `./duo.policy.yaml` default resolves to your in-repo policy file.
+  (Config loading is no longer cwd-relative — it comes from
+  `DUO_CONFIG` or the XDG path; see `00-setup.md` §4.)
+- Holds stdin open via `sleep $DUO_SLEEP` so async responses flush
+  before EOF, then bounds the run with `timeout $DUO_TIMEOUT` as a
+  safety net. Duo exits cleanly on stdin EOF, so the expected exit
+  code is `0`. A `124` means the run as a whole exceeded
+  `DUO_TIMEOUT` — possible causes, in order of likelihood:
+    1. `DUO_TIMEOUT <= DUO_SLEEP` (so `timeout` fires before EOF).
+    2. `DUO_TIMEOUT` is too small for boot + slow Solo spawn or a
+       long tool call in the driver. **Bump `DUO_TIMEOUT` first.**
+    3. With a generous timeout and a payload that should be quick:
+       Duo failed to shut down on stdin EOF — that's a regression
+       worth filing.
+  Defaults (10 / 5) are sized for the bundled drivers.
 
 ## Prerequisites
 
 Run from a shell where `npm run build` has produced
-`dist/index.js`. Each script will check and bail out with a clear
+`dist/duo.mjs`. Each script will check and bail out with a clear
 message otherwise.
 
 ## Tunables
@@ -32,7 +44,7 @@ Knobs (defaults in `lib.sh`):
 | `DUO_TIMEOUT` | seconds before `timeout(1)` kills the run (10) |
 | `DUO_SLEEP` | seconds to keep stdin open after last request (5) |
 | `DUO_NODE` | node binary (`node`) |
-| `DUO_DIST` | path to `dist/index.js` |
+| `DUO_DIST` | path to `dist/duo.mjs` |
 | `DUO_REPO_ROOT` | repo root (auto-derived) |
 | `DUO_PROTOCOL` | MCP protocol version (`2024-11-05`) |
 | `DUO_CLIENT_NAME` | initialize clientInfo.name (`runbook`) |

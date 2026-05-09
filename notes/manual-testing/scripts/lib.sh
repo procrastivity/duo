@@ -2,8 +2,10 @@
 # sourced by every driver in this directory.
 #
 # Conventions:
-# - Drivers `cd` to the Duo repo root so `./duo.config.yaml` (the
-#   tester's local config, not the fixture) is what gets loaded.
+# - Drivers `cd` to the Duo repo root so the cwd-relative
+#   `./duo.policy.yaml` default resolves to the in-repo policy
+#   file. Config loading is not cwd-relative — it comes from
+#   `DUO_CONFIG` or the XDG path (see `00-setup.md` §4).
 # - Drivers emit a sequence of JSON-RPC lines on stdout, then pipe
 #   that into `duo_drive`, which holds stdin open for $DUO_SLEEP
 #   seconds (so Duo can flush all responses) and bounds the run
@@ -13,7 +15,7 @@
 #
 # Tunables:
 #   DUO_REPO_ROOT       Auto-derived from this file's path.
-#   DUO_DIST            Path to dist/index.js (default $DUO_REPO_ROOT/dist/index.js).
+#   DUO_DIST            Path to dist/duo.mjs (default $DUO_REPO_ROOT/dist/duo.mjs).
 #   DUO_NODE            `node` binary (default `node`).
 #   DUO_TIMEOUT         Seconds before timeout(1) kills duo (default 10).
 #   DUO_SLEEP           Seconds to keep stdin open after last request (default 5).
@@ -32,7 +34,7 @@ __lib_dir() {
 }
 
 : "${DUO_REPO_ROOT:=$(cd "$(__lib_dir)/../../.." && pwd)}"
-: "${DUO_DIST:=$DUO_REPO_ROOT/dist/index.js}"
+: "${DUO_DIST:=$DUO_REPO_ROOT/dist/duo.mjs}"
 : "${DUO_NODE:=node}"
 : "${DUO_TIMEOUT:=10}"
 : "${DUO_SLEEP:=5}"
@@ -64,11 +66,22 @@ duo_tools_call() {
     "$id" "$name" "$args"
 }
 
-# Run the JSON-RPC stream from stdin against `dist/index.js`.
-# - cd to DUO_REPO_ROOT so duo.config.yaml resolves.
+# Run the JSON-RPC stream from stdin against `dist/duo.mjs mcp`.
+# - cd to DUO_REPO_ROOT so the cwd-relative `duo.policy.yaml`
+#   default resolves to the in-repo policy file. (Config loading
+#   is not cwd-relative — see DUO_CONFIG / XDG paths.)
 # - Hold stdin open via `sleep` so Duo can flush async responses.
-# - Bound the run via `timeout`. Exit 124 from `timeout` is the
-#   normal completion signal; anything else means duo exited early.
+# - Bound the run via `timeout` as a safety net. Duo exits cleanly
+#   on stdin EOF, so a healthy run returns 0. EOF only happens
+#   after `sleep $DUO_SLEEP` completes, so `DUO_TIMEOUT` must be
+#   larger than `DUO_SLEEP` (with margin) — otherwise `timeout`
+#   fires before EOF reaches Duo and you'll see a spurious 124.
+#   Defaults (`DUO_TIMEOUT=10`, `DUO_SLEEP=5`) leave a 5s margin
+#   for boot + handshake + any tool calls in the driver. A 124
+#   means *the run as a whole exceeded `DUO_TIMEOUT`*: bump
+#   `DUO_TIMEOUT` first if a slow Solo spawn or long tool call is
+#   plausible. If 124 persists with a generous timeout and an
+#   otherwise-quick payload, that's an EOF-shutdown regression.
 duo_drive() {
   cd "$DUO_REPO_ROOT" || {
     printf 'lib.sh: cannot cd to DUO_REPO_ROOT=%s\n' "$DUO_REPO_ROOT" >&2
@@ -81,5 +94,5 @@ duo_drive() {
   {
     cat
     sleep "$DUO_SLEEP"
-  } | timeout "$DUO_TIMEOUT" "$DUO_NODE" "$DUO_DIST"
+  } | timeout "$DUO_TIMEOUT" "$DUO_NODE" "$DUO_DIST" mcp
 }
