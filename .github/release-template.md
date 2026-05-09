@@ -1,28 +1,23 @@
 # Binary releases for macOS
 
-This release ships standalone `duo` binaries for macOS. The binaries are **not codesigned or notarized yet**, so macOS Gatekeeper will quarantine them on first download. The instructions below walk through the one-time `xattr` workaround.
+This release ships a standalone `duo` binary for **macOS on Apple Silicon (arm64)**. The binary is **not codesigned or notarized yet**, so macOS Gatekeeper will quarantine it on first download. The instructions below walk through the one-time `xattr` workaround.
 
-## 1. Pick the right binary
+> **Intel Macs (`x86_64`) are not currently supported.** No `duo-darwin-x64` binary is attached to this release.
 
-Check your CPU architecture:
+## 1. Confirm your architecture
 
 ```sh
 uname -m
 ```
 
-- `arm64` → download **`duo-darwin-arm64`** (Apple Silicon: M1/M2/M3/M4)
-- `x86_64` → download **`duo-darwin-x64`** (Intel Macs)
+You should see `arm64`. Then download **`duo-darwin-arm64`** from the Assets list below.
 
 ## 2. Remove the macOS quarantine flag
 
-After downloading, run the matching command from the directory containing the binary:
+From the directory containing the downloaded binary:
 
 ```sh
-# Apple Silicon
 xattr -d com.apple.quarantine ./duo-darwin-arm64
-
-# Intel
-xattr -d com.apple.quarantine ./duo-darwin-x64
 ```
 
 If you skip this step, macOS will refuse to launch the binary with a "cannot be opened because the developer cannot be verified" error.
@@ -30,7 +25,7 @@ If you skip this step, macOS will refuse to launch the binary with a "cannot be 
 ## 3. Make it executable and test
 
 ```sh
-chmod +x ./duo-darwin-arm64   # or duo-darwin-x64
+chmod +x ./duo-darwin-arm64
 ./duo-darwin-arm64 --help
 ```
 
@@ -47,7 +42,7 @@ If `~/.local/bin` is not on your `PATH`, add it (e.g. `export PATH="$HOME/.local
 
 Future releases will offer easier install paths. **None of these are available yet:**
 
-- A `curl | sh` installer that downloads the right binary and runs the dequarantine step for you.
+- A `curl | sh` installer that downloads the binary and runs the dequarantine step for you.
 - A Homebrew tap so you can `brew install` Duo.
 
 Until those land, the steps above are the supported install path on macOS.
@@ -58,5 +53,4 @@ SHA256 checksums for the attached binaries can be added below post-publish via t
 
 ```
 <sha256>  duo-darwin-arm64
-<sha256>  duo-darwin-x64
 ```
