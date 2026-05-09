@@ -46,12 +46,12 @@ cat > /tmp/duo-logs.sh <<'BASH'
   echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"resolve_agent_tool","arguments":{"tier":"medium"}}}'
   echo '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resolve_agent_tool","arguments":{"tier":"purple"}}}'
   sleep 5
-} | timeout 10 node ./dist/index.js
+} | timeout 10 node ./dist/duo.mjs mcp
 BASH
 chmod +x /tmp/duo-logs.sh
 /tmp/duo-logs.sh 2>/tmp/duo.err >/tmp/duo.out
-# exit 124 from `timeout` is the success case; anything else means
-# Duo exited on its own (likely an error before the window closed).
+# Duo exits cleanly on stdin EOF (rc=0). Older builds stayed alive
+# until `timeout` killed them (rc=124); accept either as healthy.
 ```
 
 Then:

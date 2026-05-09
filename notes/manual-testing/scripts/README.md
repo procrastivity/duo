@@ -5,16 +5,18 @@ runbook. Each script:
 
 - Sources [`lib.sh`](./lib.sh) for the MCP handshake helpers and
   the `duo_drive` runner.
-- `cd`s into the repo root before invoking `node ./dist/index.js`,
+- `cd`s into the repo root before invoking `node ./dist/duo.mjs`,
   so your local `./duo.config.yaml` is what gets loaded.
 - Holds stdin open via `sleep` so async responses flush before
-  EOF, then bounds the run with `timeout` (Duo does not
-  self-exit). Exit code `124` = healthy completion.
+  EOF, then bounds the run with `timeout` as a safety net. Duo
+  exits cleanly on stdin EOF, so the expected exit code is `0`;
+  `124` (timeout firing) means Duo failed to shut down on EOF and
+  is a regression worth filing.
 
 ## Prerequisites
 
 Run from a shell where `npm run build` has produced
-`dist/index.js`. Each script will check and bail out with a clear
+`dist/duo.mjs`. Each script will check and bail out with a clear
 message otherwise.
 
 ## Tunables
@@ -32,7 +34,7 @@ Knobs (defaults in `lib.sh`):
 | `DUO_TIMEOUT` | seconds before `timeout(1)` kills the run (10) |
 | `DUO_SLEEP` | seconds to keep stdin open after last request (5) |
 | `DUO_NODE` | node binary (`node`) |
-| `DUO_DIST` | path to `dist/index.js` |
+| `DUO_DIST` | path to `dist/duo.mjs` |
 | `DUO_REPO_ROOT` | repo root (auto-derived) |
 | `DUO_PROTOCOL` | MCP protocol version (`2024-11-05`) |
 | `DUO_CLIENT_NAME` | initialize clientInfo.name (`runbook`) |

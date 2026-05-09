@@ -39,7 +39,7 @@ npm run build
 `node24` target) and writes a single ESM bundle to `dist/duo.mjs`.
 The `bin` entry in `package.json` points at that file, so
 `npx @procrastivity/duo` (once published) and a local
-`node ./dist/duo.mjs` invocation are equivalent.
+`node ./dist/duo.mjs mcp` invocation are equivalent.
 
 Optional sanity checks:
 
@@ -175,26 +175,27 @@ Before wiring Duo into a client, confirm it boots cleanly without
 any client attached:
 
 ```bash
-node ./dist/duo.mjs < /dev/null
+node ./dist/duo.mjs mcp < /dev/null
 ```
 
-Duo will **not exit on its own** — even with stdin closed, the
-spawned Solo child process keeps Node's event loop alive. The
-smoke check is therefore: wait ~2 seconds, confirm nothing prints
-on stderr, then Ctrl+C. Any **config / policy / Solo-spawn** error
-surfaces on stderr almost immediately; if Solo's path is wrong
-you'll see an `execa` error naming the missing command. Fix the
-config and rerun until the first couple of seconds are silent.
+Duo shuts down cleanly when stdin reaches EOF (here, immediately,
+because `< /dev/null` is empty). The smoke check is therefore:
+the command returns within a moment, exits `0`, and prints nothing
+on stderr. Any **config / policy / Solo-spawn** error surfaces on
+stderr; if Solo's path is wrong you'll see an `execa` error naming
+the missing command. Fix the config and rerun until stderr is
+silent.
 
-For a scriptable form, bound the run with `timeout`:
+For a scriptable form, bound the run with `timeout` as a safety
+net:
 
 ```bash
-timeout 2 node ./dist/duo.mjs < /dev/null; echo "exit=$?"
+timeout 2 node ./dist/duo.mjs mcp < /dev/null; echo "exit=$?"
 ```
 
-Exit code `124` means `timeout` killed a healthy process — that's
-the success case. Any other non-zero exit accompanied by stderr
-output is the failure case.
+Exit code `0` is the success case. Exit `124` would mean Duo hung
+past the timeout — a regression worth filing. Any other non-zero
+exit accompanied by stderr output is the failure case.
 
 Or use the matching driver:
 

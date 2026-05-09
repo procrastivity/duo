@@ -167,7 +167,7 @@ Revert and restart.
 loading fails fast at startup.
 
 ```bash
-DUO_POLICY=/tmp/does-not-exist.yaml node ./dist/index.js < /dev/null
+DUO_POLICY=/tmp/does-not-exist.yaml node ./dist/duo.mjs mcp < /dev/null
 ```
 
 Acceptance:
@@ -180,7 +180,7 @@ For comparison, the silent-no-op branch:
 
 ```bash
 rm -f duo.policy.yaml
-node ./dist/index.js < /dev/null
+node ./dist/duo.mjs mcp < /dev/null
 ```
 
 Acceptance: no policy-related stderr; Duo boots with built-in

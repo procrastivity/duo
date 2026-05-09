@@ -5,6 +5,6 @@ set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib.sh"
 
-# No requests; just open the process for $DUO_TIMEOUT and let
-# `timeout` kill it. Exit 124 = healthy.
+# No requests; just open the process. Duo exits cleanly on stdin
+# EOF, so a healthy run returns exit 0 with no stderr output.
 : | duo_drive

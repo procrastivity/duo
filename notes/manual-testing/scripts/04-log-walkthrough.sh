@@ -26,8 +26,8 @@ ERR="${DUO_ERR:-/tmp/duo.err}"
   duo_tools_call 4 resolve_agent_tool '{"tier":"purple"}'
 } | duo_drive >"$OUT" 2>"$ERR" || rc=$?
 
-# `timeout` exits 124 on the normal completion path; treat that as
-# success. Anything else is a real failure.
+# Duo exits cleanly on stdin EOF (rc=0). Older builds relied on
+# `timeout` killing it (rc=124); accept both for compatibility.
 rc="${rc:-0}"
 if [ "$rc" -ne 124 ] && [ "$rc" -ne 0 ]; then
   printf '04-log-walkthrough: duo exited rc=%s; see %s\n' "$rc" "$ERR" >&2
