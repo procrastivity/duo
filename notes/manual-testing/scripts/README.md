@@ -13,11 +13,15 @@ runbook. Each script:
 - Holds stdin open via `sleep $DUO_SLEEP` so async responses flush
   before EOF, then bounds the run with `timeout $DUO_TIMEOUT` as a
   safety net. Duo exits cleanly on stdin EOF, so the expected exit
-  code is `0`. **`DUO_TIMEOUT` must be larger than `DUO_SLEEP`
-  (with margin)** — otherwise `timeout` fires before EOF reaches
-  Duo and you'll see a spurious `124`. Defaults (10 / 5) leave a
-  5-second margin; a `124` with the margin intact does mean Duo
-  failed to shut down on EOF and is a regression worth filing.
+  code is `0`. A `124` means the run as a whole exceeded
+  `DUO_TIMEOUT` — possible causes, in order of likelihood:
+    1. `DUO_TIMEOUT <= DUO_SLEEP` (so `timeout` fires before EOF).
+    2. `DUO_TIMEOUT` is too small for boot + slow Solo spawn or a
+       long tool call in the driver. **Bump `DUO_TIMEOUT` first.**
+    3. With a generous timeout and a payload that should be quick:
+       Duo failed to shut down on stdin EOF — that's a regression
+       worth filing.
+  Defaults (10 / 5) are sized for the bundled drivers.
 
 ## Prerequisites
 

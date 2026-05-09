@@ -76,9 +76,12 @@ duo_tools_call() {
 #   after `sleep $DUO_SLEEP` completes, so `DUO_TIMEOUT` must be
 #   larger than `DUO_SLEEP` (with margin) — otherwise `timeout`
 #   fires before EOF reaches Duo and you'll see a spurious 124.
-#   With defaults (`DUO_TIMEOUT=10`, `DUO_SLEEP=5`) the 5s margin
-#   is plenty. A 124 with that margin intact does mean Duo failed
-#   to shut down on EOF — file it.
+#   Defaults (`DUO_TIMEOUT=10`, `DUO_SLEEP=5`) leave a 5s margin
+#   for boot + handshake + any tool calls in the driver. A 124
+#   means *the run as a whole exceeded `DUO_TIMEOUT`*: bump
+#   `DUO_TIMEOUT` first if a slow Solo spawn or long tool call is
+#   plausible. If 124 persists with a generous timeout and an
+#   otherwise-quick payload, that's an EOF-shutdown regression.
 duo_drive() {
   cd "$DUO_REPO_ROOT" || {
     printf 'lib.sh: cannot cd to DUO_REPO_ROOT=%s\n' "$DUO_REPO_ROOT" >&2

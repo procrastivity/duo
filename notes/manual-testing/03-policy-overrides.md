@@ -204,7 +204,11 @@ shortly after — that's expected.)
 
 **Goal**: confirm Zod rejects malformed policies at load time.
 
-Policy:
+Like §4, schema rejection is caught by `runServer()` and surfaced
+through the unavailable-server fallback (`solo_connection_failed`
+tool response), not on stderr at boot.
+
+Policy at `/tmp/bad-policy.yaml`:
 
 ```yaml
 command_tokens:
@@ -214,13 +218,23 @@ command_tokens:
       - flagship
 ```
 
-Exercise: start Duo.
+Exercise: drive a tool call against the bad policy.
 
-Acceptance: process exits with code 1 and stderr contains
-`Failed to parse policy from …` followed by a Zod issue path
-(e.g. `command_tokens.large.mode`). Duo never reaches the MCP
-handshake stage in this case.
+```bash
+DUO_POLICY=/tmp/bad-policy.yaml \
+  ./notes/manual-testing/scripts/02-list-agent-tiers.sh
+```
 
-Revert.
+Acceptance:
+
+- Boot itself does not error on stderr; exit `0`.
+- The `tools/call` response on stdout has `result.isError: true`,
+  with `result.content[0].text` containing
+  `Failed to parse policy from /tmp/bad-policy.yaml:` followed by
+  the Zod issue path (e.g.
+  `command_tokens.large.mode: Invalid enum value. Expected
+  'extend' | 'replace', received 'replace_all'`).
+
+Clean up the file.
 
 You're ready for [`04-logging.md`](./04-logging.md).
