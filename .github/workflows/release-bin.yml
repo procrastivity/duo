@@ -78,6 +78,7 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: dist/bin/${{ matrix.asset_name }}
+          body_path: .github/release-template.md
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
           fail_on_unmatched_files: true
 
