@@ -2,8 +2,9 @@
 
 > Applies to: Duo current `main`.
 > Prereqs: [`00-setup.md`](./00-setup.md) complete; `dist/duo.mjs`
-> built; `./duo.config.yaml` points at a real Solo binary; Solo has
-> agent tools registered.
+> built; a Duo config reachable via `DUO_CONFIG` (absolute path) or
+> the XDG default points at a real Solo binary; Solo has agent
+> tools registered.
 
 This doc verifies that Duo comes up as an MCP stdio server, that an
 MCP client can complete the `initialize` handshake, and that

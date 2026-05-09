@@ -182,10 +182,13 @@ node ./dist/duo.mjs mcp < /dev/null
 Duo shuts down cleanly when stdin reaches EOF (here, immediately,
 because `< /dev/null` is empty). The smoke check is therefore:
 the command returns within a moment, exits `0`, and prints nothing
-on stderr. Any **config / policy / Solo-spawn** error surfaces on
-stderr; if Solo's path is wrong you'll see an `execa` error naming
-the missing command. Fix the config and rerun until stderr is
-silent.
+on stderr. **Config-load and policy-load errors** surface here on
+stderr (config missing, policy YAML malformed, etc.); fix and
+rerun until stderr is silent. Solo-spawn errors are *not*
+exercised by this step — the Solo client connects lazily on the
+first tool call. To validate the Solo path, drive a `tools/list`
+or `list_agent_tiers` call (see `01-running-duo.md` Option B and
+the `01-tools-list.sh` driver).
 
 For a scriptable form, bound the run with `timeout` as a safety
 net:
