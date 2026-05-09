@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 2026-05-09
+
+### Documentation
+
+- docs(manual-testing): refresh 00-setup for bundle path and XDG config (#17) by @simensen in [#17](https://github.com/procrastivity/duo/pull/17)
+
+### Maintenance
+
+- chore: wire up release body
 ## [0.1.7] - 2026-05-06
 
 ### Added
