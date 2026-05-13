@@ -71,5 +71,6 @@ Builders do not contact researcher directly; coordinator is the routing hub.
 1. Verify shipping criteria.
 2. Run post-build eval and append retro entry.
 3. Archive workplan and scratchpad.
+3a. If this step closes a round (last step in `roadmap-N.md`): also archive `roadmap-N.md` → `notes/roadmap/archive/`, and archive every proposal + intake file referenced by that roadmap's `**Intakes**:` block → `notes/proposals/archive/`. For each linked `intake-<slug>.md`, also move the matching `<slug>.md` and `<slug>-stories.md` if present. Run `scripts/check-proposal-hygiene.sh` to confirm no orphans remain.
 4. Post step-shipped comment.
 5. Close researcher and coordinator processes.
