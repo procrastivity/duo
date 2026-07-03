@@ -1,7 +1,7 @@
 {
   "name": "@procrastivity/duo",
   "version": "0.1.8",
-  "description": "Solo MCP companion for agent tier-based selection and override-aware orchestration.",
+  "description": "Solo MCP companion for agent preset selection, provider toggles, and per-launch extra_args.",
   "type": "module",
   "bin": {
     "duo": "./dist/duo.mjs"
