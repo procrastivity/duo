@@ -28,6 +28,7 @@ export const SoloSpawnArgsSchema = z.object({
   name: z.string().optional(),
   project_id: z.number().int().optional(),
   prompt: z.string().optional(),
+  extra_args: z.array(z.string()).optional(),
 });
 
 export type SoloSpawnArgs = z.infer<typeof SoloSpawnArgsSchema>;

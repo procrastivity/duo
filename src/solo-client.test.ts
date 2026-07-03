@@ -331,6 +331,64 @@ describe("SoloClient", () => {
       expect(capturedArgs).not.toHaveProperty("project_id");
     });
 
+    it("includes extra_args in call args when non-empty", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({
+        kind: "agent",
+        agent_tool_id: 2,
+        extra_args: ["--model", "sonnet"],
+      });
+
+      expect(capturedArgs).toEqual({
+        kind: "agent",
+        agent_tool_id: 2,
+        project_id: 6,
+        extra_args: ["--model", "sonnet"],
+      });
+    });
+
+    it("omits extra_args when the array is empty", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2, extra_args: [] });
+      expect(capturedArgs).not.toHaveProperty("extra_args");
+    });
+
+    it("omits extra_args when absent", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      const transport = createMockTransport((name, args) => {
+        if (name === "spawn_process") {
+          capturedArgs = args as Record<string, unknown>;
+          return validSpawnResult;
+        }
+        return [];
+      });
+      const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "6" }, cwd: "/" });
+      await client.connect();
+
+      await client.spawnProcess({ kind: "agent", agent_tool_id: 2 });
+      expect(capturedArgs).not.toHaveProperty("extra_args");
+    });
+
     it("throws SoloClientError when transport returns an MCP error", async () => {
       const transport = createMockTransport(() => []);
       const client = new SoloClient(transport, { env: { SOLO_PROJECT_ID: "1" }, cwd: "/" });
