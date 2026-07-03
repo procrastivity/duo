@@ -5,6 +5,7 @@ import { EXIT_USER_ERROR } from "../connect.js";
 import { stringify as stringifyYaml } from "yaml";
 import { isValidProviderLabel } from "../../state/paths.js";
 import { listProviders, setProviderEnabled } from "../../state/providers.js";
+import { presetCommand } from "./preset.js";
 
 const showCommand = defineCommand({
   meta: {
@@ -144,6 +145,7 @@ export const configCommand = defineCommand({
   subCommands: {
     show: showCommand,
     path: pathCommand,
+    preset: presetCommand,
     provider: providerCommand,
   },
 });
