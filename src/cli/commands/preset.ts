@@ -1,17 +1,22 @@
 import { defineCommand } from "citty";
-import type { PresetDefinition } from "../../types/presets.js";
+import type { PresetDefinition, Presets } from "../../types/presets.js";
+import { PresetsSchema } from "../../types/presets.js";
 import type { SoloAgentTool } from "../../types/solo.js";
+import { SoloClient } from "../../solo-client.js";
+import { StdioTransport } from "../../transport/stdio.js";
+import { resolveTransportCommand } from "../../transport/resolve-command.js";
 import {
   connectSolo,
   handleSoloError,
   EXIT_USER_ERROR,
 } from "../connect.js";
+import { loadConfig } from "../config-loader.js";
 import {
   generateDefinitionId,
   readRawConfig,
   writeConfig,
 } from "../config-writer.js";
-import { writeErr, writeJson, writeOut } from "../output.js";
+import { writeErr, writeJson, writeOut, renderTable, type Column } from "../output.js";
 
 /**
  * Pure `--agent-tool` selector resolver (D4).
@@ -251,8 +256,173 @@ const addCommand = defineCommand({
 });
 
 /**
- * The `preset` subcommand group under `duo config`. Task-3 ships `add`;
- * `list` and `remove` (Tasks 4–5) attach here as siblings.
+ * Read the `presets` section OFFLINE (D7) — no Solo required. Reuses the Task-2
+ * raw reader and the Task-1 {@link PresetsSchema}, so a hand-edited config with a
+ * malformed `presets` block fails with a readable Zod message rather than
+ * rendering garbage. An absent section is simply an empty map.
+ */
+export const readPresets = (): Presets => {
+  const raw = readRawConfig();
+  if (raw.presets === undefined) return {};
+  return PresetsSchema.parse(raw.presets);
+};
+
+/** One flattened `(preset, definition)` pair, table-ready. */
+export interface PresetRow {
+  readonly preset: string;
+  readonly id: string;
+  readonly agent_tool_id: number;
+  /** Display for the tool column: `Name (#4)` enriched, `#4` offline, `(unknown tool) (#4)` when the id no longer resolves (OQ3). */
+  readonly tool: string;
+  readonly extra_args: string;
+  readonly provider: string;
+}
+
+/**
+ * Render the tool column (D7 / OQ2 / OQ3):
+ * - no live map (Solo unreachable / not consulted) → `#<id>` (id-only).
+ * - live map present, id resolves → `<name> (#<id>)`.
+ * - live map present, id absent → `(unknown tool) (#<id>)`.
+ */
+const toolDisplay = (id: number, names?: ReadonlyMap<number, string> | null): string => {
+  if (!names) return `#${id}`;
+  const name = names.get(id);
+  return name === undefined ? `(unknown tool) (#${id})` : `${name} (#${id})`;
+};
+
+/**
+ * Pure, offline view builder over an already-loaded presets map. Optionally
+ * filters to a single preset and enriches the tool column from a live
+ * `agent_tool_id → name` map. Directly unit-tested — reads/spawns nothing.
+ */
+export const buildPresetView = (
+  presets: Presets,
+  opts: { readonly filter?: string; readonly toolNames?: ReadonlyMap<number, string> | null } = {},
+): { readonly presets: Presets; readonly rows: PresetRow[]; readonly filterMissing: boolean } => {
+  const filter = opts.filter?.trim();
+  let selected: Presets = presets;
+  let filterMissing = false;
+  if (filter) {
+    if (Object.prototype.hasOwnProperty.call(presets, filter)) {
+      selected = { [filter]: presets[filter]! };
+    } else {
+      selected = {};
+      filterMissing = true;
+    }
+  }
+
+  const rows: PresetRow[] = [];
+  for (const [name, defs] of Object.entries(selected)) {
+    for (const def of defs) {
+      rows.push({
+        preset: name,
+        id: def.id,
+        agent_tool_id: def.agent_tool_id,
+        tool: toolDisplay(def.agent_tool_id, opts.toolNames),
+        extra_args: def.extra_args ?? "—",
+        provider: def.provider ?? "—",
+      });
+    }
+  }
+  return { presets: selected, rows, filterMissing };
+};
+
+/**
+ * Best-effort live tool-name lookup for `list` enrichment (D7 / OQ2). Attempts a
+ * Solo connection and `listAgentTools`, returning an `agent_tool_id → name` map
+ * on success. On ANY failure (no/invalid config, transport command missing,
+ * connect refused, RPC error) it returns `null` so the caller degrades to
+ * id-only output. This NEVER throws and NEVER exits — enrichment is a bonus, not
+ * a requirement, so a missing Solo must not break `list`.
+ */
+export const tryLoadToolNames = async (
+  opts: { cwd?: string } = {},
+): Promise<Map<number, string> | null> => {
+  const cwd = opts.cwd ?? process.cwd();
+  let client: SoloClient;
+  try {
+    const loaded = loadConfig({ cwd });
+    const command = resolveTransportCommand(loaded.config.solo.transport.command);
+    const transport = new StdioTransport({ ...loaded.config.solo.transport, command });
+    client = new SoloClient(transport, { cwd, env: process.env });
+    await client.connect();
+  } catch {
+    return null;
+  }
+  try {
+    const tools = await client.listAgentTools();
+    return new Map(tools.map((t) => [t.id, t.name] as const));
+  } catch {
+    return null;
+  } finally {
+    try {
+      await client.disconnect();
+    } catch {
+      // ignore close errors — best-effort enrichment
+    }
+  }
+};
+
+const PRESET_LIST_COLUMNS: readonly Column<PresetRow>[] = [
+  { header: "PRESET", get: (r) => r.preset },
+  { header: "ID", get: (r) => r.id },
+  { header: "TOOL", get: (r) => r.tool, truncate: 40 },
+  { header: "EXTRA_ARGS", get: (r) => r.extra_args, truncate: 40 },
+  { header: "PROVIDER", get: (r) => r.provider },
+];
+
+const listCommand = defineCommand({
+  meta: {
+    name: "list",
+    description: "List presets and their definitions (offline; best-effort tool names)",
+  },
+  args: {
+    name: { type: "positional", required: false, description: "Filter to a single preset" },
+    cwd: { type: "string", description: "Working directory" },
+    json: { type: "boolean", description: "Emit the raw structured view (presets → definitions)" },
+    quiet: { type: "boolean", alias: "q", description: "Print only definition ids, one per line" },
+  },
+  async run({ args }) {
+    const filter = args.name !== undefined ? String(args.name).trim() : undefined;
+
+    let presets: Presets;
+    try {
+      presets = readPresets();
+    } catch (err) {
+      writeErr(err instanceof Error ? err.message : String(err));
+      process.exit(EXIT_USER_ERROR);
+    }
+
+    // Only the human table needs live names; --json is raw and --quiet is ids,
+    // so skip the (subprocess-spawning) Solo enrichment for those paths.
+    const toolNames =
+      args.json || args.quiet ? null : await tryLoadToolNames({ cwd: args.cwd });
+
+    const view = buildPresetView(presets, { filter, toolNames });
+
+    if (args.json) {
+      writeJson(view.presets);
+      return;
+    }
+    if (args.quiet) {
+      for (const r of view.rows) writeOut(r.id);
+      return;
+    }
+    if (view.rows.length === 0) {
+      writeOut(
+        view.filterMissing
+          ? `No preset named "${filter}" is configured.`
+          : "No presets configured.",
+      );
+      return;
+    }
+    writeOut(renderTable(view.rows, PRESET_LIST_COLUMNS));
+  },
+});
+
+/**
+ * The `preset` subcommand group under `duo config`. Task-3 ships `add`,
+ * Task-4 `list`; `remove` (Task-5) attaches here as a sibling.
  */
 export const presetCommand = defineCommand({
   meta: {
@@ -261,5 +431,6 @@ export const presetCommand = defineCommand({
   },
   subCommands: {
     add: addCommand,
+    list: listCommand,
   },
 });

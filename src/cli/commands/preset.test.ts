@@ -4,7 +4,15 @@ import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SoloAgentTool } from "../../types/solo.js";
-import { presetAdd, resolvePresetAgentTool, type AgentToolLister } from "./preset.js";
+import {
+  presetAdd,
+  resolvePresetAgentTool,
+  readPresets,
+  buildPresetView,
+  tryLoadToolNames,
+  type AgentToolLister,
+} from "./preset.js";
+import type { Presets } from "../../types/presets.js";
 
 const tool = (
   id: number,
@@ -175,5 +183,170 @@ describe("presetAdd", () => {
     expect(result.status).toBe("written");
     const text = readFileSync(configPath, "utf8");
     expect(text).not.toContain("policy");
+  });
+});
+
+// A fixture config with two presets, one carrying multiple definitions.
+const FIXTURE_CONFIG = [
+  "solo:",
+  "  transport:",
+  "    type: stdio",
+  "presets:",
+  "  builder:",
+  "    - id: aaaa1111",
+  "      agent_tool_id: 4",
+  "      extra_args: -m sonnet",
+  "      provider: anthropic",
+  "    - id: bbbb2222",
+  "      agent_tool_id: 3",
+  "  reviewer:",
+  "    - id: cccc3333",
+  "      agent_tool_id: 17",
+  "",
+].join("\n");
+
+describe("readPresets (offline)", () => {
+  const originalEnv = process.env;
+  let tmp: string;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.DUO_CONFIG;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.DUO_POLICY;
+    tmp = mkdtempSync(join(tmpdir(), "duo-preset-list-"));
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("returns the parsed presets section from a fixture config", () => {
+    const path = join(tmp, "config.yaml");
+    writeFileSync(path, FIXTURE_CONFIG);
+    process.env.DUO_CONFIG = path;
+    expect(readPresets()).toEqual({
+      builder: [
+        { id: "aaaa1111", agent_tool_id: 4, extra_args: "-m sonnet", provider: "anthropic" },
+        { id: "bbbb2222", agent_tool_id: 3 },
+      ],
+      reviewer: [{ id: "cccc3333", agent_tool_id: 17 }],
+    });
+  });
+
+  it("returns {} when there is no presets section (empty case)", () => {
+    const path = join(tmp, "config.yaml");
+    writeFileSync(path, "solo:\n  transport:\n    type: stdio\n");
+    process.env.DUO_CONFIG = path;
+    expect(readPresets()).toEqual({});
+  });
+
+  it("returns {} when the config file is absent", () => {
+    process.env.DUO_CONFIG = join(tmp, "missing.yaml");
+    expect(readPresets()).toEqual({});
+  });
+
+  it("throws a readable error when the presets section is malformed", () => {
+    const path = join(tmp, "config.yaml");
+    writeFileSync(
+      path,
+      "solo:\n  transport:\n    type: stdio\npresets:\n  builder:\n    - agent_tool_id: 4\n",
+    );
+    process.env.DUO_CONFIG = path;
+    // Missing the required `id` — the Task-1 schema rejects it.
+    expect(() => readPresets()).toThrow();
+  });
+});
+
+const PRESETS: Presets = {
+  builder: [
+    { id: "aaaa1111", agent_tool_id: 4, extra_args: "-m sonnet", provider: "anthropic" },
+    { id: "bbbb2222", agent_tool_id: 3 },
+  ],
+  reviewer: [{ id: "cccc3333", agent_tool_id: 17 }],
+};
+
+describe("buildPresetView", () => {
+  it("flattens every preset → definition into rows (id-only when no live names)", () => {
+    const view = buildPresetView(PRESETS);
+    expect(view.filterMissing).toBe(false);
+    expect(view.rows).toEqual([
+      { preset: "builder", id: "aaaa1111", agent_tool_id: 4, tool: "#4", extra_args: "-m sonnet", provider: "anthropic" },
+      { preset: "builder", id: "bbbb2222", agent_tool_id: 3, tool: "#3", extra_args: "—", provider: "—" },
+      { preset: "reviewer", id: "cccc3333", agent_tool_id: 17, tool: "#17", extra_args: "—", provider: "—" },
+    ]);
+  });
+
+  it("enriches the tool column with live names when a map is supplied", () => {
+    const names = new Map<number, string>([
+      [4, "Codex"],
+      [3, "Claude"],
+      // 17 intentionally absent → renders (unknown tool) (OQ3)
+    ]);
+    const view = buildPresetView(PRESETS, { toolNames: names });
+    expect(view.rows.map((r) => r.tool)).toEqual([
+      "Codex (#4)",
+      "Claude (#3)",
+      "(unknown tool) (#17)",
+    ]);
+  });
+
+  it("filters to a single preset by name", () => {
+    const view = buildPresetView(PRESETS, { filter: "reviewer" });
+    expect(view.filterMissing).toBe(false);
+    expect(view.presets).toEqual({ reviewer: [{ id: "cccc3333", agent_tool_id: 17 }] });
+    expect(view.rows).toHaveLength(1);
+    expect(view.rows[0]!.preset).toBe("reviewer");
+  });
+
+  it("flags a filter that matches no preset (empty view, filterMissing=true)", () => {
+    const view = buildPresetView(PRESETS, { filter: "ghost" });
+    expect(view.filterMissing).toBe(true);
+    expect(view.presets).toEqual({});
+    expect(view.rows).toEqual([]);
+  });
+
+  it("empty/no-presets case yields no rows", () => {
+    const view = buildPresetView({});
+    expect(view.filterMissing).toBe(false);
+    expect(view.rows).toEqual([]);
+  });
+});
+
+describe("tryLoadToolNames (graceful degrade — never throws)", () => {
+  const originalEnv = process.env;
+  let tmp: string;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.DUO_CONFIG;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.DUO_POLICY;
+    tmp = mkdtempSync(join(tmpdir(), "duo-preset-enrich-"));
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("returns null (does not throw) when Solo is unreachable", async () => {
+    // A config whose transport command does not exist → connect fails → null.
+    const path = join(tmp, "config.yaml");
+    writeFileSync(
+      path,
+      "solo:\n  transport:\n    type: stdio\n    command: this-command-does-not-exist-duo\n",
+    );
+    process.env.DUO_CONFIG = path;
+    await expect(tryLoadToolNames({ cwd: tmp })).resolves.toBeNull();
+  });
+
+  it("returns null when config loading itself fails", async () => {
+    // A non-mapping config makes loadConfig throw; the helper still degrades.
+    const path = join(tmp, "config.yaml");
+    writeFileSync(path, "- not\n- a\n- mapping\n");
+    process.env.DUO_CONFIG = path;
+    await expect(tryLoadToolNames({ cwd: tmp })).resolves.toBeNull();
   });
 });
