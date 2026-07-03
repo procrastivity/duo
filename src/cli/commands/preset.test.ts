@@ -92,7 +92,6 @@ describe("presetAdd", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-preset-add-"));
     configPath = join(tmp, "config.yaml");
     process.env.DUO_CONFIG = configPath;
@@ -174,17 +173,6 @@ describe("presetAdd", () => {
     expect(result.tools).toHaveLength(3);
     expect(existsSync(configPath)).toBe(false);
   });
-
-  it("does not persist a policy key into config.yaml even with duo.policy.yaml present (D3)", async () => {
-    const policyPath = join(tmp, "duo.policy.yaml");
-    process.env.DUO_POLICY = policyPath;
-    writeFileSync(policyPath, "command_tokens:\n  small:\n    tokens:\n      - foo\n");
-
-    const result = await presetAdd(fakeClient(TOOLS), { name: "builder", agentTool: "4" });
-    expect(result.status).toBe("written");
-    const text = readFileSync(configPath, "utf8");
-    expect(text).not.toContain("policy");
-  });
 });
 
 // A fixture config with two presets, one carrying multiple definitions.
@@ -214,7 +202,6 @@ describe("readPresets (offline)", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-preset-list-"));
   });
 
@@ -324,7 +311,6 @@ describe("presetRemove (Chunk 5)", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-preset-remove-"));
     configPath = join(tmp, "config.yaml");
     process.env.DUO_CONFIG = configPath;
@@ -385,7 +371,6 @@ describe("tryLoadToolNames (graceful degrade — never throws)", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-preset-enrich-"));
   });
 

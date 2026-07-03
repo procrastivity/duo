@@ -46,7 +46,6 @@ beforeEach(() => {
   h.loadConfig.mockReturnValue({
     config: { presets },
     configPath: "/x",
-    policyPath: null,
     usedDefaults: false,
   });
   h.spawnProcess.mockResolvedValue({ process_id: 555, name: "agent-x" });

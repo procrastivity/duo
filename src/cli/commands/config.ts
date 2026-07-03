@@ -22,7 +22,6 @@ const showCommand = defineCommand({
       if (args.json) {
         writeJson({
           config_path: loaded.configPath,
-          policy_path: loaded.policyPath,
           config: loaded.config,
         });
       } else {
@@ -48,11 +47,9 @@ const pathCommand = defineCommand({
   async run({ args }) {
     const cwd = args.cwd ?? process.cwd();
     let configPath = resolveConfigPath();
-    let policyPath: string | null = null;
     try {
       const loaded = loadConfig({ cwd });
       configPath = loaded.configPath;
-      policyPath = loaded.policyPath;
     } catch {
       // Fall through with the resolved (possibly missing) path.
     }
@@ -61,11 +58,10 @@ const pathCommand = defineCommand({
       return;
     }
     if (args.json) {
-      writeJson({ config_path: configPath, policy_path: policyPath });
+      writeJson({ config_path: configPath });
       return;
     }
     writeOut(`config: ${configPath}`);
-    writeOut(`policy: ${policyPath ?? "—"}`);
   },
 });
 

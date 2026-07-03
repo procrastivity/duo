@@ -1,14 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseConfig, type SoloConfig } from "../config.js";
-import { loadPolicy } from "../policy.js";
 
 export interface LoadedConfig {
   config: SoloConfig;
   configPath: string;
-  policyPath: string | null;
   usedDefaults: boolean;
 }
 
@@ -45,11 +43,7 @@ export const resolveConfigPath = (): string => {
   return join(homedir(), ".config", "duo", "config.yaml");
 };
 
-export const resolvePolicyPath = (cwd: string = process.cwd()): string =>
-  process.env.DUO_POLICY ?? resolve(cwd, "duo.policy.yaml");
-
-export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
-  const cwd = opts.cwd ?? process.cwd();
+export const loadConfig = (_opts: LoadConfigOptions = {}): LoadedConfig => {
   const configPath = resolveConfigPath();
   let raw: unknown;
   let usedDefaults = false;
@@ -89,27 +83,6 @@ export const loadConfig = (opts: LoadConfigOptions = {}): LoadedConfig => {
     raw = parsed;
   }
 
-  const policyPath = resolvePolicyPath(cwd);
-  const explicitPolicyEnv = process.env.DUO_POLICY !== undefined;
-  let usedPolicyPath: string | null = null;
-
-  if (explicitPolicyEnv && !existsSync(policyPath)) {
-    throw new Error(`DUO_POLICY is set to "${policyPath}" but file does not exist`);
-  }
-
-  if (existsSync(policyPath)) {
-    try {
-      const rawPolicy = parseYaml(readFileSync(policyPath, "utf8"));
-      const policy = loadPolicy(rawPolicy);
-      (raw as Record<string, unknown>).policy = policy;
-      usedPolicyPath = policyPath;
-    } catch (err) {
-      throw new Error(
-        `Failed to parse policy from ${policyPath}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-
   const config = parseConfig(raw);
-  return { config, configPath, policyPath: usedPolicyPath, usedDefaults };
+  return { config, configPath, usedDefaults };
 };

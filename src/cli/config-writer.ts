@@ -10,12 +10,9 @@ import { DEFAULT_RAW_CONFIG, resolveConfigPath } from "./config-loader.js";
  * or seed a fresh object from {@link DEFAULT_RAW_CONFIG} when the file is absent
  * (or present-but-empty).
  *
- * D3 (load-bearing): this deliberately bypasses `loadConfig`. `loadConfig` reads
- * a SEPARATE `duo.policy.yaml`, runs `loadPolicy`, and injects the result as
- * `raw.policy` before parsing — so the merged, loaded config carries a `policy`
- * key that never lives in `config.yaml`. Mutating and re-serializing that merged
- * object would wrongly persist `policy` into `config.yaml`. Callers that intend
- * to write MUST start from this raw view.
+ * This deliberately bypasses `loadConfig` (and thus `parseConfig`) so that
+ * schema defaults injected during parsing are never written back to disk.
+ * Callers that intend to write MUST start from this raw view.
  */
 export const readRawConfig = (): Record<string, unknown> => {
   const configPath = resolveConfigPath();
@@ -76,8 +73,7 @@ export const readRawConfig = (): Record<string, unknown> => {
  *
  * The RAW `next` object is what gets serialized (not the schema-parsed result),
  * so schema defaults (e.g. `solo.transport.args: []`) are not injected into the
- * on-disk file. Combined with {@link readRawConfig}, this upholds D3: a `policy`
- * key is never introduced into `config.yaml`.
+ * on-disk file.
  *
  * @returns the validated {@link SoloConfig}.
  */

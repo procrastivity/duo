@@ -55,17 +55,15 @@ export const doctorCommand = defineCommand({
     // 2. duo config discovered + parses cleanly
     let config: SoloConfig | null = null;
     let configPath = resolveConfigPath();
-    let policyPath: string | null = null;
     try {
       const loaded = loadConfig({ cwd });
       config = loaded.config;
       configPath = loaded.configPath;
-      policyPath = loaded.policyPath;
       const base = loaded.usedDefaults ? `${configPath} (defaults — file not found)` : configPath;
       checks.push({
         name: "duo config",
         status: "ok",
-        detail: policyPath ? `${base} (+ policy: ${policyPath})` : base,
+        detail: base,
       });
     } catch (err) {
       checks.push({

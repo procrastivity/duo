@@ -14,7 +14,6 @@ describe("readRawConfig", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-config-writer-"));
   });
 
@@ -68,7 +67,6 @@ describe("writeConfig", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-config-writer-"));
   });
 
@@ -134,29 +132,24 @@ describe("writeConfig", () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  it("REGRESSION GUARD (D3): a preset write leaves NO policy key in config.yaml even with duo.policy.yaml present", () => {
+  it("REGRESSION GUARD: a preset write serializes only the raw config.yaml keys (no injected schema defaults)", () => {
     const configPath = join(tmp, "config.yaml");
-    const policyPath = join(tmp, "duo.policy.yaml");
     process.env.DUO_CONFIG = configPath;
-    process.env.DUO_POLICY = policyPath;
-    writeFileSync(policyPath, "command_tokens:\n  small:\n    tokens:\n      - foo\n");
 
-    // Writer starts from the RAW config.yaml (absent → default seed), never the
-    // merged loaded config — so the injected `policy` never reaches disk.
+    // Writer starts from the RAW config.yaml (absent → default seed), and only
+    // the keys present in that raw view reach disk.
     const raw = readRawConfig();
     raw.presets = { reviewer: [{ id: generateDefinitionId(), agent_tool_id: 4 }] };
     writeConfig(raw);
 
     const text = readFileSync(configPath, "utf8");
-    expect(text).not.toContain("policy");
     const reparsed = parseYaml(text) as Record<string, unknown>;
-    expect(reparsed.policy).toBeUndefined();
     expect(reparsed.presets).toBeDefined();
+    // No schema default (e.g. transport.args) leaked into the on-disk file.
+    expect((reparsed.solo as { transport: { args?: unknown } }).transport.args).toBeUndefined();
 
-    // End-to-end: loadConfig still injects policy from the SEPARATE file, and
-    // the written presets load alongside it.
+    // End-to-end: the written presets load back via loadConfig.
     const loaded = loadConfig({ cwd: tmp });
-    expect(loaded.config.policy).toBeDefined();
     expect(loaded.config.presets?.reviewer?.[0]?.agent_tool_id).toBe(4);
   });
 });
