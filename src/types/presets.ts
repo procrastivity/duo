@@ -1,11 +1,20 @@
 import { z } from "zod";
+import { isValidProviderLabel } from "../state/paths.js";
+
+const ProviderLabelSchema = z
+  .string()
+  .min(1)
+  .refine(isValidProviderLabel, {
+    message:
+      'Provider labels must match ^[A-Za-z0-9._-]+$ and cannot be "", ".", "..", or contain a path separator.',
+  });
 
 export const PresetDefinitionSchema = z
   .object({
     id: z.string().min(1),
     agent_tool_id: z.number().int(),
     extra_args: z.string().optional(),
-    provider: z.string().min(1).optional(),
+    provider: ProviderLabelSchema.optional(),
   })
   .strict();
 

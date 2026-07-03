@@ -132,6 +132,37 @@ describe("duo agent launch", () => {
     expect(args.extra_args).toEqual(["--model", "sonnet", "--json"]);
   });
 
+  it("appends caller --extra-arguments after preset args", async () => {
+    await runCommand(agentCommand, {
+      rawArgs: [
+        "launch",
+        "withArgs",
+        "--extra-arguments",
+        "--verbose '--label=hello world'",
+        "--json",
+      ],
+    });
+
+    const expected = [
+      "--model",
+      "sonnet",
+      "--json",
+      "--verbose",
+      "--label=hello world",
+    ];
+    expect(h.spawnProcess.mock.calls[0][0].extra_args).toEqual(expected);
+    expect(JSON.parse(out()).extra_args).toEqual(expected);
+  });
+
+  it("sends caller-only --extra-arguments when the preset has none", async () => {
+    await runCommand(agentCommand, {
+      rawArgs: ["launch", "builder", "--extra-arguments", "--only-caller", "--json"],
+    });
+
+    expect(h.spawnProcess.mock.calls[0][0].extra_args).toEqual(["--only-caller"]);
+    expect(JSON.parse(out()).extra_args).toEqual(["--only-caller"]);
+  });
+
   it("omits extra_args when the preset has none", async () => {
     await runCommand(agentCommand, { rawArgs: ["launch", "builder", "--json"] });
     const args = h.spawnProcess.mock.calls[0][0];

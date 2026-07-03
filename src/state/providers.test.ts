@@ -155,5 +155,13 @@ describe("provider state", () => {
         { provider: "zeta", enabled: true },
       ]);
     });
+
+    it("ignores invalid labels and transient temp files", () => {
+      setProviderEnabled("openai", false);
+      write("provider!", "0");
+      write("openrouter.123.tmp", "0");
+
+      expect(listProviders()).toEqual([{ provider: "openai", enabled: false }]);
+    });
   });
 });

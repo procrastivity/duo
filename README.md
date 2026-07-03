@@ -6,7 +6,7 @@
 
 **Duo** is a standalone MCP server that surfaces a *preset* layer over Solo's process primitives. Instead of spawning Solo-managed agent processes by hard-coded `agent_tool_id`, you declare named **presets** — `builder`, `reviewer`, `default`, whatever you like — each mapping to one or more agent-tool definitions, and Duo picks an eligible definition at launch time.
 
-A preset definition carries an `agent_tool_id`, an optional opaque `extra_args` string (tokenized and threaded to the spawned process), and an optional `provider` label. **Providers** are freeform labels with a lock-free enabled/disabled state; a definition whose provider is disabled is skipped at launch, so you can turn a whole class of agents on or off without editing config. Launches also accept a per-launch `extra_args` append and a soft `avoid_provider` preference, which powers workflows like "spawn the reviewer on a different provider than the builder."
+A preset definition carries an `agent_tool_id`, an optional opaque `extra_args` string (tokenized and threaded to the spawned process), and an optional filename-safe `provider` label. **Providers** are user-defined labels with a lock-free enabled/disabled state; a definition whose provider is disabled is skipped at launch, so you can turn a whole class of agents on or off without editing config. Launches also accept a per-launch `extra_args` append and a soft `avoid_provider` preference, which powers workflows like "spawn the reviewer on a different provider than the builder."
 
 Solo's `spawn_process` tool remains directly available. Reach for Duo when you want named presets, provider toggles, per-launch `extra_args`, and structured resolution logs; reach for direct `spawn_process` only for explicit one-off tooling overrides that don't fit the preset model.
 
@@ -66,15 +66,16 @@ duo agent resolve builder --avoid-provider=openai       # dry-run, soft-avoiding
 duo agent launch builder --name worker-1                # launch a builder-preset agent
 duo agent launch reviewer --avoid-provider=openai       # launch, soft-avoiding a provider
 duo agent launch builder --prompt "Analyze the codebase"  # launch with a bootstrap prompt
+duo agent launch builder --extra-arguments="--verbose"  # append per-launch args
 ```
 
-`--prompt` (CLI only) delivers a message to the spawned agent's first turn. `--avoid-provider` on `resolve`/`launch` is a *soft* preference: Duo restricts the candidate set to definitions whose provider differs, and only relents (allowing the avoided provider) if no preset can otherwise be satisfied — it never hard-fails on `avoid_provider` alone.
+`--prompt` (CLI only) delivers a message to the spawned agent's first turn. `--extra-arguments` on `launch` is tokenized the same way as preset `extra_args` and appended after the preset's resolved args. `--avoid-provider` on `resolve`/`launch` is a *soft* preference: Duo restricts the candidate set to definitions whose provider differs, and only relents (allowing the avoided provider) if no preset can otherwise be satisfied — it never hard-fails on `avoid_provider` alone.
 
 ### Cross-cutting flags
 
 - `--json` — emit JSON instead of a human-readable table (read commands).
 - `-q` / `--quiet` — suppress connect logs and chrome; emit only the primary identifier (e.g. process id).
-- `--cwd <path>` — override `process.cwd()` (handy for testing).
+- `--cwd <path>` — override the working directory used for Solo/project resolution. Config still comes from `DUO_CONFIG` or the XDG config path.
 - `NO_COLOR=1` and `--no-color` (on `duo doctor`) disable ANSI color.
 
 ### Exit codes
@@ -90,6 +91,7 @@ duo agent launch builder --prompt "Analyze the codebase"  # launch with a bootst
 duo doctor                                                   # verify setup
 duo agent launch builder --name worker-1                     # launch a builder agent
 duo agent launch reviewer --avoid-provider=openai            # launch on a different provider
+duo agent launch builder --extra-arguments="--verbose"       # append per-launch args
 duo proc ls --json | jq '.[] | .name'                        # script-friendly output
 duo proc logs 298 --follow                                   # tail a process
 SOLO_PROJECT_ID=6 duo whoami                                 # one-shot project override
@@ -217,7 +219,7 @@ presets:
   - `id` — a stable short id used to target the definition for removal. `duo config preset add` generates one for you.
   - `agent_tool_id` — the Solo agent-tool id to spawn.
   - `extra_args` — (optional) an opaque string; Duo splits it shell-style and threads the tokens to the spawned process. Duo does **not** validate agent-specific flags.
-  - `provider` — (optional) a freeform provider label. When the provider is disabled, the definition is skipped at launch.
+  - `provider` — (optional) a provider label matching `^[A-Za-z0-9._-]+$` other than `.`, or `..`. When the provider is disabled, the definition is skipped at launch.
 
 Prefer editing presets through `duo config preset add|remove` (which generates ids and validates tool selectors) over hand-editing the file.
 

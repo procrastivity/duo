@@ -3,6 +3,7 @@ import { connectSolo, handleSoloError, EXIT_USER_ERROR } from "../connect.js";
 import { loadConfig } from "../config-loader.js";
 import { listPresets } from "../../tools/list-presets.js";
 import { resolvePreset } from "../../resolver.js";
+import { tokenizeArgs } from "../../tokenize-args.js";
 import { writeErr, writeJson, writeOut, renderTable } from "../output.js";
 import { PresetUnavailableError, UnknownPresetError } from "../../errors.js";
 
@@ -118,6 +119,10 @@ const launchCommand = defineCommand({
       type: "string",
       description: "Soft-avoid a provider when selecting a definition",
     },
+    "extra-arguments": {
+      type: "string",
+      description: "Opaque per-launch args appended after the preset args",
+    },
     prompt: { type: "string", description: "Bootstrap prompt delivered as the agent's first message" },
     cwd: { type: "string" },
     json: { type: "boolean" },
@@ -169,8 +174,13 @@ const launchCommand = defineCommand({
       if (args.name) spawnArgs.name = args.name;
       if (projectId !== undefined) spawnArgs.project_id = projectId;
       if (args.prompt) spawnArgs.prompt = args.prompt;
-      if (resolution.extra_args.length > 0)
-        spawnArgs.extra_args = resolution.extra_args;
+      const callerExtraArgs =
+        args["extra-arguments"] !== undefined
+          ? tokenizeArgs(args["extra-arguments"])
+          : [];
+      const mergedExtraArgs = [...resolution.extra_args, ...callerExtraArgs];
+      if (mergedExtraArgs.length > 0)
+        spawnArgs.extra_args = mergedExtraArgs;
 
       const spawned = await client.spawnProcess(spawnArgs);
       const effectiveProjectId = projectId ?? client.projectId;
@@ -183,7 +193,7 @@ const launchCommand = defineCommand({
         name: spawned.name,
         preset: presetName,
         agent_tool_id: resolution.agent_tool_id,
-        extra_args: resolution.extra_args,
+        extra_args: mergedExtraArgs,
         ...(resolution.provider !== undefined && { provider: resolution.provider }),
         project_id: effectiveProjectId,
         ...(url !== undefined && { url }),

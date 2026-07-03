@@ -1,6 +1,10 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { assertValidProviderLabel, resolveProviderStateDir } from "./paths.js";
+import {
+  assertValidProviderLabel,
+  isValidProviderLabel,
+  resolveProviderStateDir,
+} from "./paths.js";
 
 /**
  * In-process counter for unique temp filenames. Combined with `process.pid` this
@@ -53,9 +57,9 @@ export const setProviderEnabled = (provider: string, enabled: boolean): void => 
  * Enumerate the provider state directory only, fresh on every call.
  *
  * Returns `{ provider, enabled }` for every file present, sorted by provider for
- * deterministic output; a missing directory yields `[]`. Preset-derived
- * providers are intentionally NOT unioned in here (deferred to step-03+), which
- * keeps this module free of any Lane A / step-01 dependency.
+ * deterministic output; a missing directory yields `[]`. Invalid labels and
+ * transient temp files are ignored so only real provider state files are
+ * surfaced. Preset-derived providers are intentionally NOT unioned in here.
  */
 export const listProviders = (): { provider: string; enabled: boolean }[] => {
   let entries: string[];
@@ -65,6 +69,7 @@ export const listProviders = (): { provider: string; enabled: boolean }[] => {
     return [];
   }
   return entries
+    .filter((provider) => isValidProviderLabel(provider) && !provider.endsWith(".tmp"))
     .map((provider) => ({ provider, enabled: isProviderEnabled(provider) }))
     .sort((a, b) => (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
 };

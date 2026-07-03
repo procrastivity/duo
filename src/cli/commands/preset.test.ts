@@ -129,6 +129,18 @@ describe("presetAdd", () => {
     ]);
   });
 
+  it("rejects an unsafe provider label and writes nothing", async () => {
+    await expect(
+      presetAdd(fakeClient(TOOLS), {
+        name: "builder",
+        agentTool: "Codex",
+        provider: "../escape",
+      }),
+    ).rejects.toThrow(/Provider labels must match/);
+
+    expect(existsSync(configPath)).toBe(false);
+  });
+
   it("resolves an all-digits selector identically", async () => {
     const result = await presetAdd(fakeClient(TOOLS), { name: "builder", agentTool: "4" });
     expect(result.status).toBe("written");

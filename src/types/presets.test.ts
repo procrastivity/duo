@@ -77,6 +77,18 @@ describe("PresetDefinitionSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects provider labels that are unsafe as state filenames", () => {
+    for (const provider of ["../escape", ".", "..", "provider!", "with/slash"]) {
+      const result = PresetDefinitionSchema.safeParse({
+        id: "abc123xy",
+        agent_tool_id: 4,
+        provider,
+      });
+
+      expect(result.success).toBe(false);
+    }
+  });
 });
 
 describe("PresetsSchema", () => {
