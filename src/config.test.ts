@@ -202,4 +202,52 @@ describe("parseConfig", () => {
       });
     });
   });
+
+  describe("presets field", () => {
+    it("parses config without presets block: presets is undefined", () => {
+      const config = parseConfig({
+        solo: {
+          transport: { type: "stdio", command: "solo" },
+        },
+      });
+
+      expect(config.presets).toBeUndefined();
+    });
+
+    it("parses config with a valid presets block", () => {
+      const config = parseConfig({
+        solo: {
+          transport: { type: "stdio", command: "solo" },
+        },
+        presets: {
+          builder: [
+            {
+              id: "abc123xy",
+              agent_tool_id: 4,
+              extra_args: "-m sonnet",
+              provider: "anthropic",
+            },
+          ],
+          default: [{ id: "def456uv", agent_tool_id: 4 }],
+        },
+      });
+
+      expect(config.presets?.builder).toHaveLength(1);
+      expect(config.presets?.builder?.[0]?.agent_tool_id).toBe(4);
+      expect(config.presets?.default?.[0]?.provider).toBeUndefined();
+    });
+
+    it("throws for a definition with an extra key (strict)", () => {
+      expect(() =>
+        parseConfig({
+          solo: {
+            transport: { type: "stdio", command: "solo" },
+          },
+          presets: {
+            builder: [{ id: "abc123xy", agent_tool_id: 4, bogus: true }],
+          },
+        }),
+      ).toThrow(/presets|builder|unrecognized/i);
+    });
+  });
 });
