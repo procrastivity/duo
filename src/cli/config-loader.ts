@@ -12,7 +12,7 @@ export interface LoadedConfig {
   usedDefaults: boolean;
 }
 
-const DEFAULT_RAW_CONFIG = {
+export const DEFAULT_RAW_CONFIG = {
   solo: { transport: { type: "stdio" } },
 } as const;
 
