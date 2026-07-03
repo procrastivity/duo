@@ -5,24 +5,29 @@ import { PresetUnavailableError, UnknownPresetError } from "../errors.js";
 import type { Logger } from "../logger.js";
 import type { Presets } from "../types/presets.js";
 
-export const SpawnAgentInputSchema = z
+export const LaunchAgentInputSchema = z
   .object({
-    // Public wire key kept as `tier` for step-03 (OQ1); it names a preset now.
-    tier: z.string().min(1, "tier is required"),
+    preset: z.string().min(1, "preset is required"),
     name: z.string().min(1).optional(),
     project_id: z.number().int().nonnegative().optional(),
+    avoid_provider: z.string().optional(),
+    // Caller-supplied append; string[] (OQ1) matches SoloSpawnArgsSchema.extra_args
+    // and the resolver's tokenized output — a plain concat, no tokenizer here.
+    extra_args: z.array(z.string()).optional(),
   })
   .strict();
 
-export type SpawnAgentInput = z.infer<typeof SpawnAgentInputSchema>;
+export type LaunchAgentInput = z.infer<typeof LaunchAgentInputSchema>;
 
-export interface SpawnAgentResult {
+export interface LaunchAgentResult {
   process_id: number;
   name: string;
   preset: string;
   agent_tool_id: number;
   extra_args: string[];
-  provider?: string;
+  // Always present (D4/OQ2): the provider label when the selected definition
+  // has one, `null` when it has none (chain reads `null` as "nothing to avoid").
+  provider: string | null;
   project_id?: number;
 }
 
@@ -52,25 +57,34 @@ const mcpError = (
 });
 
 /**
- * Resolve a preset and spawn the selected agent tool as a Solo process. The
+ * Resolve a preset and launch the selected agent tool as a Solo process. The
  * resolver needs only the config `presets` + provider enabled-state (no Solo
  * agent-tool list); the Solo client is still required to spawn. The resolved
- * `extra_args` (tokenized) are threaded into the spawn call — this is where the
- * preset engine (deliverable a) meets the transport plumbing (deliverable c).
+ * `extra_args` (tokenized) are threaded into the spawn call, with any caller
+ * `extra_args` appended after them (D3 order: resolved first, caller second) —
+ * this is where the preset engine (deliverable a) meets the transport plumbing
+ * (deliverable c). `input.avoid_provider` threads into `options.avoidProvider`
+ * (D5 — pure input plumbing; the resolver capability already exists).
  * `options` carries the resolver test seams; production callers pass nothing.
  */
-export async function spawnAgentHandler(
+export async function launchAgentHandler(
   soloClient: SoloClient,
   logger: Logger,
-  input: SpawnAgentInput,
+  input: LaunchAgentInput,
   presets: Presets | undefined,
   options: ResolvePresetOptions = {},
 ): Promise<ToolResult> {
-  const presetName = input.tier;
+  const presetName = input.preset;
+  const resolveOptions: ResolvePresetOptions = {
+    ...options,
+    ...(input.avoid_provider !== undefined
+      ? { avoidProvider: input.avoid_provider }
+      : {}),
+  };
 
   let resolution;
   try {
-    resolution = resolvePreset(presets ?? {}, presetName, options);
+    resolution = resolvePreset(presets ?? {}, presetName, resolveOptions);
   } catch (err) {
     if (err instanceof UnknownPresetError) {
       logger.resolutionFailure({
@@ -97,6 +111,13 @@ export async function spawnAgentHandler(
     relented_on_avoid_provider: resolution.relented_on_avoid_provider,
   });
 
+  // D3: resolved preset args first, caller append second. The merged effective
+  // array is what reaches Solo and what result.extra_args reports.
+  const mergedExtraArgs = [
+    ...resolution.extra_args,
+    ...(input.extra_args ?? []),
+  ];
+
   const spawnArgs: {
     kind: "agent";
     agent_tool_id: number;
@@ -109,8 +130,7 @@ export async function spawnAgentHandler(
   };
   if (input.name !== undefined) spawnArgs.name = input.name;
   if (input.project_id !== undefined) spawnArgs.project_id = input.project_id;
-  if (resolution.extra_args.length > 0)
-    spawnArgs.extra_args = resolution.extra_args;
+  if (mergedExtraArgs.length > 0) spawnArgs.extra_args = mergedExtraArgs;
 
   let spawnResult;
   try {
@@ -139,14 +159,14 @@ export async function spawnAgentHandler(
 
   const effectiveProjectId = input.project_id ?? soloClient.projectId;
 
-  const result: SpawnAgentResult = {
+  const result: LaunchAgentResult = {
     process_id: spawnResult.process_id,
     name: spawnResult.name,
     preset: presetName,
     agent_tool_id: resolution.agent_tool_id,
-    extra_args: resolution.extra_args,
+    extra_args: mergedExtraArgs,
+    provider: resolution.provider ?? null,
   };
-  if (resolution.provider !== undefined) result.provider = resolution.provider;
   if (effectiveProjectId !== undefined) result.project_id = effectiveProjectId;
 
   return ok(result);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { spawnAgentHandler, SpawnAgentInputSchema } from "./spawn-agent.js";
+import { launchAgentHandler, LaunchAgentInputSchema } from "./launch-agent.js";
 import { SoloClient, SoloClientError } from "../solo-client.js";
 import type { Logger } from "../logger.js";
 import {
@@ -65,15 +65,15 @@ const makeFakeLogger = () => {
   return { logger, calls };
 };
 
-describe("spawnAgentHandler", () => {
+describe("launchAgentHandler", () => {
   describe("happy path, named", () => {
     it("calls spawnProcess with the resolved id + name, returns preset shape", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", name: "my-helper" },
+        { preset: "builder", name: "my-helper" },
         presets,
         opts,
       );
@@ -100,10 +100,10 @@ describe("spawnAgentHandler", () => {
     it("calls spawnProcess without a name key; result name comes from Solo", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessUnnamed);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         presets,
         opts,
       );
@@ -120,10 +120,10 @@ describe("spawnAgentHandler", () => {
     it("populates spawnArgs.extra_args from the resolved, tokenized extra_args", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "withArgs" },
+        { preset: "withArgs" },
         presets,
         opts,
       );
@@ -137,10 +137,10 @@ describe("spawnAgentHandler", () => {
     it("omits extra_args from the spawn call when the preset has none", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      await spawnAgentHandler(
+      await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         presets,
         opts,
       );
@@ -150,18 +150,141 @@ describe("spawnAgentHandler", () => {
     });
   });
 
-  describe("provider echo", () => {
-    it("includes the resolved provider in the result", async () => {
+  describe("caller extra_args append (D3)", () => {
+    it("appends caller extra_args AFTER the preset's resolved args (order preserved), on the spawn call and in the result", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "provided" },
+        { preset: "withArgs", extra_args: ["--verbose", "--flag"] },
+        presets,
+        opts,
+      );
+
+      expect(result.isError).toBeFalsy();
+      const expected = ["--model", "sonnet", "--json", "--verbose", "--flag"];
+      // Merged array actually reaches the spawned Solo process...
+      expect(client.spawnProcess.mock.calls[0][0].extra_args).toEqual(expected);
+      // ...and is echoed in the result.
+      expect(parse(result).extra_args).toEqual(expected);
+    });
+
+    it("caller extra_args reach the spawn call even when the preset has none (caller-only)", async () => {
+      const { logger } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "builder", extra_args: ["--only-caller"] },
+        presets,
+        opts,
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(client.spawnProcess.mock.calls[0][0].extra_args).toEqual([
+        "--only-caller",
+      ]);
+      expect(parse(result).extra_args).toEqual(["--only-caller"]);
+    });
+
+    it("omits extra_args from the spawn call when both preset and caller are empty", async () => {
+      const { logger } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "builder", extra_args: [] },
+        presets,
+        opts,
+      );
+      expect(result.isError).toBeFalsy();
+      expect(client.spawnProcess.mock.calls[0][0]).not.toHaveProperty(
+        "extra_args",
+      );
+      expect(parse(result).extra_args).toEqual([]);
+    });
+  });
+
+  describe("provider always reported (D4/OQ2)", () => {
+    it("result.provider equals the label when the selected definition has one", async () => {
+      const { logger } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "provided" },
         presets,
         opts,
       );
       expect(parse(result).provider).toBe("anthropic");
+    });
+
+    it("result.provider is null when the selected definition has no provider", async () => {
+      const { logger } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "builder" },
+        presets,
+        opts,
+      );
+      const data = parse(result);
+      // Key is always present (required), null for a no-provider definition.
+      expect(data).toHaveProperty("provider");
+      expect(data.provider).toBeNull();
+    });
+  });
+
+  describe("avoid_provider threading (D5)", () => {
+    it("relents to the avoided provider when it is the only eligible definition (relented_on_avoid_provider surfaces)", async () => {
+      const { logger, calls } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      // Only one def, carrying the avoided provider → soft-avoid relents to it.
+      const p: Presets = {
+        solo: [{ id: "only", agent_tool_id: 9, provider: "anthropic" }],
+      };
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "solo", avoid_provider: "anthropic" },
+        p,
+        opts,
+      );
+
+      expect(result.isError).toBeFalsy();
+      const data = parse(result);
+      expect(data.provider).toBe("anthropic");
+      expect(data.agent_tool_id).toBe(9);
+      const resFields = calls[0].fields as Record<string, unknown>;
+      expect(resFields.relented_on_avoid_provider).toBe(true);
+    });
+
+    it("steers away from the avoided provider when an alternative exists", async () => {
+      const { logger, calls } = makeFakeLogger();
+      const client = makeClient(spawnSuccessNamed);
+      const p: Presets = {
+        multi: [
+          { id: "a", agent_tool_id: 10, provider: "anthropic" },
+          { id: "o", agent_tool_id: 11, provider: "openai" },
+        ],
+      };
+      const result = await launchAgentHandler(
+        asClient(client),
+        logger,
+        { preset: "multi", avoid_provider: "anthropic" },
+        p,
+        opts,
+      );
+
+      expect(result.isError).toBeFalsy();
+      const data = parse(result);
+      // Steered to the non-avoided provider — did not relent.
+      expect(data.provider).toBe("openai");
+      expect(data.agent_tool_id).toBe(11);
+      const resFields = calls[0].fields as Record<string, unknown>;
+      expect(resFields.relented_on_avoid_provider).toBe(false);
     });
   });
 
@@ -169,10 +292,10 @@ describe("spawnAgentHandler", () => {
     it("caller-supplied project_id is passed through to spawnProcess", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessWithProjectId);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", name: "my-helper", project_id: 7 },
+        { preset: "builder", name: "my-helper", project_id: 7 },
         presets,
         opts,
       );
@@ -183,10 +306,10 @@ describe("spawnAgentHandler", () => {
     it("client.projectId surfaces in result when caller omits project_id", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessFromEnvProjectId, 6);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         presets,
         opts,
       );
@@ -200,14 +323,23 @@ describe("spawnAgentHandler", () => {
   describe("schema rejection", () => {
     it("non-integer project_id rejected by schema", () => {
       expect(
-        SpawnAgentInputSchema.safeParse({ tier: "builder", project_id: 1.5 })
+        LaunchAgentInputSchema.safeParse({ preset: "builder", project_id: 1.5 })
           .success,
       ).toBe(false);
     });
 
     it("empty-string name rejected by schema", () => {
       expect(
-        SpawnAgentInputSchema.safeParse({ tier: "builder", name: "" }).success,
+        LaunchAgentInputSchema.safeParse({ preset: "builder", name: "" }).success,
+      ).toBe(false);
+    });
+
+    it("non-string extra_args entries rejected by schema", () => {
+      expect(
+        LaunchAgentInputSchema.safeParse({
+          preset: "builder",
+          extra_args: [1, 2],
+        }).success,
       ).toBe(false);
     });
   });
@@ -216,10 +348,10 @@ describe("spawnAgentHandler", () => {
     it("unknown preset returns unknown_preset and does not call spawnProcess", async () => {
       const { logger } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "nope" },
+        { preset: "nope" },
         presets,
         opts,
       );
@@ -234,10 +366,10 @@ describe("spawnAgentHandler", () => {
       const p: Presets = {
         builder: [{ id: "b", agent_tool_id: 2, provider: "openai" }],
       };
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         p,
         { isProviderEnabled: (prov) => prov !== "openai" },
       );
@@ -257,10 +389,10 @@ describe("spawnAgentHandler", () => {
         spawnRejectionNameInUse.code,
       );
       const client = makeClient(err);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", name: "my-helper" },
+        { preset: "builder", name: "my-helper" },
         presets,
         opts,
       );
@@ -280,10 +412,10 @@ describe("spawnAgentHandler", () => {
         spawnRejectionPermissionDenied.code,
       );
       const client = makeClient(err);
-      const result = await spawnAgentHandler(
+      const result = await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", project_id: 99 },
+        { preset: "builder", project_id: 99 },
         presets,
         opts,
       );
@@ -298,10 +430,10 @@ describe("spawnAgentHandler", () => {
     it("happy path — one resolutionSuccess followed by one spawnSuccess (order)", async () => {
       const { logger, calls } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      await spawnAgentHandler(
+      await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", name: "my-helper" },
+        { preset: "builder", name: "my-helper" },
         presets,
         opts,
       );
@@ -331,10 +463,10 @@ describe("spawnAgentHandler", () => {
     it("unknown preset — one resolutionFailure, no spawnSuccess", async () => {
       const { logger, calls } = makeFakeLogger();
       const client = makeClient(spawnSuccessNamed);
-      await spawnAgentHandler(
+      await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "nope" },
+        { preset: "nope" },
         presets,
         opts,
       );
@@ -352,10 +484,10 @@ describe("spawnAgentHandler", () => {
         spawnRejectionNameInUse.code,
       );
       const client = makeClient(err);
-      await spawnAgentHandler(
+      await launchAgentHandler(
         asClient(client),
         logger,
-        { tier: "builder", name: "my-helper" },
+        { preset: "builder", name: "my-helper" },
         presets,
         opts,
       );

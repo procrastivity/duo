@@ -13,10 +13,10 @@ import {
   type ResolvePresetInput,
 } from "./tools/resolve-preset.js";
 import {
-  spawnAgentHandler,
-  SpawnAgentInputSchema,
-  type SpawnAgentInput,
-} from "./tools/spawn-agent.js";
+  launchAgentHandler,
+  LaunchAgentInputSchema,
+  type LaunchAgentInput,
+} from "./tools/launch-agent.js";
 
 export interface MCPServer {
   start(): Promise<void>;
@@ -158,17 +158,17 @@ export class DuoServer implements MCPServer {
     );
 
     this._mcpServer.registerTool(
-      "spawn_agent",
+      "launch_agent",
       {
         description:
-          "Spawn a new agent process for a configured preset with optional name and project scope",
-        inputSchema: SpawnAgentInputSchema,
+          "Launch a new agent process for a configured preset with optional name, project scope, provider avoidance, and caller extra_args",
+        inputSchema: LaunchAgentInputSchema,
       },
       (async (input: unknown) =>
-        this._withSoloClient((soloClient) => spawnAgentHandler(
+        this._withSoloClient((soloClient) => launchAgentHandler(
           soloClient,
           this._logger,
-          input as SpawnAgentInput,
+          input as LaunchAgentInput,
           presets,
         ))) as any,
     );

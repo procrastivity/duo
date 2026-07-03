@@ -25,7 +25,7 @@ import { parseConfig } from "./config.js";
 import { SoloClient } from "./solo-client.js";
 import { type Logger } from "./logger.js";
 import { spawnSuccessFromEnvProjectId } from "./__fixtures__/spawn-results.js";
-import { SpawnAgentInputSchema } from "./tools/spawn-agent.js";
+import { LaunchAgentInputSchema } from "./tools/launch-agent.js";
 import { getVersion } from "./cli/version-info.js";
 
 const validRawConfig = {
@@ -112,7 +112,7 @@ describe("DuoServer", () => {
         expect.arrayContaining([
           "list_presets",
           "resolve_preset",
-          "spawn_agent",
+          "launch_agent",
         ]),
       );
     });
@@ -140,7 +140,7 @@ describe("DuoServer", () => {
       let spawnHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "spawn_agent") spawnHandler = handler;
+          if (toolName === "launch_agent") spawnHandler = handler;
           return undefined as unknown;
         },
       );
@@ -148,7 +148,7 @@ describe("DuoServer", () => {
       await server.start();
       expect(SoloClient.prototype.connect).not.toHaveBeenCalled();
 
-      await spawnHandler?.({ tier: "medium" });
+      await spawnHandler?.({ preset: "medium" });
       expect(SoloClient.prototype.connect).toHaveBeenCalledTimes(1);
     });
 
@@ -244,7 +244,7 @@ describe("DuoServer", () => {
       expect(fakeLogger.resolutionFailure).toHaveBeenCalled();
     });
 
-    it("forwards config presets to spawn_agent (spawnProcess called)", async () => {
+    it("forwards config presets to launch_agent (spawnProcess called)", async () => {
       const mockClient = makeClient();
       const fakeLogger = makeFakeLogger();
       const server = new DuoServer(parseConfig(rawConfigWithPresets), mockClient, fakeLogger);
@@ -253,22 +253,22 @@ describe("DuoServer", () => {
       let spawnHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "spawn_agent") spawnHandler = handler;
+          if (toolName === "launch_agent") spawnHandler = handler;
           return undefined as unknown;
         },
       );
 
       await server.start();
-      await spawnHandler?.({ tier: "medium" });
+      await spawnHandler?.({ preset: "medium" });
       expect(mockClient.spawnProcess).toHaveBeenCalled();
       expect(fakeLogger.resolutionSuccess).toHaveBeenCalled();
     });
   });
 });
 
-describe("spawn_agent tool", () => {
+describe("launch_agent tool", () => {
   describe("registration", () => {
-    it("registers spawn_agent under that exact name", async () => {
+    it("registers launch_agent under that exact name", async () => {
       const server = new DuoServer(parseConfig(validRawConfig), makeClient());
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
 
@@ -281,21 +281,21 @@ describe("spawn_agent tool", () => {
       );
 
       await server.start();
-      expect(registeredToolNames).toContain("spawn_agent");
+      expect(registeredToolNames).toContain("launch_agent");
     });
   });
 
   describe("input schema", () => {
-    it("rejects missing tier", () => {
-      expect(SpawnAgentInputSchema.safeParse({ name: "my-agent" }).success).toBe(false);
+    it("rejects missing preset", () => {
+      expect(LaunchAgentInputSchema.safeParse({ name: "my-agent" }).success).toBe(false);
     });
 
     it("rejects empty-string name", () => {
-      expect(SpawnAgentInputSchema.safeParse({ tier: "small", name: "" }).success).toBe(false);
+      expect(LaunchAgentInputSchema.safeParse({ preset: "small", name: "" }).success).toBe(false);
     });
 
     it("rejects string project_id (must be number)", () => {
-      expect(SpawnAgentInputSchema.safeParse({ tier: "small", project_id: "6" }).success).toBe(false);
+      expect(LaunchAgentInputSchema.safeParse({ preset: "small", project_id: "6" }).success).toBe(false);
     });
   });
 
@@ -312,13 +312,13 @@ describe("spawn_agent tool", () => {
       let capturedHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "spawn_agent") capturedHandler = handler;
+          if (toolName === "launch_agent") capturedHandler = handler;
           return undefined as unknown;
         },
       );
 
       await server.start();
-      await capturedHandler?.({ tier: "medium" });
+      await capturedHandler?.({ preset: "medium" });
       expect(mockClient.spawnProcess).toHaveBeenCalled();
     });
 
@@ -330,13 +330,13 @@ describe("spawn_agent tool", () => {
       let capturedHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "spawn_agent") capturedHandler = handler;
+          if (toolName === "launch_agent") capturedHandler = handler;
           return undefined as unknown;
         },
       );
 
       await server.start();
-      await capturedHandler?.({ tier: "medium" });
+      await capturedHandler?.({ preset: "medium" });
       const args = (mockClient.spawnProcess as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(args).not.toHaveProperty("project_id");
     });
