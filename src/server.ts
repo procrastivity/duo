@@ -17,6 +17,15 @@ import {
   LaunchAgentInputSchema,
   type LaunchAgentInput,
 } from "./tools/launch-agent.js";
+import {
+  listProvidersHandler,
+  ListProvidersInputSchema,
+} from "./tools/list-providers.js";
+import {
+  setProviderEnabledHandler,
+  SetProviderEnabledInputSchema,
+  type SetProviderEnabledInput,
+} from "./tools/set-provider-enabled.js";
 
 export interface MCPServer {
   start(): Promise<void>;
@@ -171,6 +180,32 @@ export class DuoServer implements MCPServer {
           input as LaunchAgentInput,
           presets,
         ))) as any,
+    );
+
+    // Provider-state tools are offline (D6): they read/write only the XDG
+    // provider state, so they register through the `_startupToolError()` guard
+    // (like list_presets/resolve_preset), never `_withSoloClient`.
+    this._mcpServer.registerTool(
+      "list_providers",
+      {
+        description:
+          "List the providers tracked in provider state with their enabled/disabled status",
+        inputSchema: ListProvidersInputSchema,
+      },
+      (async () =>
+        this._startupToolError() ?? listProvidersHandler()) as any,
+    );
+
+    this._mcpServer.registerTool(
+      "set_provider_enabled",
+      {
+        description:
+          "Enable or disable a provider in provider state (offline; validates the provider label)",
+        inputSchema: SetProviderEnabledInputSchema,
+      },
+      (async (input: unknown) =>
+        this._startupToolError() ??
+        setProviderEnabledHandler(input as SetProviderEnabledInput)) as any,
     );
 
     const serverTransport = new StdioServerTransport();

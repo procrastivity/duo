@@ -95,7 +95,7 @@ describe("DuoServer", () => {
   });
 
   describe("tool registration", () => {
-    it("registers the three public tool names", async () => {
+    it("registers exactly the five public tool names", async () => {
       const server = new DuoServer(parseConfig(validRawConfig), makeClient());
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
 
@@ -108,13 +108,13 @@ describe("DuoServer", () => {
       );
 
       await server.start();
-      expect(names).toEqual(
-        expect.arrayContaining([
-          "list_presets",
-          "resolve_preset",
-          "launch_agent",
-        ]),
-      );
+      expect(names.slice().sort()).toEqual([
+        "launch_agent",
+        "list_presets",
+        "list_providers",
+        "resolve_preset",
+        "set_provider_enabled",
+      ]);
     });
   });
 
