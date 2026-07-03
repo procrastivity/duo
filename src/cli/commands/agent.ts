@@ -65,16 +65,22 @@ const resolveCommand = defineCommand({
     description: "Resolve which agent tool a preset would select",
   },
   args: {
-    tier: { type: "positional", required: true, description: "Preset name" },
+    preset: { type: "positional", required: true, description: "Preset name" },
+    "avoid-provider": {
+      type: "string",
+      description: "Soft-avoid a provider when selecting a definition",
+    },
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
   },
   async run({ args }) {
     const presets = loadPresets(args.cwd);
-    const presetName = String(args.tier);
+    const presetName = String(args.preset);
     try {
-      const resolution = resolvePreset(presets, presetName);
+      const resolution = resolvePreset(presets, presetName, {
+        avoidProvider: args["avoid-provider"],
+      });
       if (args.json) {
         writeJson(resolution);
       } else if (args.quiet) {
@@ -102,19 +108,23 @@ const resolveCommand = defineCommand({
   },
 });
 
-const spawnCommand = defineCommand({
-  meta: { name: "spawn", description: "Spawn an agent process for a preset" },
+const launchCommand = defineCommand({
+  meta: { name: "launch", description: "Launch an agent process for a preset" },
   args: {
-    tier: { type: "positional", required: true, description: "Preset name" },
+    preset: { type: "positional", required: true, description: "Preset name" },
     name: { type: "string", description: "Process name" },
     "project-id": { type: "string", description: "Override Solo project ID" },
+    "avoid-provider": {
+      type: "string",
+      description: "Soft-avoid a provider when selecting a definition",
+    },
     prompt: { type: "string", description: "Bootstrap prompt delivered as the agent's first message" },
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
   },
   async run({ args }) {
-    const presetName = String(args.tier);
+    const presetName = String(args.preset);
     let projectId: number | undefined;
     if (args["project-id"]) {
       const n = Number(args["project-id"]);
@@ -130,7 +140,9 @@ const spawnCommand = defineCommand({
       const presets = config.config.presets ?? {};
       let resolution;
       try {
-        resolution = resolvePreset(presets, presetName);
+        resolution = resolvePreset(presets, presetName, {
+          avoidProvider: args["avoid-provider"],
+        });
       } catch (e) {
         if (e instanceof UnknownPresetError) {
           writeErr(`Unknown preset "${e.preset}".`);
@@ -206,6 +218,6 @@ export const agentCommand = defineCommand({
   subCommands: {
     list: listCommand,
     resolve: resolveCommand,
-    spawn: spawnCommand,
+    launch: launchCommand,
   },
 });
