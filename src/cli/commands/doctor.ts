@@ -180,7 +180,7 @@ export const doctorCommand = defineCommand({
       checks.push({ name: "bind_session_process", status: "skip" });
     }
 
-    // 9. list_agent_tiers returns non-empty
+    // 9. list_presets returns non-empty
     if (client && !connectErr) {
       try {
         const tools = await client.listAgentTools();

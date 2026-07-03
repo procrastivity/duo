@@ -2,9 +2,9 @@ import { z } from "zod";
 import { isProviderEnabled as defaultIsProviderEnabled } from "../state/providers.js";
 import type { PresetDefinition, Presets } from "../types/presets.js";
 
-export const ListAgentTiersInputSchema = z.object({}).strict();
+export const ListPresetsInputSchema = z.object({}).strict();
 
-export type ListAgentTiersInput = z.infer<typeof ListAgentTiersInputSchema>;
+export type ListPresetsInput = z.infer<typeof ListPresetsInputSchema>;
 
 export interface PresetDefinitionView {
   id: string;
@@ -23,7 +23,7 @@ export interface PresetAvailability {
   definitions: PresetDefinitionView[];
 }
 
-export type ListAgentTiersResult = Record<string, PresetAvailability>;
+export type ListPresetsResult = Record<string, PresetAvailability>;
 
 const DEFAULT_PRESET = "default";
 
@@ -43,10 +43,10 @@ const viewDefs = (
  * config- + provider-state driven — it does not consult Solo. `isProviderEnabled`
  * defaults to the filesystem-backed reader and is injectable for tests.
  */
-export function listAgentTiers(
+export function listPresets(
   presets: Presets | undefined,
   options: { isProviderEnabled?: (provider: string) => boolean } = {},
-): ListAgentTiersResult {
+): ListPresetsResult {
   const isEnabled = options.isProviderEnabled ?? defaultIsProviderEnabled;
   const map = presets ?? {};
 
@@ -55,7 +55,7 @@ export function listAgentTiers(
     (d) => d.enabled,
   );
 
-  const result: ListAgentTiersResult = {};
+  const result: ListPresetsResult = {};
   for (const [name, defs] of Object.entries(map)) {
     const definitions = viewDefs(defs, isEnabled);
     const selfEligible = definitions.some((d) => d.enabled);

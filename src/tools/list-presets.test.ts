@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listAgentTiers } from "./list-agent-tiers.js";
+import { listPresets } from "./list-presets.js";
 import type { Presets } from "../types/presets.js";
 
 const allEnabled = (): boolean => true;
@@ -18,21 +18,21 @@ const presets: Presets = {
   default: [{ id: "d-anthropic", agent_tool_id: 10, provider: "anthropic" }],
 };
 
-describe("listAgentTiers — enumerates configured presets", () => {
+describe("listPresets — enumerates configured presets", () => {
   it("returns an entry for every configured preset", () => {
-    const result = listAgentTiers(presets, { isProviderEnabled: allEnabled });
+    const result = listPresets(presets, { isProviderEnabled: allEnabled });
     expect(Object.keys(result).sort()).toEqual(["builder", "default", "planner"]);
   });
 
   it("all presets available when every provider is enabled", () => {
-    const result = listAgentTiers(presets, { isProviderEnabled: allEnabled });
+    const result = listPresets(presets, { isProviderEnabled: allEnabled });
     expect(result.builder.available).toBe(true);
     expect(result.planner.available).toBe(true);
     expect(result.default.available).toBe(true);
   });
 
   it("surfaces each definition with its agent_tool_id, provider, and enabled flag", () => {
-    const result = listAgentTiers(presets, { isProviderEnabled: allEnabled });
+    const result = listPresets(presets, { isProviderEnabled: allEnabled });
     expect(result.builder.definitions).toEqual([
       { id: "b-anthropic", agent_tool_id: 1, provider: "anthropic", enabled: true },
       { id: "b-openai", agent_tool_id: 2, provider: "openai", enabled: true },
@@ -41,14 +41,14 @@ describe("listAgentTiers — enumerates configured presets", () => {
   });
 
   it("empty / undefined presets yields an empty result", () => {
-    expect(listAgentTiers(undefined)).toEqual({});
-    expect(listAgentTiers({})).toEqual({});
+    expect(listPresets(undefined)).toEqual({});
+    expect(listPresets({})).toEqual({});
   });
 });
 
-describe("listAgentTiers — provider disabled-state", () => {
+describe("listPresets — provider disabled-state", () => {
   it("marks disabled-provider definitions as not enabled", () => {
-    const result = listAgentTiers(presets, {
+    const result = listPresets(presets, {
       isProviderEnabled: disabledSet("openai"),
     });
     const openaiDef = result.builder.definitions.find(
@@ -61,7 +61,7 @@ describe("listAgentTiers — provider disabled-state", () => {
 
   it("a preset with only disabled providers is available via the default fallback", () => {
     // planner offers only openai (disabled); default (anthropic) is enabled.
-    const result = listAgentTiers(presets, {
+    const result = listPresets(presets, {
       isProviderEnabled: disabledSet("openai"),
     });
     expect(result.planner.definitions[0].enabled).toBe(false);
@@ -69,7 +69,7 @@ describe("listAgentTiers — provider disabled-state", () => {
   });
 
   it("a preset is unavailable when neither it nor default has an eligible def", () => {
-    const result = listAgentTiers(presets, {
+    const result = listPresets(presets, {
       isProviderEnabled: disabledSet("openai", "anthropic"),
     });
     // planner: openai disabled; default: anthropic disabled → unavailable.
@@ -79,7 +79,7 @@ describe("listAgentTiers — provider disabled-state", () => {
   });
 
   it("default is not rescued by itself when its only provider is disabled", () => {
-    const result = listAgentTiers(presets, {
+    const result = listPresets(presets, {
       isProviderEnabled: disabledSet("anthropic"),
     });
     expect(result.default.available).toBe(false);

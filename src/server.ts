@@ -6,7 +6,7 @@ import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
 import { getVersion } from "./cli/version-info.js";
-import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-tiers.js";
+import { listPresets, ListPresetsInputSchema } from "./tools/list-presets.js";
 import {
   resolveAgentToolHandler,
   ResolveAgentToolInputSchema,
@@ -131,14 +131,14 @@ export class DuoServer implements MCPServer {
     // Register tools. Public tool names are kept per step-03/D1; only the
     // behavior and result shapes are preset-driven now.
     this._mcpServer.registerTool(
-      "list_agent_tiers",
+      "list_presets",
       {
         description:
           "List the configured agent presets with per-preset availability and definitions",
-        inputSchema: ListAgentTiersInputSchema,
+        inputSchema: ListPresetsInputSchema,
       },
       (async () =>
-        this._startupToolError() ?? listAgentTiers(presets)) as any,
+        this._startupToolError() ?? listPresets(presets)) as any,
     );
 
     this._mcpServer.registerTool(

@@ -110,7 +110,7 @@ describe("DuoServer", () => {
       await server.start();
       expect(names).toEqual(
         expect.arrayContaining([
-          "list_agent_tiers",
+          "list_presets",
           "resolve_agent_tool",
           "spawn_agent",
         ]),
@@ -152,7 +152,7 @@ describe("DuoServer", () => {
       expect(SoloClient.prototype.connect).toHaveBeenCalledTimes(1);
     });
 
-    it("list_agent_tiers needs no Solo connection", async () => {
+    it("list_presets needs no Solo connection", async () => {
       const server = new DuoServer(parseConfig(rawConfigWithPresets));
       vi.spyOn(SoloClient.prototype, "connect").mockResolvedValue(undefined);
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
@@ -160,7 +160,7 @@ describe("DuoServer", () => {
       let listHandler: (() => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: () => Promise<unknown>) => {
-          if (toolName === "list_agent_tiers") listHandler = handler;
+          if (toolName === "list_presets") listHandler = handler;
           return undefined as unknown;
         },
       );
@@ -180,7 +180,7 @@ describe("DuoServer", () => {
       let listHandler: (() => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: () => Promise<unknown>) => {
-          if (toolName === "list_agent_tiers") listHandler = handler;
+          if (toolName === "list_presets") listHandler = handler;
           return undefined as unknown;
         },
       );

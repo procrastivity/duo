@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { connectSolo, handleSoloError, EXIT_USER_ERROR } from "../connect.js";
 import { loadConfig } from "../config-loader.js";
-import { listAgentTiers } from "../../tools/list-agent-tiers.js";
+import { listPresets } from "../../tools/list-presets.js";
 import { resolvePreset } from "../../resolver.js";
 import { writeErr, writeJson, writeOut, renderTable } from "../output.js";
 import { PresetUnavailableError, UnknownPresetError } from "../../errors.js";
@@ -24,7 +24,7 @@ const listCommand = defineCommand({
   },
   async run({ args }) {
     const presets = loadPresets(args.cwd);
-    const view = listAgentTiers(presets);
+    const view = listPresets(presets);
     if (args.json) {
       writeJson(view);
       return;
