@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SoloAgentTool } from "../../types/solo.js";
 import {
   presetAdd,
+  presetRemove,
   resolvePresetAgentTool,
   readPresets,
   buildPresetView,
@@ -311,6 +312,68 @@ describe("buildPresetView", () => {
     const view = buildPresetView({});
     expect(view.filterMissing).toBe(false);
     expect(view.rows).toEqual([]);
+  });
+});
+
+describe("presetRemove (Chunk 5)", () => {
+  const originalEnv = process.env;
+  let tmp: string;
+  let configPath: string;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.DUO_CONFIG;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.DUO_POLICY;
+    tmp = mkdtempSync(join(tmpdir(), "duo-preset-remove-"));
+    configPath = join(tmp, "config.yaml");
+    process.env.DUO_CONFIG = configPath;
+    writeFileSync(configPath, FIXTURE_CONFIG);
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("removes exactly one definition and leaves siblings intact", () => {
+    const result = presetRemove("aaaa1111");
+    expect(result.status).toBe("removed");
+    if (result.status !== "removed") throw new Error("expected removed");
+    expect(result.preset).toBe("builder");
+    expect(result.definition).toEqual({
+      id: "aaaa1111",
+      agent_tool_id: 4,
+      extra_args: "-m sonnet",
+      provider: "anthropic",
+    });
+    expect(result.prunedPreset).toBe(false);
+
+    const onDisk = parseYaml(readFileSync(configPath, "utf8"));
+    // The sibling in `builder` and the whole `reviewer` preset survive.
+    expect(onDisk.presets.builder).toEqual([{ id: "bbbb2222", agent_tool_id: 3 }]);
+    expect(onDisk.presets.reviewer).toEqual([{ id: "cccc3333", agent_tool_id: 17 }]);
+  });
+
+  it("prunes a preset key that becomes empty after removal", () => {
+    const result = presetRemove("cccc3333");
+    expect(result.status).toBe("removed");
+    if (result.status !== "removed") throw new Error("expected removed");
+    expect(result.preset).toBe("reviewer");
+    expect(result.prunedPreset).toBe(true);
+
+    const onDisk = parseYaml(readFileSync(configPath, "utf8"));
+    expect(Object.prototype.hasOwnProperty.call(onDisk.presets, "reviewer")).toBe(false);
+    // `builder` (untouched) still carries both of its definitions.
+    expect(onDisk.presets.builder).toHaveLength(2);
+  });
+
+  it("unknown id → not_found, exits nothing, config unchanged", () => {
+    const before = readFileSync(configPath, "utf8");
+    const result = presetRemove("zzzzzzzz");
+    expect(result).toEqual({ status: "not_found", id: "zzzzzzzz" });
+    // Nothing was rewritten — the file is byte-for-byte identical.
+    expect(readFileSync(configPath, "utf8")).toBe(before);
   });
 });
 

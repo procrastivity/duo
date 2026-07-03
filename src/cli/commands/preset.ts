@@ -363,6 +363,102 @@ export const tryLoadToolNames = async (
   }
 };
 
+export type PresetRemoveResult =
+  | {
+      readonly status: "removed";
+      readonly preset: string;
+      readonly definition: PresetDefinition;
+      /** True when removing this definition emptied its preset, so the key was pruned. */
+      readonly prunedPreset: boolean;
+    }
+  | { readonly status: "not_found"; readonly id: string };
+
+/**
+ * Core of `duo config preset remove`: read config OFFLINE (D7), locate the single
+ * definition carrying the stable `id` (D2) across ALL presets, remove exactly it,
+ * prune the preset key if it becomes empty, and persist via the Task-2 writer.
+ *
+ * On `not_found` it writes **nothing** and returns the outcome so the caller can
+ * print an error and exit non-zero. Because `id` is globally unique (D2), the first
+ * match is the only match — survivors are never reindexed. Reads/writes config via
+ * the writer, which honors `resolveConfigPath()` (test with `DUO_CONFIG`).
+ */
+export const presetRemove = (id: string): PresetRemoveResult => {
+  const raw = readRawConfig();
+  const presets =
+    raw.presets && typeof raw.presets === "object" && !Array.isArray(raw.presets)
+      ? (raw.presets as Record<string, PresetDefinition[]>)
+      : {};
+
+  for (const [name, defs] of Object.entries(presets)) {
+    if (!Array.isArray(defs)) continue;
+    const idx = defs.findIndex(
+      (def) => def && typeof def === "object" && (def as { id?: unknown }).id === id,
+    );
+    if (idx === -1) continue;
+
+    const [removed] = defs.splice(idx, 1);
+    let prunedPreset = false;
+    if (defs.length === 0) {
+      delete presets[name];
+      prunedPreset = true;
+    }
+    raw.presets = presets;
+    writeConfig(raw);
+
+    return { status: "removed", preset: name, definition: removed!, prunedPreset };
+  }
+
+  return { status: "not_found", id };
+};
+
+const removeCommand = defineCommand({
+  meta: {
+    name: "remove",
+    description: "Remove a preset definition by its stable id (offline)",
+  },
+  args: {
+    id: { type: "positional", required: true, description: "Definition id to remove" },
+    cwd: { type: "string", description: "Working directory" },
+    json: { type: "boolean", description: "Emit JSON describing what was removed" },
+    quiet: { type: "boolean", alias: "q", description: "Print only the removed definition id" },
+  },
+  async run({ args }) {
+    const id = String(args.id ?? "").trim();
+    if (!id) {
+      writeErr("A definition id is required, e.g. `duo config preset remove aaaa1111`.");
+      process.exit(EXIT_USER_ERROR);
+    }
+
+    let result: PresetRemoveResult;
+    try {
+      result = presetRemove(id);
+    } catch (err) {
+      writeErr(err instanceof Error ? err.message : String(err));
+      process.exit(EXIT_USER_ERROR);
+      return;
+    }
+
+    if (result.status === "not_found") {
+      writeErr(`No preset definition with id "${result.id}" exists. Nothing was removed.`);
+      process.exit(EXIT_USER_ERROR);
+    }
+
+    const { preset, definition, prunedPreset } = result;
+    if (args.json) {
+      writeJson({ removed: definition, preset, pruned_preset: prunedPreset });
+      return;
+    }
+    if (args.quiet) {
+      writeOut(definition.id);
+      return;
+    }
+    writeOut(`removed:     ${definition.id}`);
+    writeOut(`preset:      ${preset}${prunedPreset ? " (now empty — key pruned)" : ""}`);
+    writeOut(`tool:        #${definition.agent_tool_id}`);
+  },
+});
+
 const PRESET_LIST_COLUMNS: readonly Column<PresetRow>[] = [
   { header: "PRESET", get: (r) => r.preset },
   { header: "ID", get: (r) => r.id },
@@ -422,7 +518,7 @@ const listCommand = defineCommand({
 
 /**
  * The `preset` subcommand group under `duo config`. Task-3 ships `add`,
- * Task-4 `list`; `remove` (Task-5) attaches here as a sibling.
+ * Task-4 `list`, Task-5 `remove`.
  */
 export const presetCommand = defineCommand({
   meta: {
@@ -432,5 +528,6 @@ export const presetCommand = defineCommand({
   subCommands: {
     add: addCommand,
     list: listCommand,
+    remove: removeCommand,
   },
 });
