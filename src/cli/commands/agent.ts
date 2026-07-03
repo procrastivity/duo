@@ -1,122 +1,135 @@
 import { defineCommand } from "citty";
 import { connectSolo, handleSoloError, EXIT_USER_ERROR } from "../connect.js";
-import { listAgentTiers } from "../../tools/list-agent-tiers.js";
-import { resolveAgentTool } from "../../resolver.js";
-import { writeErr, writeJson, writeOut, printResult, renderTable } from "../output.js";
-import { TierUnavailableError, UnsupportedTierError, TIER_LABELS } from "../../errors.js";
+import { loadConfig } from "../config-loader.js";
+import { listPresets } from "../../tools/list-presets.js";
+import { resolvePreset } from "../../resolver.js";
+import { tokenizeArgs } from "../../tokenize-args.js";
+import { writeErr, writeJson, writeOut, renderTable } from "../output.js";
+import { PresetUnavailableError, UnknownPresetError } from "../../errors.js";
 
-const tierArg = (input: unknown): "small" | "medium" | "large" | null => {
-  const tier = String(input ?? "");
-  if (tier === "small" || tier === "medium" || tier === "large") return tier;
-  return null;
+const loadPresets = (cwd: string | undefined) => {
+  try {
+    return loadConfig({ cwd }).config.presets ?? {};
+  } catch (err) {
+    writeErr(err instanceof Error ? err.message : String(err));
+    process.exit(EXIT_USER_ERROR);
+  }
 };
 
 const listCommand = defineCommand({
-  meta: { name: "list", description: "List agent tools grouped by tier" },
+  meta: { name: "list", description: "List configured agent presets" },
   args: {
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
   },
   async run({ args }) {
-    const { client, dispose } = await connectSolo({ cwd: args.cwd, quiet: args.quiet });
-    try {
-      const tiers = await listAgentTiers(client);
-      if (args.json) {
-        writeJson(tiers);
-        return;
-      }
-      if (args.quiet) return;
-      const rows: { tier: string; default: string; alts: string }[] = [];
-      for (const tier of TIER_LABELS) {
-        const t = tiers[tier];
-        rows.push({
-          tier,
-          default: t.default ? `${t.default.tool_name} (#${t.default.agent_tool_id})` : "—",
-          alts: t.alternatives.map((a) => a.tool_name).join(", ") || "—",
-        });
-      }
-      writeOut(
-        renderTable(rows, [
-          { header: "TIER", get: (r) => r.tier },
-          { header: "DEFAULT", get: (r) => r.default, truncate: 50 },
-          { header: "ALTERNATIVES", get: (r) => r.alts, truncate: 60 },
-        ]),
-      );
-    } catch (err) {
-      handleSoloError(err);
-    } finally {
-      await dispose();
+    const presets = loadPresets(args.cwd);
+    const view = listPresets(presets);
+    if (args.json) {
+      writeJson(view);
+      return;
     }
+    if (args.quiet) return;
+    const names = Object.keys(view).sort();
+    if (names.length === 0) {
+      writeOut("No presets configured.");
+      return;
+    }
+    const rows = names.map((name) => {
+      const p = view[name]!;
+      const defs = p.definitions
+        .map(
+          (d) =>
+            `${d.provider ?? "—"}:#${d.agent_tool_id}${d.enabled ? "" : " (off)"}`,
+        )
+        .join(", ");
+      return {
+        preset: name,
+        available: p.available ? "yes" : "no",
+        defs: defs || "—",
+      };
+    });
+    writeOut(
+      renderTable(rows, [
+        { header: "PRESET", get: (r) => r.preset },
+        { header: "AVAILABLE", get: (r) => r.available },
+        { header: "DEFINITIONS", get: (r) => r.defs, truncate: 60 },
+      ]),
+    );
   },
 });
 
 const resolveCommand = defineCommand({
-  meta: { name: "resolve", description: "Resolve which agent tool would be selected for a tier" },
+  meta: {
+    name: "resolve",
+    description: "Resolve which agent tool a preset would select",
+  },
   args: {
-    tier: { type: "positional", required: true, description: "Tier (small | medium | large)" },
+    preset: { type: "positional", required: true, description: "Preset name" },
+    "avoid-provider": {
+      type: "string",
+      description: "Soft-avoid a provider when selecting a definition",
+    },
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
   },
   async run({ args }) {
-    const tier = tierArg(args.tier);
-    if (!tier) {
-      writeErr(`Unknown tier "${args.tier}". Expected: ${TIER_LABELS.join(", ")}.`);
-      process.exit(EXIT_USER_ERROR);
-    }
-    const { client, dispose } = await connectSolo({ cwd: args.cwd, quiet: args.quiet });
+    const presets = loadPresets(args.cwd);
+    const presetName = String(args.preset);
     try {
-      const tools = await client.listAgentTools();
-      try {
-        const resolution = resolveAgentTool(tools, tier);
-        if (args.json) {
-          writeJson(resolution);
-        } else if (args.quiet) {
-          writeOut(String(resolution.selected.agent_tool_id));
-        } else {
-          writeOut(`tier:        ${tier}`);
-          writeOut(`tool_id:     ${resolution.selected.agent_tool_id}`);
-          writeOut(`tool_name:   ${resolution.selected.tool_name}`);
-          writeOut(`command:     ${resolution.selected.command}`);
-          writeOut(`source:      ${resolution.classification_source}`);
-        }
-      } catch (e) {
-        if (e instanceof UnsupportedTierError) {
-          writeErr(`Unsupported tier "${e.requested}". Supported: ${TIER_LABELS.join(", ")}.`);
-          process.exit(EXIT_USER_ERROR);
-        }
-        if (e instanceof TierUnavailableError) {
-          writeErr(`No enabled candidates available for tier "${e.diagnostics.requested_tier}".`);
-          process.exit(EXIT_USER_ERROR);
-        }
-        throw e;
+      const resolution = resolvePreset(presets, presetName, {
+        avoidProvider: args["avoid-provider"],
+      });
+      if (args.json) {
+        writeJson(resolution);
+      } else if (args.quiet) {
+        writeOut(String(resolution.agent_tool_id));
+      } else {
+        writeOut(`preset:      ${resolution.preset_requested}`);
+        writeOut(`preset_used: ${resolution.preset_used}`);
+        writeOut(`tool_id:     ${resolution.agent_tool_id}`);
+        if (resolution.provider !== undefined)
+          writeOut(`provider:    ${resolution.provider}`);
+        if (resolution.extra_args.length > 0)
+          writeOut(`extra_args:  ${resolution.extra_args.join(" ")}`);
       }
-    } catch (err) {
-      handleSoloError(err);
-    } finally {
-      await dispose();
+    } catch (e) {
+      if (e instanceof UnknownPresetError) {
+        writeErr(`Unknown preset "${e.preset}".`);
+        process.exit(EXIT_USER_ERROR);
+      }
+      if (e instanceof PresetUnavailableError) {
+        writeErr(e.message);
+        process.exit(EXIT_USER_ERROR);
+      }
+      throw e;
     }
   },
 });
 
-const spawnCommand = defineCommand({
-  meta: { name: "spawn", description: "Spawn an agent process for a tier" },
+const launchCommand = defineCommand({
+  meta: { name: "launch", description: "Launch an agent process for a preset" },
   args: {
-    tier: { type: "positional", required: true, description: "Tier (small | medium | large)" },
+    preset: { type: "positional", required: true, description: "Preset name" },
     name: { type: "string", description: "Process name" },
     "project-id": { type: "string", description: "Override Solo project ID" },
+    "avoid-provider": {
+      type: "string",
+      description: "Soft-avoid a provider when selecting a definition",
+    },
+    "extra-arguments": {
+      type: "string",
+      description: "Opaque per-launch args appended after the preset args",
+    },
     prompt: { type: "string", description: "Bootstrap prompt delivered as the agent's first message" },
     cwd: { type: "string" },
     json: { type: "boolean" },
     quiet: { type: "boolean", alias: "q" },
   },
   async run({ args }) {
-    const tier = tierArg(args.tier);
-    if (!tier) {
-      writeErr(`Unknown tier "${args.tier}". Expected: ${TIER_LABELS.join(", ")}.`);
-      process.exit(EXIT_USER_ERROR);
-    }
+    const presetName = String(args.preset);
     let projectId: number | undefined;
     if (args["project-id"]) {
       const n = Number(args["project-id"]);
@@ -127,23 +140,47 @@ const spawnCommand = defineCommand({
       projectId = n;
     }
 
-    const { client, dispose } = await connectSolo({ cwd: args.cwd, quiet: args.quiet });
+    const { client, config, dispose } = await connectSolo({ cwd: args.cwd, quiet: args.quiet });
     try {
-      const tools = await client.listAgentTools();
-      const resolution = resolveAgentTool(tools, tier);
+      const presets = config.config.presets ?? {};
+      let resolution;
+      try {
+        resolution = resolvePreset(presets, presetName, {
+          avoidProvider: args["avoid-provider"],
+        });
+      } catch (e) {
+        if (e instanceof UnknownPresetError) {
+          writeErr(`Unknown preset "${e.preset}".`);
+          process.exit(EXIT_USER_ERROR);
+        }
+        if (e instanceof PresetUnavailableError) {
+          writeErr(e.message);
+          process.exit(EXIT_USER_ERROR);
+        }
+        throw e;
+      }
+
       const spawnArgs: {
         kind: "agent";
         agent_tool_id: number;
         name?: string;
         project_id?: number;
         prompt?: string;
+        extra_args?: string[];
       } = {
         kind: "agent",
-        agent_tool_id: resolution.selected.agent_tool_id,
+        agent_tool_id: resolution.agent_tool_id,
       };
       if (args.name) spawnArgs.name = args.name;
       if (projectId !== undefined) spawnArgs.project_id = projectId;
       if (args.prompt) spawnArgs.prompt = args.prompt;
+      const callerExtraArgs =
+        args["extra-arguments"] !== undefined
+          ? tokenizeArgs(args["extra-arguments"])
+          : [];
+      const mergedExtraArgs = [...resolution.extra_args, ...callerExtraArgs];
+      if (mergedExtraArgs.length > 0)
+        spawnArgs.extra_args = mergedExtraArgs;
 
       const spawned = await client.spawnProcess(spawnArgs);
       const effectiveProjectId = projectId ?? client.projectId;
@@ -154,9 +191,10 @@ const spawnCommand = defineCommand({
       const result = {
         process_id: spawned.process_id,
         name: spawned.name,
-        tier,
-        agent_tool_id: resolution.selected.agent_tool_id,
-        agent_tool_name: resolution.selected.tool_name,
+        preset: presetName,
+        agent_tool_id: resolution.agent_tool_id,
+        extra_args: mergedExtraArgs,
+        ...(resolution.provider !== undefined && { provider: resolution.provider }),
         project_id: effectiveProjectId,
         ...(url !== undefined && { url }),
       };
@@ -167,8 +205,12 @@ const spawnCommand = defineCommand({
       } else {
         writeOut(`process_id:  ${result.process_id}`);
         writeOut(`name:        ${result.name}`);
-        writeOut(`tier:        ${result.tier}`);
-        writeOut(`tool:        ${result.agent_tool_name} (#${result.agent_tool_id})`);
+        writeOut(`preset:      ${result.preset}`);
+        writeOut(`tool_id:     ${result.agent_tool_id}`);
+        if (result.provider !== undefined)
+          writeOut(`provider:    ${result.provider}`);
+        if (result.extra_args.length > 0)
+          writeOut(`extra_args:  ${result.extra_args.join(" ")}`);
         if (result.project_id !== undefined)
           writeOut(`project_id:  ${result.project_id}`);
         if (url !== undefined) writeOut(`url:         ${url}`);
@@ -182,10 +224,10 @@ const spawnCommand = defineCommand({
 });
 
 export const agentCommand = defineCommand({
-  meta: { name: "agent", description: "Manage Duo agent tiers" },
+  meta: { name: "agent", description: "Manage Duo agent presets" },
   subCommands: {
     list: listCommand,
     resolve: resolveCommand,
-    spawn: spawnCommand,
+    launch: launchCommand,
   },
 });

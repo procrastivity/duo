@@ -121,7 +121,7 @@ const handleLine = (line) => {
     if (tools.error) finish(1, `tools/list failed: ${JSON.stringify(tools.error)}`);
     if (call.error) finish(1, `tools/call returned JSON-RPC error: ${JSON.stringify(call.error)}`);
     const toolNames = tools.result?.tools?.map((tool) => tool.name) ?? [];
-    for (const name of ["list_agent_tiers", "resolve_agent_tool", "spawn_agent"]) {
+    for (const name of ["list_presets", "resolve_preset", "launch_agent", "list_providers", "set_provider_enabled"]) {
       if (!toolNames.includes(name)) {
         finish(1, `tools/list missing ${name}`);
       }
@@ -179,7 +179,10 @@ child.stdin.write(JSON.stringify({
   jsonrpc: "2.0",
   id: 3,
   method: "tools/call",
-  params: { name: "list_agent_tiers", arguments: {} },
+  // launch_agent is the only tool that connects to Solo, so it exercises the
+  // solo_connection_failed path when the transport command is unreachable.
+  // (The other four tools are offline: config/provider-state only.)
+  params: { name: "launch_agent", arguments: { preset: "smoke" } },
 }) + "\n");
 EOF
 echo "PASS: mcp stdio handshake"

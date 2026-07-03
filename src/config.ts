@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PolicySchema } from "./types/policy.js";
+import { PresetsSchema } from "./types/presets.js";
 
 export const soloStdioTransportSchema = z
   .object({
@@ -18,7 +18,7 @@ export const soloConfigSchema = z
         transport: soloStdioTransportSchema,
       })
       .strict(),
-    policy: PolicySchema.optional(),
+    presets: PresetsSchema.optional(),
   })
   .strict();
 

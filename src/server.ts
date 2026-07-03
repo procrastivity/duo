@@ -5,19 +5,27 @@ import { StdioTransport } from "./transport/stdio.js";
 import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
-import { buildClassifierPolicy, defaultPolicy } from "./classifier.js";
 import { getVersion } from "./cli/version-info.js";
-import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-tiers.js";
+import { listPresets, ListPresetsInputSchema } from "./tools/list-presets.js";
 import {
-  resolveAgentToolHandler,
-  ResolveAgentToolInputSchema,
-  type ResolveAgentToolInput,
-} from "./tools/resolve-agent-tool.js";
+  resolvePresetHandler,
+  ResolvePresetInputSchema,
+  type ResolvePresetInput,
+} from "./tools/resolve-preset.js";
 import {
-  spawnAgentHandler,
-  SpawnAgentInputSchema,
-  type SpawnAgentInput,
-} from "./tools/spawn-agent.js";
+  launchAgentHandler,
+  LaunchAgentInputSchema,
+  type LaunchAgentInput,
+} from "./tools/launch-agent.js";
+import {
+  listProvidersHandler,
+  ListProvidersInputSchema,
+} from "./tools/list-providers.js";
+import {
+  setProviderEnabledHandler,
+  SetProviderEnabledInputSchema,
+  type SetProviderEnabledInput,
+} from "./tools/set-provider-enabled.js";
 
 export interface MCPServer {
   start(): Promise<void>;
@@ -111,58 +119,93 @@ export class DuoServer implements MCPServer {
     }
   }
 
+  /**
+   * Preset resolution is config- + provider-state driven and needs no Solo
+   * connection, but a failed startup config must still surface as a structured
+   * tool error. Returns a `ToolResult` to short-circuit, or `null` to proceed.
+   */
+  private _startupToolError(): ToolResult | null {
+    if (this._startupError) {
+      return toolError(
+        "solo_connection_failed",
+        startupErrorMessage(this._startupError),
+      );
+    }
+    return null;
+  }
+
   async start(): Promise<void> {
-    // Build classifier policy from config
-    const classifierPolicy = this._config?.policy
-      ? buildClassifierPolicy(this._config.policy)
-      : defaultPolicy();
+    const presets = this._config?.presets;
 
-    const selectionPreference = this._config?.policy?.selection?.preference;
-
-    // Register tools
+    // Register tools. Public tool names are kept per step-03/D1; only the
+    // behavior and result shapes are preset-driven now.
     this._mcpServer.registerTool(
-      "list_agent_tiers",
+      "list_presets",
       {
         description:
-          "List available agent tools grouped by tier (small, medium, large) with default selection and alternatives",
-        inputSchema: ListAgentTiersInputSchema,
+          "List the configured agent presets with per-preset availability and definitions",
+        inputSchema: ListPresetsInputSchema,
       },
       (async () =>
-        this._withSoloClient((soloClient) => listAgentTiers(soloClient))) as any,
+        this._startupToolError() ?? listPresets(presets)) as any,
     );
 
     this._mcpServer.registerTool(
-      "resolve_agent_tool",
+      "resolve_preset",
       {
         description:
-          "Resolve and select an agent tool for a specific tier (small, medium, or large)",
-        inputSchema: ResolveAgentToolInputSchema,
+          "Resolve and select the agent tool for a configured preset (optionally avoiding a provider)",
+        inputSchema: ResolvePresetInputSchema,
       },
       (async (input: unknown) =>
-        this._withSoloClient((soloClient) => resolveAgentToolHandler(
-          soloClient,
+        this._startupToolError() ??
+        resolvePresetHandler(
           this._logger,
-          input as ResolveAgentToolInput,
-          classifierPolicy,
-          selectionPreference,
-        ))) as any,
+          input as ResolvePresetInput,
+          presets,
+        )) as any,
     );
 
     this._mcpServer.registerTool(
-      "spawn_agent",
+      "launch_agent",
       {
         description:
-          "Spawn a new agent process for a given tier with optional name and project scope",
-        inputSchema: SpawnAgentInputSchema,
+          "Launch a new agent process for a configured preset with optional name, project scope, provider avoidance, and caller extra_args",
+        inputSchema: LaunchAgentInputSchema,
       },
       (async (input: unknown) =>
-        this._withSoloClient((soloClient) => spawnAgentHandler(
+        this._withSoloClient((soloClient) => launchAgentHandler(
           soloClient,
           this._logger,
-          input as SpawnAgentInput,
-          classifierPolicy,
-          selectionPreference,
+          input as LaunchAgentInput,
+          presets,
         ))) as any,
+    );
+
+    // Provider-state tools are offline (D6): they read/write only the XDG
+    // provider state, so they register through the `_startupToolError()` guard
+    // (like list_presets/resolve_preset), never `_withSoloClient`.
+    this._mcpServer.registerTool(
+      "list_providers",
+      {
+        description:
+          "List the providers tracked in provider state with their enabled/disabled status",
+        inputSchema: ListProvidersInputSchema,
+      },
+      (async () =>
+        this._startupToolError() ?? listProvidersHandler()) as any,
+    );
+
+    this._mcpServer.registerTool(
+      "set_provider_enabled",
+      {
+        description:
+          "Enable or disable a provider in provider state (offline; validates the provider label)",
+        inputSchema: SetProviderEnabledInputSchema,
+      },
+      (async (input: unknown) =>
+        this._startupToolError() ??
+        setProviderEnabledHandler(input as SetProviderEnabledInput)) as any,
     );
 
     const serverTransport = new StdioServerTransport();
@@ -201,7 +244,7 @@ export interface RunServerOptions {
 }
 
 /**
- * Boot the Duo MCP server. Loads config + policy, constructs the server,
+ * Boot the Duo MCP server. Loads config + presets, constructs the server,
  * and starts the stdio transport. If config load or server construction
  * fails, falls back to an unavailable server that surfaces the error
  * via structured tool responses rather than throwing — the stdio
@@ -216,7 +259,9 @@ export async function runServer(opts: RunServerOptions = {}): Promise<void> {
     const loaded = loadConfig({ cwd });
     const rawConfig: Record<string, unknown> = {
       solo: loaded.config.solo,
-      ...(loaded.config.policy !== undefined && { policy: loaded.config.policy }),
+      ...(loaded.config.presets !== undefined && {
+        presets: loaded.config.presets,
+      }),
     };
     server = await createServer(rawConfig, logger);
   } catch (err) {

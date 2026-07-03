@@ -64,142 +64,51 @@ describe("parseConfig", () => {
     ).toThrow("solo.transport.command");
   });
 
-  describe("policy field", () => {
-    it("parses config without policy block: policy is undefined", () => {
+  describe("presets field", () => {
+    it("parses config without presets block: presets is undefined", () => {
       const config = parseConfig({
         solo: {
-          transport: {
-            type: "stdio",
-            command: "solo",
-            args: ["mcp", "serve"],
-          },
+          transport: { type: "stdio", command: "solo" },
         },
       });
 
-      expect(config.policy).toBeUndefined();
+      expect(config.presets).toBeUndefined();
     });
 
-    it("parses config with valid policy block", () => {
+    it("parses config with a valid presets block", () => {
       const config = parseConfig({
         solo: {
-          transport: {
-            type: "stdio",
-            command: "solo",
-            args: ["mcp", "serve"],
-          },
+          transport: { type: "stdio", command: "solo" },
         },
-        policy: {
-          command_tokens: {
-            small: {
-              mode: "extend",
-              tokens: ["custom-small"],
+        presets: {
+          builder: [
+            {
+              id: "abc123xy",
+              agent_tool_id: 4,
+              extra_args: "-m sonnet",
+              provider: "anthropic",
             },
-          },
-          selection: {
-            preference: [
-              {
-                tool_type: "test-type",
-              },
-            ],
-          },
+          ],
+          default: [{ id: "def456uv", agent_tool_id: 4 }],
         },
       });
 
-      expect(config.policy).toBeDefined();
-      expect(config.policy?.command_tokens?.small).toBeDefined();
-      expect(config.policy?.selection?.preference).toHaveLength(1);
+      expect(config.presets?.builder).toHaveLength(1);
+      expect(config.presets?.builder?.[0]?.agent_tool_id).toBe(4);
+      expect(config.presets?.default?.[0]?.provider).toBeUndefined();
     });
 
-    it("throws field-level error for invalid policy block", () => {
+    it("throws for a definition with an extra key (strict)", () => {
       expect(() =>
         parseConfig({
           solo: {
-            transport: {
-              type: "stdio",
-              command: "solo",
-            },
+            transport: { type: "stdio", command: "solo" },
           },
-          policy: {
-            selection: {
-              preference: [{}], // Missing both tool_type and tool_name
-            },
+          presets: {
+            builder: [{ id: "abc123xy", agent_tool_id: 4, bogus: true }],
           },
         }),
-      ).toThrow(/policy|selection|preference/);
-    });
-
-    it("accepts policy with only tool_type in preference selector", () => {
-      const config = parseConfig({
-        solo: {
-          transport: {
-            type: "stdio",
-            command: "solo",
-          },
-        },
-        policy: {
-          selection: {
-            preference: [
-              {
-                tool_type: "agent-type",
-              },
-            ],
-          },
-        },
-      });
-
-      expect(config.policy?.selection?.preference?.[0]?.tool_type).toBe(
-        "agent-type",
-      );
-    });
-
-    it("accepts policy with only tool_name in preference selector", () => {
-      const config = parseConfig({
-        solo: {
-          transport: {
-            type: "stdio",
-            command: "solo",
-          },
-        },
-        policy: {
-          selection: {
-            preference: [
-              {
-                tool_name: "my-agent",
-              },
-            ],
-          },
-        },
-      });
-
-      expect(config.policy?.selection?.preference?.[0]?.tool_name).toBe(
-        "my-agent",
-      );
-    });
-
-    it("accepts policy with both tool_type and tool_name in preference selector", () => {
-      const config = parseConfig({
-        solo: {
-          transport: {
-            type: "stdio",
-            command: "solo",
-          },
-        },
-        policy: {
-          selection: {
-            preference: [
-              {
-                tool_type: "agent-type",
-                tool_name: "my-agent",
-              },
-            ],
-          },
-        },
-      });
-
-      expect(config.policy?.selection?.preference?.[0]).toEqual({
-        tool_type: "agent-type",
-        tool_name: "my-agent",
-      });
+      ).toThrow(/presets|builder|unrecognized/i);
     });
   });
 });

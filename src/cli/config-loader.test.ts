@@ -57,7 +57,6 @@ describe("loadConfig", () => {
     process.env = { ...originalEnv };
     delete process.env.DUO_CONFIG;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DUO_POLICY;
     tmp = mkdtempSync(join(tmpdir(), "duo-config-loader-"));
   });
 

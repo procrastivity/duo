@@ -206,6 +206,8 @@ export class SoloClient {
       agent_tool_id: args.agent_tool_id,
       ...(args.name !== undefined && { name: args.name }),
       ...(projectId !== undefined && { project_id: projectId }),
+      ...(args.extra_args !== undefined &&
+        args.extra_args.length > 0 && { extra_args: args.extra_args }),
     };
     const result = await this._request("tools/call", {
       name: "spawn_process",
