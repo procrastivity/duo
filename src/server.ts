@@ -5,7 +5,6 @@ import { StdioTransport } from "./transport/stdio.js";
 import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
-import { buildClassifierPolicy, defaultPolicy } from "./classifier.js";
 import { getVersion } from "./cli/version-info.js";
 import { listAgentTiers, ListAgentTiersInputSchema } from "./tools/list-agent-tiers.js";
 import {
@@ -111,48 +110,58 @@ export class DuoServer implements MCPServer {
     }
   }
 
+  /**
+   * Preset resolution is config- + provider-state driven and needs no Solo
+   * connection, but a failed startup config must still surface as a structured
+   * tool error. Returns a `ToolResult` to short-circuit, or `null` to proceed.
+   */
+  private _startupToolError(): ToolResult | null {
+    if (this._startupError) {
+      return toolError(
+        "solo_connection_failed",
+        startupErrorMessage(this._startupError),
+      );
+    }
+    return null;
+  }
+
   async start(): Promise<void> {
-    // Build classifier policy from config
-    const classifierPolicy = this._config?.policy
-      ? buildClassifierPolicy(this._config.policy)
-      : defaultPolicy();
+    const presets = this._config?.presets;
 
-    const selectionPreference = this._config?.policy?.selection?.preference;
-
-    // Register tools
+    // Register tools. Public tool names are kept per step-03/D1; only the
+    // behavior and result shapes are preset-driven now.
     this._mcpServer.registerTool(
       "list_agent_tiers",
       {
         description:
-          "List available agent tools grouped by tier (small, medium, large) with default selection and alternatives",
+          "List the configured agent presets with per-preset availability and definitions",
         inputSchema: ListAgentTiersInputSchema,
       },
       (async () =>
-        this._withSoloClient((soloClient) => listAgentTiers(soloClient))) as any,
+        this._startupToolError() ?? listAgentTiers(presets)) as any,
     );
 
     this._mcpServer.registerTool(
       "resolve_agent_tool",
       {
         description:
-          "Resolve and select an agent tool for a specific tier (small, medium, or large)",
+          "Resolve and select the agent tool for a configured preset",
         inputSchema: ResolveAgentToolInputSchema,
       },
       (async (input: unknown) =>
-        this._withSoloClient((soloClient) => resolveAgentToolHandler(
-          soloClient,
+        this._startupToolError() ??
+        resolveAgentToolHandler(
           this._logger,
           input as ResolveAgentToolInput,
-          classifierPolicy,
-          selectionPreference,
-        ))) as any,
+          presets,
+        )) as any,
     );
 
     this._mcpServer.registerTool(
       "spawn_agent",
       {
         description:
-          "Spawn a new agent process for a given tier with optional name and project scope",
+          "Spawn a new agent process for a configured preset with optional name and project scope",
         inputSchema: SpawnAgentInputSchema,
       },
       (async (input: unknown) =>
@@ -160,8 +169,7 @@ export class DuoServer implements MCPServer {
           soloClient,
           this._logger,
           input as SpawnAgentInput,
-          classifierPolicy,
-          selectionPreference,
+          presets,
         ))) as any,
     );
 
@@ -201,7 +209,7 @@ export interface RunServerOptions {
 }
 
 /**
- * Boot the Duo MCP server. Loads config + policy, constructs the server,
+ * Boot the Duo MCP server. Loads config + presets, constructs the server,
  * and starts the stdio transport. If config load or server construction
  * fails, falls back to an unavailable server that surfaces the error
  * via structured tool responses rather than throwing — the stdio
@@ -216,7 +224,9 @@ export async function runServer(opts: RunServerOptions = {}): Promise<void> {
     const loaded = loadConfig({ cwd });
     const rawConfig: Record<string, unknown> = {
       solo: loaded.config.solo,
-      ...(loaded.config.policy !== undefined && { policy: loaded.config.policy }),
+      ...(loaded.config.presets !== undefined && {
+        presets: loaded.config.presets,
+      }),
     };
     server = await createServer(rawConfig, logger);
   } catch (err) {

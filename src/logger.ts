@@ -1,30 +1,26 @@
 import pino from "pino";
 
 /**
- * Log emitted when tool resolution succeeds.
+ * Log emitted when preset resolution succeeds.
  * Allow-list enforced: only these fields are logged.
  */
 export interface ResolutionSuccessLog {
   event: "resolution.success";
-  requested_tier: "small" | "medium" | "large";
+  requested_preset: string;
+  preset_used: string;
   selected_tool_id: number;
-  selected_tool_name: string;
-  match_source: "command" | "name_fallback";
-  candidate_count: number;
-  token_source: "built_in" | "override";
-  strategy: "random" | "custom";
-  preference_applied: boolean;
+  fell_back_to_default: boolean;
+  relented_on_avoid_provider: boolean;
 }
 
 /**
- * Log emitted when tool resolution fails.
+ * Log emitted when preset resolution fails.
  * Allow-list enforced: only these fields are logged.
  */
 export interface ResolutionFailureLog {
   event: "resolution.failure";
-  requested_tier: string;
-  error_code: "unsupported_tier" | "tier_unavailable" | string;
-  available_tiers: ("small" | "medium" | "large")[];
+  requested_preset: string;
+  error_code: "unknown_preset" | "preset_unavailable" | string;
 }
 
 /**
@@ -33,7 +29,7 @@ export interface ResolutionFailureLog {
  */
 export interface SpawnSuccessLog {
   event: "spawn.success";
-  requested_tier: "small" | "medium" | "large";
+  requested_preset: string;
   selected_tool_id: number;
   solo_process_id: string;
   process_name: string;
@@ -58,10 +54,10 @@ export interface Logger {
 
 /**
  * Creates a Logger instance wrapping pino.
- * 
+ *
  * @param destination Optional pino destination stream. Defaults to stderr (fd 2).
  * @returns Logger instance with allow-list-enforced methods.
- * 
+ *
  * Configuration:
  * - level: "info" (single channel, no debug spam in v0)
  * - timestamp: ISO 8601 format (pino.stdTimeFunctions.isoTime)
@@ -86,46 +82,38 @@ export const createLogger = (
 
   return {
     /**
-     * Log successful tool resolution.
+     * Log successful preset resolution.
      * Destructures and re-emits ONLY the declared fields from ResolutionSuccessLog.
      */
     resolutionSuccess({
-      requested_tier,
+      requested_preset,
+      preset_used,
       selected_tool_id,
-      selected_tool_name,
-      match_source,
-      candidate_count,
-      token_source,
-      strategy,
-      preference_applied,
+      fell_back_to_default,
+      relented_on_avoid_provider,
     }): void {
       pinoLogger.info({
         event: "resolution.success",
-        requested_tier,
+        requested_preset,
+        preset_used,
         selected_tool_id,
-        selected_tool_name,
-        match_source,
-        candidate_count,
-        token_source,
-        strategy,
-        preference_applied,
+        fell_back_to_default,
+        relented_on_avoid_provider,
       });
     },
 
     /**
-     * Log failed tool resolution.
+     * Log failed preset resolution.
      * Destructures and re-emits ONLY the declared fields from ResolutionFailureLog.
      */
     resolutionFailure({
-      requested_tier,
+      requested_preset,
       error_code,
-      available_tiers,
     }): void {
       pinoLogger.info({
         event: "resolution.failure",
-        requested_tier,
+        requested_preset,
         error_code,
-        available_tiers,
       });
     },
 
@@ -134,14 +122,14 @@ export const createLogger = (
      * Destructures and re-emits ONLY the declared fields from SpawnSuccessLog.
      */
     spawnSuccess({
-      requested_tier,
+      requested_preset,
       selected_tool_id,
       solo_process_id,
       process_name,
     }): void {
       pinoLogger.info({
         event: "spawn.success",
-        requested_tier,
+        requested_preset,
         selected_tool_id,
         solo_process_id,
         process_name,

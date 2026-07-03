@@ -1,17 +1,13 @@
 import { z } from "zod";
 import { SoloClient, SoloClientError } from "../solo-client.js";
-import { resolveAgentTool } from "../resolver.js";
-import {
-  TierUnavailableError,
-  UnsupportedTierError,
-  TIER_LABELS,
-} from "../errors.js";
+import { resolvePreset, type ResolvePresetOptions } from "../resolver.js";
+import { PresetUnavailableError, UnknownPresetError } from "../errors.js";
 import type { Logger } from "../logger.js";
-import type { ClassifierTokenPolicy } from "../classifier.js";
-import type { PreferenceSelector } from "../types/policy.js";
+import type { Presets } from "../types/presets.js";
 
 export const SpawnAgentInputSchema = z
   .object({
+    // Public wire key kept as `tier` for step-03 (OQ1); it names a preset now.
     tier: z.string().min(1, "tier is required"),
     name: z.string().min(1).optional(),
     project_id: z.number().int().nonnegative().optional(),
@@ -20,19 +16,13 @@ export const SpawnAgentInputSchema = z
 
 export type SpawnAgentInput = z.infer<typeof SpawnAgentInputSchema>;
 
-export interface SpawnAgentToolSummary {
-  agent_tool_id: number;
-  tool_name: string;
-  tool_type: string;
-  command: string;
-  classification_source: "command" | "name_fallback";
-}
-
 export interface SpawnAgentResult {
   process_id: number;
   name: string;
-  tier: "small" | "medium" | "large";
-  tool: SpawnAgentToolSummary;
+  preset: string;
+  agent_tool_id: number;
+  extra_args: string[];
+  provider?: string;
   project_id?: number;
 }
 
@@ -61,67 +51,50 @@ const mcpError = (
   isError: true,
 });
 
+/**
+ * Resolve a preset and spawn the selected agent tool as a Solo process. The
+ * resolver needs only the config `presets` + provider enabled-state (no Solo
+ * agent-tool list); the Solo client is still required to spawn. The resolved
+ * `extra_args` (tokenized) are threaded into the spawn call — this is where the
+ * preset engine (deliverable a) meets the transport plumbing (deliverable c).
+ * `options` carries the resolver test seams; production callers pass nothing.
+ */
 export async function spawnAgentHandler(
   soloClient: SoloClient,
   logger: Logger,
   input: SpawnAgentInput,
-  classifierPolicy?: ClassifierTokenPolicy,
-  preference?: PreferenceSelector[],
+  presets: Presets | undefined,
+  options: ResolvePresetOptions = {},
 ): Promise<ToolResult> {
-  let tools;
-  try {
-    tools = await soloClient.listAgentTools();
-  } catch (err) {
-    if (err instanceof SoloClientError) {
-      return mcpError(err.code, err.message);
-    }
-    throw err;
-  }
+  const presetName = input.tier;
 
   let resolution;
   try {
-    const options = {
-      classifierPolicy,
-      ...(preference && { preference, strategy: "custom" as const }),
-    };
-    resolution = resolveAgentTool(tools, input.tier, options);
+    resolution = resolvePreset(presets ?? {}, presetName, options);
   } catch (err) {
-    if (err instanceof UnsupportedTierError) {
+    if (err instanceof UnknownPresetError) {
       logger.resolutionFailure({
-        requested_tier: input.tier,
-        error_code: "unsupported_tier",
-        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
+        requested_preset: presetName,
+        error_code: err.code,
       });
-      return mcpError(
-        err.code,
-        `Unsupported tier "${err.requested}". Supported tiers: ${TIER_LABELS.join(", ")}.`,
-      );
+      return mcpError(err.code, err.message, { preset: err.preset });
     }
-    if (err instanceof TierUnavailableError) {
+    if (err instanceof PresetUnavailableError) {
       logger.resolutionFailure({
-        requested_tier: input.tier,
-        error_code: "tier_unavailable",
-        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
+        requested_preset: presetName,
+        error_code: err.code,
       });
-      return mcpError(
-        err.code,
-        `No enabled candidates available for tier "${err.diagnostics.requested_tier}".`,
-        { diagnostics: err.diagnostics },
-      );
+      return mcpError(err.code, err.message, { diagnostics: err.diagnostics });
     }
     throw err;
   }
 
-  const tier = input.tier as "small" | "medium" | "large";
   logger.resolutionSuccess({
-    requested_tier: tier,
-    selected_tool_id: resolution.selected.agent_tool_id,
-    selected_tool_name: resolution.selected.tool_name,
-    match_source: resolution.classification_source,
-    candidate_count: resolution.diagnostics.candidates_considered,
-    token_source: resolution.selected.token_source,
-    strategy: resolution.diagnostics.strategy,
-    preference_applied: resolution.diagnostics.preference_applied,
+    requested_preset: resolution.preset_requested,
+    preset_used: resolution.preset_used,
+    selected_tool_id: resolution.agent_tool_id,
+    fell_back_to_default: resolution.fell_back_to_default,
+    relented_on_avoid_provider: resolution.relented_on_avoid_provider,
   });
 
   const spawnArgs: {
@@ -129,12 +102,15 @@ export async function spawnAgentHandler(
     agent_tool_id: number;
     name?: string;
     project_id?: number;
+    extra_args?: string[];
   } = {
     kind: "agent",
-    agent_tool_id: resolution.selected.agent_tool_id,
+    agent_tool_id: resolution.agent_tool_id,
   };
   if (input.name !== undefined) spawnArgs.name = input.name;
   if (input.project_id !== undefined) spawnArgs.project_id = input.project_id;
+  if (resolution.extra_args.length > 0)
+    spawnArgs.extra_args = resolution.extra_args;
 
   let spawnResult;
   try {
@@ -143,8 +119,8 @@ export async function spawnAgentHandler(
     if (err instanceof SoloClientError) {
       const data: Record<string, unknown> = {
         solo_code: err.code,
-        requested_tier: input.tier,
-        agent_tool_id: resolution.selected.agent_tool_id,
+        requested_preset: presetName,
+        agent_tool_id: resolution.agent_tool_id,
       };
       if (input.name !== undefined) data.requested_name = input.name;
       if (input.project_id !== undefined)
@@ -155,8 +131,8 @@ export async function spawnAgentHandler(
   }
 
   logger.spawnSuccess({
-    requested_tier: tier,
-    selected_tool_id: resolution.selected.agent_tool_id,
+    requested_preset: presetName,
+    selected_tool_id: resolution.agent_tool_id,
     solo_process_id: String(spawnResult.process_id),
     process_name: spawnResult.name,
   });
@@ -166,15 +142,11 @@ export async function spawnAgentHandler(
   const result: SpawnAgentResult = {
     process_id: spawnResult.process_id,
     name: spawnResult.name,
-    tier,
-    tool: {
-      agent_tool_id: resolution.selected.agent_tool_id,
-      tool_name: resolution.selected.tool_name,
-      tool_type: resolution.selected.tool_type,
-      command: resolution.selected.command,
-      classification_source: resolution.classification_source,
-    },
+    preset: presetName,
+    agent_tool_id: resolution.agent_tool_id,
+    extra_args: resolution.extra_args,
   };
+  if (resolution.provider !== undefined) result.provider = resolution.provider;
   if (effectiveProjectId !== undefined) result.project_id = effectiveProjectId;
 
   return ok(result);

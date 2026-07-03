@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { SoloClient, SoloClientError } from "../solo-client.js";
-import { resolveAgentTool } from "../resolver.js";
-import { TierUnavailableError, UnsupportedTierError, TIER_LABELS } from "../errors.js";
+import { resolvePreset, type ResolvePresetOptions } from "../resolver.js";
+import { PresetUnavailableError, UnknownPresetError } from "../errors.js";
 import type { Logger } from "../logger.js";
-import type { ClassifierTokenPolicy } from "../classifier.js";
-import type { PreferenceSelector } from "../types/policy.js";
+import type { Presets } from "../types/presets.js";
 
 export const ResolveAgentToolInputSchema = z
   .object({
+    // Public wire key kept as `tier` for step-03 (OQ1); it names a preset now.
     tier: z.string().min(1, "tier is required"),
   })
   .strict();
@@ -37,68 +36,43 @@ const mcpError = (
   isError: true,
 });
 
+/**
+ * Resolve which agent tool a preset selects. The resolver is provider-aware and
+ * needs only the config `presets` plus per-provider enabled-state — it no longer
+ * consults the Solo agent-tool list. `options` carries the resolver test seams
+ * (`rng`, injected `isProviderEnabled`); production callers pass nothing.
+ */
 export async function resolveAgentToolHandler(
-  soloClient: SoloClient,
   logger: Logger,
   input: ResolveAgentToolInput,
-  classifierPolicy?: ClassifierTokenPolicy,
-  preference?: PreferenceSelector[],
+  presets: Presets | undefined,
+  options: ResolvePresetOptions = {},
 ): Promise<ToolResult> {
-  let tools;
+  const presetName = input.tier;
   try {
-    tools = await soloClient.listAgentTools();
-  } catch (err) {
-    if (err instanceof SoloClientError) {
-      logger.resolutionFailure({
-        requested_tier: input.tier,
-        error_code: String(err.code),
-        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
-      });
-      return mcpError(err.code, err.message);
-    }
-    throw err;
-  }
-
-  try {
-    const options = {
-      classifierPolicy,
-      ...(preference && { preference, strategy: "custom" as const }),
-    };
-    const resolution = resolveAgentTool(tools, input.tier, options);
+    const resolution = resolvePreset(presets ?? {}, presetName, options);
     logger.resolutionSuccess({
-      requested_tier: input.tier as "small" | "medium" | "large",
-      selected_tool_id: resolution.selected.agent_tool_id,
-      selected_tool_name: resolution.selected.tool_name,
-      match_source: resolution.classification_source,
-      candidate_count: resolution.diagnostics.candidates_considered,
-      token_source: resolution.selected.token_source,
-      strategy: resolution.diagnostics.strategy,
-      preference_applied: resolution.diagnostics.preference_applied,
+      requested_preset: resolution.preset_requested,
+      preset_used: resolution.preset_used,
+      selected_tool_id: resolution.agent_tool_id,
+      fell_back_to_default: resolution.fell_back_to_default,
+      relented_on_avoid_provider: resolution.relented_on_avoid_provider,
     });
     return ok(resolution);
   } catch (err) {
-    if (err instanceof UnsupportedTierError) {
+    if (err instanceof UnknownPresetError) {
       logger.resolutionFailure({
-        requested_tier: input.tier,
-        error_code: "unsupported_tier",
-        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
+        requested_preset: presetName,
+        error_code: err.code,
       });
-      return mcpError(
-        err.code,
-        `Unsupported tier "${err.requested}". Supported tiers: ${TIER_LABELS.join(", ")}.`,
-      );
+      return mcpError(err.code, err.message, { preset: err.preset });
     }
-    if (err instanceof TierUnavailableError) {
+    if (err instanceof PresetUnavailableError) {
       logger.resolutionFailure({
-        requested_tier: input.tier,
-        error_code: "tier_unavailable",
-        available_tiers: TIER_LABELS as ("small" | "medium" | "large")[],
+        requested_preset: presetName,
+        error_code: err.code,
       });
-      return mcpError(
-        err.code,
-        `No enabled candidates available for tier "${err.diagnostics.requested_tier}".`,
-        { diagnostics: err.diagnostics },
-      );
+      return mcpError(err.code, err.message, { diagnostics: err.diagnostics });
     }
     throw err;
   }

@@ -1,90 +1,69 @@
 import { z } from "zod";
-import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { TierUnavailableError, type ResolverDiagnostics } from "../errors.js";
-import { resolveAgentTool } from "../resolver.js";
-import { SoloClientError, type SoloClient } from "../solo-client.js";
-import type { SoloAgentTool } from "../types/solo.js";
+import { isProviderEnabled as defaultIsProviderEnabled } from "../state/providers.js";
+import type { PresetDefinition, Presets } from "../types/presets.js";
 
 export const ListAgentTiersInputSchema = z.object({}).strict();
 
 export type ListAgentTiersInput = z.infer<typeof ListAgentTiersInputSchema>;
 
-export interface TierAvailabilityDefault {
+export interface PresetDefinitionView {
+  id: string;
   agent_tool_id: number;
-  tool_name: string;
-  tool_type: string;
-  command: string;
-  classification_source: "command" | "name_fallback";
+  provider?: string;
+  /** Provider enabled-state at read time; always true for a no-provider def. */
+  enabled: boolean;
 }
 
-export interface TierAvailabilityAlternative {
-  agent_tool_id: number;
-  tool_name: string;
-  tool_type: string;
-  classification_source: "command" | "name_fallback";
-}
-
-export interface TierAvailability {
+export interface PresetAvailability {
+  /**
+   * True when the preset (or its `default` fallback) has at least one eligible
+   * definition — mirrors the D4 no-`avoid` ladder without the random pick.
+   */
   available: boolean;
-  default?: TierAvailabilityDefault;
-  alternatives: TierAvailabilityAlternative[];
-  diagnostics: ResolverDiagnostics;
+  definitions: PresetDefinitionView[];
 }
 
-export interface ListAgentTiersResult {
-  small: TierAvailability;
-  medium: TierAvailability;
-  large: TierAvailability;
-}
+export type ListAgentTiersResult = Record<string, PresetAvailability>;
 
-const TIERS = ["small", "medium", "large"] as const;
+const DEFAULT_PRESET = "default";
 
-function resolveTier(
-  tools: readonly SoloAgentTool[],
-  tier: "small" | "medium" | "large",
-): TierAvailability {
-  try {
-    const resolution = resolveAgentTool(tools, tier);
-    return {
-      available: true,
-      default: {
-        agent_tool_id: resolution.selected.agent_tool_id,
-        tool_name: resolution.selected.tool_name,
-        tool_type: resolution.selected.tool_type,
-        command: resolution.selected.command,
-        classification_source: resolution.classification_source,
-      },
-      alternatives: resolution.alternatives,
-      diagnostics: resolution.diagnostics,
+const viewDefs = (
+  defs: readonly PresetDefinition[],
+  isEnabled: (provider: string) => boolean,
+): PresetDefinitionView[] =>
+  defs.map((d) => ({
+    id: d.id,
+    agent_tool_id: d.agent_tool_id,
+    ...(d.provider !== undefined ? { provider: d.provider } : {}),
+    enabled: d.provider === undefined || isEnabled(d.provider),
+  }));
+
+/**
+ * Enumerate the configured presets and report per-preset availability. Purely
+ * config- + provider-state driven — it does not consult Solo. `isProviderEnabled`
+ * defaults to the filesystem-backed reader and is injectable for tests.
+ */
+export function listAgentTiers(
+  presets: Presets | undefined,
+  options: { isProviderEnabled?: (provider: string) => boolean } = {},
+): ListAgentTiersResult {
+  const isEnabled = options.isProviderEnabled ?? defaultIsProviderEnabled;
+  const map = presets ?? {};
+
+  const defaultDefs = map[DEFAULT_PRESET] ?? [];
+  const defaultHasEligible = viewDefs(defaultDefs, isEnabled).some(
+    (d) => d.enabled,
+  );
+
+  const result: ListAgentTiersResult = {};
+  for (const [name, defs] of Object.entries(map)) {
+    const definitions = viewDefs(defs, isEnabled);
+    const selfEligible = definitions.some((d) => d.enabled);
+    result[name] = {
+      available:
+        selfEligible || (name !== DEFAULT_PRESET && defaultHasEligible),
+      definitions,
     };
-  } catch (err) {
-    if (err instanceof TierUnavailableError) {
-      return {
-        available: false,
-        alternatives: [],
-        diagnostics: err.diagnostics,
-      };
-    }
-    throw err;
   }
-}
-
-export async function listAgentTiers(
-  client: SoloClient,
-): Promise<ListAgentTiersResult> {
-  let tools: SoloAgentTool[];
-  try {
-    tools = await client.listAgentTools();
-  } catch (err) {
-    if (err instanceof SoloClientError) {
-      throw new McpError(err.code, err.message);
-    }
-    throw err;
-  }
-
-  return {
-    small: resolveTier(tools, "small"),
-    medium: resolveTier(tools, "medium"),
-    large: resolveTier(tools, "large"),
-  };
+  return result;
 }
