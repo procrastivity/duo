@@ -8,10 +8,10 @@ import { createLogger, type Logger } from "./logger.js";
 import { getVersion } from "./cli/version-info.js";
 import { listPresets, ListPresetsInputSchema } from "./tools/list-presets.js";
 import {
-  resolveAgentToolHandler,
-  ResolveAgentToolInputSchema,
-  type ResolveAgentToolInput,
-} from "./tools/resolve-agent-tool.js";
+  resolvePresetHandler,
+  ResolvePresetInputSchema,
+  type ResolvePresetInput,
+} from "./tools/resolve-preset.js";
 import {
   spawnAgentHandler,
   SpawnAgentInputSchema,
@@ -142,17 +142,17 @@ export class DuoServer implements MCPServer {
     );
 
     this._mcpServer.registerTool(
-      "resolve_agent_tool",
+      "resolve_preset",
       {
         description:
-          "Resolve and select the agent tool for a configured preset",
-        inputSchema: ResolveAgentToolInputSchema,
+          "Resolve and select the agent tool for a configured preset (optionally avoiding a provider)",
+        inputSchema: ResolvePresetInputSchema,
       },
       (async (input: unknown) =>
         this._startupToolError() ??
-        resolveAgentToolHandler(
+        resolvePresetHandler(
           this._logger,
-          input as ResolveAgentToolInput,
+          input as ResolvePresetInput,
           presets,
         )) as any,
     );

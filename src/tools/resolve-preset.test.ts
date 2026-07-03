@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveAgentToolHandler } from "./resolve-agent-tool.js";
+import { resolvePresetHandler } from "./resolve-preset.js";
 import type { Logger } from "../logger.js";
 import type { Presets } from "../types/presets.js";
 
@@ -43,13 +43,13 @@ const presets: Presets = {
   default: [{ id: "d-anthropic", agent_tool_id: 10, provider: "anthropic" }],
 };
 
-describe("resolveAgentToolHandler", () => {
+describe("resolvePresetHandler", () => {
   describe("happy path — enabled providers", () => {
     it("returns the pool member indicated by rng", async () => {
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         presets,
         { isProviderEnabled: allEnabled, rng: seededRng(0) },
       );
@@ -65,9 +65,9 @@ describe("resolveAgentToolHandler", () => {
       const seen = new Set<number>();
       for (const v of [0, 0.6]) {
         const { logger } = makeFakeLogger();
-        const result = await resolveAgentToolHandler(
+        const result = await resolvePresetHandler(
           logger,
-          { tier: "builder" },
+          { preset: "builder" },
           presets,
           { isProviderEnabled: allEnabled, rng: seededRng(v) },
         );
@@ -77,12 +77,66 @@ describe("resolveAgentToolHandler", () => {
     });
   });
 
+  describe("avoid_provider plumbing", () => {
+    it("steers to a different provider when avoid_provider is enabled elsewhere", async () => {
+      // avoid anthropic → the not-avoided, enabled openai def is chosen; no relent.
+      const { logger } = makeFakeLogger();
+      const result = await resolvePresetHandler(
+        logger,
+        { preset: "builder", avoid_provider: "anthropic" },
+        presets,
+        { isProviderEnabled: allEnabled, rng: seededRng(0) },
+      );
+      expect(result.isError).toBeFalsy();
+      const data = parse(result);
+      expect(data.agent_tool_id).toBe(2);
+      expect(data.provider).toBe("openai");
+      expect(data.relented_on_avoid_provider).toBe(false);
+      expect(data.fell_back_to_default).toBe(false);
+    });
+
+    it("relents on avoid_provider when it is the only eligible def", async () => {
+      // Only openai is available; avoiding it would leave nothing, so the
+      // resolver softly relents rather than hard-failing (D4 ladder).
+      const p: Presets = {
+        builder: [{ id: "b-openai", agent_tool_id: 2, provider: "openai" }],
+      };
+      const { logger } = makeFakeLogger();
+      const result = await resolvePresetHandler(
+        logger,
+        { preset: "builder", avoid_provider: "openai" },
+        p,
+        { isProviderEnabled: allEnabled, rng: seededRng(0) },
+      );
+      expect(result.isError).toBeFalsy();
+      const data = parse(result);
+      expect(data.agent_tool_id).toBe(2);
+      expect(data.provider).toBe("openai");
+      expect(data.relented_on_avoid_provider).toBe(true);
+    });
+
+    it("logs the relented_on_avoid_provider diagnostic through the tool result", async () => {
+      const p: Presets = {
+        builder: [{ id: "b-openai", agent_tool_id: 2, provider: "openai" }],
+      };
+      const { logger, calls } = makeFakeLogger();
+      await resolvePresetHandler(
+        logger,
+        { preset: "builder", avoid_provider: "openai" },
+        p,
+        { isProviderEnabled: allEnabled, rng: seededRng(0) },
+      );
+      const fields = calls[0].fields as Record<string, unknown>;
+      expect(fields).toHaveProperty("relented_on_avoid_provider", true);
+    });
+  });
+
   describe("unknown preset", () => {
     it("returns isError with code unknown_preset and names the preset", async () => {
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "nope" },
+        { preset: "nope" },
         presets,
         { isProviderEnabled: allEnabled },
       );
@@ -94,9 +148,9 @@ describe("resolveAgentToolHandler", () => {
 
     it("returns unknown_preset when presets is undefined", async () => {
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         undefined,
       );
       expect(result.isError).toBe(true);
@@ -112,9 +166,9 @@ describe("resolveAgentToolHandler", () => {
         default: [{ id: "d-anthropic", agent_tool_id: 10, provider: "anthropic" }],
       };
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         p,
         { isProviderEnabled: disabledSet("openai"), rng: seededRng(0) },
       );
@@ -133,9 +187,9 @@ describe("resolveAgentToolHandler", () => {
 
     it("returns isError with code preset_unavailable and diagnostics", async () => {
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "builder" },
+        { preset: "builder" },
         noDefault,
         { isProviderEnabled: disabledSet("openai") },
       );
@@ -155,9 +209,9 @@ describe("resolveAgentToolHandler", () => {
         ],
       };
       const { logger } = makeFakeLogger();
-      const result = await resolveAgentToolHandler(
+      const result = await resolvePresetHandler(
         logger,
-        { tier: "solo" },
+        { preset: "solo" },
         p,
         { isProviderEnabled: allEnabled },
       );
@@ -168,7 +222,7 @@ describe("resolveAgentToolHandler", () => {
   describe("Logger instrumentation", () => {
     it("happy path — one resolutionSuccess call with preset fields", async () => {
       const { logger, calls } = makeFakeLogger();
-      await resolveAgentToolHandler(logger, { tier: "builder" }, presets, {
+      await resolvePresetHandler(logger, { preset: "builder" }, presets, {
         isProviderEnabled: allEnabled,
         rng: seededRng(0),
       });
@@ -186,7 +240,7 @@ describe("resolveAgentToolHandler", () => {
 
     it("unknown preset — one resolutionFailure with error_code unknown_preset", async () => {
       const { logger, calls } = makeFakeLogger();
-      await resolveAgentToolHandler(logger, { tier: "nope" }, presets, {
+      await resolvePresetHandler(logger, { preset: "nope" }, presets, {
         isProviderEnabled: allEnabled,
       });
       expect(calls).toHaveLength(1);
@@ -201,7 +255,7 @@ describe("resolveAgentToolHandler", () => {
         builder: [{ id: "b-openai", agent_tool_id: 2, provider: "openai" }],
       };
       const { logger, calls } = makeFakeLogger();
-      await resolveAgentToolHandler(logger, { tier: "builder" }, noDefault, {
+      await resolvePresetHandler(logger, { preset: "builder" }, noDefault, {
         isProviderEnabled: disabledSet("openai"),
       });
       expect(calls).toHaveLength(1);

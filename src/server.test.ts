@@ -111,7 +111,7 @@ describe("DuoServer", () => {
       expect(names).toEqual(
         expect.arrayContaining([
           "list_presets",
-          "resolve_agent_tool",
+          "resolve_preset",
           "spawn_agent",
         ]),
       );
@@ -204,7 +204,7 @@ describe("DuoServer", () => {
   });
 
   describe("preset wiring", () => {
-    it("forwards config presets to resolve_agent_tool (success logs)", async () => {
+    it("forwards config presets to resolve_preset (success logs)", async () => {
       const fakeLogger = makeFakeLogger();
       const server = new DuoServer(parseConfig(rawConfigWithPresets), makeClient(), fakeLogger);
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
@@ -212,18 +212,18 @@ describe("DuoServer", () => {
       let resolveHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "resolve_agent_tool") resolveHandler = handler;
+          if (toolName === "resolve_preset") resolveHandler = handler;
           return undefined as unknown;
         },
       );
 
       await server.start();
-      const result = await resolveHandler?.({ tier: "medium" });
+      const result = await resolveHandler?.({ preset: "medium" });
       expect((result as { isError?: boolean }).isError).toBeFalsy();
       expect(fakeLogger.resolutionSuccess).toHaveBeenCalled();
     });
 
-    it("resolve_agent_tool returns unknown_preset when config has no matching preset", async () => {
+    it("resolve_preset returns unknown_preset when config has no matching preset", async () => {
       const fakeLogger = makeFakeLogger();
       const server = new DuoServer(parseConfig(validRawConfig), makeClient(), fakeLogger);
       vi.spyOn(server["_mcpServer"], "connect").mockResolvedValue(undefined);
@@ -231,13 +231,13 @@ describe("DuoServer", () => {
       let resolveHandler: ((input?: unknown) => Promise<unknown>) | undefined;
       vi.spyOn(server["_mcpServer"], "registerTool").mockImplementation(
         (toolName: string, _config: unknown, handler: (input?: unknown) => Promise<unknown>) => {
-          if (toolName === "resolve_agent_tool") resolveHandler = handler;
+          if (toolName === "resolve_preset") resolveHandler = handler;
           return undefined as unknown;
         },
       );
 
       await server.start();
-      const result = (await resolveHandler?.({ tier: "medium" })) as {
+      const result = (await resolveHandler?.({ preset: "medium" })) as {
         content: Array<{ text: string }>;
       };
       expect(JSON.parse(result.content[0].text).code).toBe("unknown_preset");

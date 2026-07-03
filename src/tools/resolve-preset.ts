@@ -4,14 +4,14 @@ import { PresetUnavailableError, UnknownPresetError } from "../errors.js";
 import type { Logger } from "../logger.js";
 import type { Presets } from "../types/presets.js";
 
-export const ResolveAgentToolInputSchema = z
+export const ResolvePresetInputSchema = z
   .object({
-    // Public wire key kept as `tier` for step-03 (OQ1); it names a preset now.
-    tier: z.string().min(1, "tier is required"),
+    preset: z.string().min(1, "preset is required"),
+    avoid_provider: z.string().optional(),
   })
   .strict();
 
-export type ResolveAgentToolInput = z.infer<typeof ResolveAgentToolInputSchema>;
+export type ResolvePresetInput = z.infer<typeof ResolvePresetInputSchema>;
 
 interface TextContent {
   type: "text";
@@ -40,17 +40,25 @@ const mcpError = (
  * Resolve which agent tool a preset selects. The resolver is provider-aware and
  * needs only the config `presets` plus per-provider enabled-state — it no longer
  * consults the Solo agent-tool list. `options` carries the resolver test seams
- * (`rng`, injected `isProviderEnabled`); production callers pass nothing.
+ * (`rng`, injected `isProviderEnabled`); production callers pass nothing. The
+ * public `avoid_provider` input is threaded into `options.avoidProvider` (D5 —
+ * pure input plumbing; the resolver capability already exists).
  */
-export async function resolveAgentToolHandler(
+export async function resolvePresetHandler(
   logger: Logger,
-  input: ResolveAgentToolInput,
+  input: ResolvePresetInput,
   presets: Presets | undefined,
   options: ResolvePresetOptions = {},
 ): Promise<ToolResult> {
-  const presetName = input.tier;
+  const presetName = input.preset;
+  const resolveOptions: ResolvePresetOptions = {
+    ...options,
+    ...(input.avoid_provider !== undefined
+      ? { avoidProvider: input.avoid_provider }
+      : {}),
+  };
   try {
-    const resolution = resolvePreset(presets ?? {}, presetName, options);
+    const resolution = resolvePreset(presets ?? {}, presetName, resolveOptions);
     logger.resolutionSuccess({
       requested_preset: resolution.preset_requested,
       preset_used: resolution.preset_used,
