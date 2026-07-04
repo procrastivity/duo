@@ -131,6 +131,34 @@ npm install @procrastivity/duo
 
 Then reference it in your MCP client config or import its types in a TypeScript project.
 
+### Via Nix flake
+
+Two install targets, each optimized for a different need:
+
+```bash
+# Run without installing — builds from source, works from ANY ref
+# (main, a branch, a specific commit/PR):
+nix run github:procrastivity/duo -- version
+nix run github:procrastivity/duo/my-branch -- version
+
+# Install the lean, self-contained standalone binary (no Node in the
+# closure). Released tags only — see the tradeoff note below:
+nix profile install github:procrastivity/duo#duo-bin
+duo version
+```
+
+| Target | Builds from | Node in closure | Works from arbitrary ref? |
+| --- | --- | --- | --- |
+| `#duo` / `.#default` | source (`buildNpmPackage`) | yes (`nodejs_24`) | ✅ yes |
+| `#duo-bin` | prebuilt release binary | **no** | ❌ released tags only |
+
+**Tradeoff:** `#duo-bin` fetches the standalone binary attached to a GitHub release, so it can only ever install a *released* version — pointing it at `main` or a commit yields whatever version the pinned manifest (`nix/prebuilt-binaries.json`) references, **not** that ref's source. Use the default `#duo` (from source) to install/test an unreleased branch or commit. A `nixpkgs` overlay (`overlays.default`) exposes both `duo` and `duo-bin` for downstream flakes.
+
+> **Maintainers:** refreshing `nix/prebuilt-binaries.json` after a release is automatic — the `update-nix-manifest` job in `release-bin.yml` runs once the binaries are uploaded (stable tags only) and commits the updated manifest to the default branch. To backfill by hand:
+> ```bash
+> node scripts/update-nix-binaries.mjs vX.Y.Z
+> ```
+
 ### macOS Gatekeeper (unsigned binary)
 
 Downloaded binaries are not codesigned. On first run, macOS may block execution with a Gatekeeper dialog. Remove the quarantine attribute before running:
