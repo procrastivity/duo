@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-07-04
+
+Replaces the tier-based agent-selection model with explicit **presets** and **provider** toggles. This is a pre-1.0 clean break with no compatibility aliases — read [Migrating from tiers](README.md#migrating-from-tiers-pre-10-breaking-change) before upgrading.
+
+### ⚠️ Breaking changes
+
+- **Agent selection is now preset-based, not tier-based.** The `small`/`medium`/`large` tiers and the command/name token classifier that inferred them are gone. You declare, per preset, exactly which `agent_tool_id`(s) it may use.
+- **MCP tools renamed:** `list_agent_tiers` → `list_presets`, `resolve_agent_tool` → `resolve_preset`, `spawn_agent` → `launch_agent`. The `tier` argument is now a `preset` string.
+- **CLI renamed:** `duo agent spawn <tier>` → `duo agent launch <preset>`; the positional on `launch`/`resolve` is now a preset name.
+- **Policy subsystem removed:** `duo.policy.yaml`, the `DUO_POLICY` env var, and the `command_tokens` / `selection` config sections no longer exist. Presets are declared under a `presets:` key in `config.yaml`, resolved from the XDG location (`~/.config/duo/config.yaml` or `DUO_CONFIG`).
+
+### Added
+
+- **Presets:** `presets:` config schema plus `duo config preset add|list|remove` CLI verbs for managing them offline.
+- **Providers:** `list_providers` and `set_provider_enabled` MCP tools, `duo config provider enable|disable|list` CLI verbs, and an `--avoid-provider` flag on `launch`/`resolve`. Provider enabled-state persists as lock-free files under `$XDG_STATE_HOME/duo/providers/`.
+- **Per-launch `extra_args`:** callers can append extra arguments through to the spawned agent process.
+
+### Changed
+
+- `resolve_preset` / `launch_agent` always report the selected provider and expose `avoid_provider`.
+
+### Removed
+
+- Deleted the tier classifier, the legacy resolver, and the entire policy subsystem.
+
+### Fixed
+
+- Addressed preset/provider review findings; fixed smoke-test tool names and the package description for the preset rename.
+
+### Documentation
+
+- README rewrite with a "Migrating from tiers" section, plus refreshed manual-testing docs ([#18](https://github.com/procrastivity/duo/pull/18), [#19](https://github.com/procrastivity/duo/pull/19)).
+- Added the Solo CLI vs MCP backend decision record and the Duo project auto-scoping design record ([#22](https://github.com/procrastivity/duo/pull/22)).
+
+### Dependencies
+
+- Bumped npm deps: `yaml`, `esbuild` (security), `release-it`, `vitest`, `@types/node` ([#28](https://github.com/procrastivity/duo/pull/28)).
+- Bumped `softprops/action-gh-release` 3.0.0 → 3.0.1 ([#26](https://github.com/procrastivity/duo/pull/26)).
+
+### Maintenance
+
+- Stopped tracking local Claude Code tooling; added a Linear project reference.
+
 ## [0.1.8] - 2026-05-09
 
 ### Documentation
