@@ -16,6 +16,12 @@ vitest.config.js.map
 duo.config.yaml
 duo.policy.yaml
 
-# Per-user Claude Code config (skills/ are project-shareable and committed)
+# Per-user Claude Code config
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+.claude/agents/wip
+.claude/commands/wip
+
+# wip plugin local state
+.wip.yaml
+.wip/
