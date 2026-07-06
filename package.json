@@ -23,7 +23,7 @@
     "build:bin:linux-x64": "node scripts/build-bin.mjs bun-linux-x64 dist/bin/duo-linux-x64",
     "build:bin:linux-arm64": "node scripts/build-bin.mjs bun-linux-arm64 dist/bin/duo-linux-arm64",
     "build:bin:all": "npm run build:bin:darwin-arm64 && npm run build:bin:linux-x64 && npm run build:bin:linux-arm64",
-    "release": "release-it"
+    "release": "contrib/release"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -36,7 +36,6 @@
   "devDependencies": {
     "@types/node": "^25.7.0",
     "esbuild": "^0.28.1",
-    "release-it": "^20.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   },

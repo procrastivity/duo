@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# contrib/release — bump the version in package.json, regenerate CHANGELOG.md
+# via the changelog-hook (git-cliff), run the release gates, commit, push, and
+# create+push the annotated v{version} tag. The tag push triggers
+# .github/workflows/release.yml, which publishes to npm with provenance and
+# creates the GitHub Release.
+#
+# duo's flake.nix reads the version straight from package.json, so this bumps
+# package.json ONLY — there is no lockstep flake.nix edit and no
+# check-version-sync (contrast clast, which pins the version in two places).
+set -Eeuo pipefail
+
+DIR=$(cd "$(dirname "${0}")" && pwd)
+PROJECT_ROOT=$(cd "$DIR/.." && pwd)
+cd "$PROJECT_ROOT"
+
+usage() {
+  echo "Usage: contrib/release --major | --minor | --patch [--dry-run]"
+  echo
+  echo "Bumps the version in package.json, regenerates CHANGELOG.md via"
+  echo "./contrib/changelog-hook, runs the gates (typecheck/test/build/pack),"
+  echo "commits 'chore(release): vX.Y.Z', pushes the branch, then creates and"
+  echo "pushes the annotated v{version} tag. The tag push triggers the release"
+  echo "workflow."
+  echo
+  echo "  --dry-run   Run preconditions + compute the next version + print the"
+  echo "              plan, then exit without editing, gating, committing, or"
+  echo "              pushing anything."
+  exit 1
+}
+
+# --- Parse arguments (bump + optional --dry-run, in any order) ---
+
+BUMP=""
+DRY_RUN=false
+for arg in "$@"; do
+  case "$arg" in
+  --major) BUMP="major" ;;
+  --minor) BUMP="minor" ;;
+  --patch) BUMP="patch" ;;
+  --dry-run) DRY_RUN=true ;;
+  *) usage ;;
+  esac
+done
+[ -n "$BUMP" ] || usage
+
+# --- Preconditions ---
+
+for tool in jq git git-cliff; do
+  command -v "$tool" >/dev/null || {
+    echo "error: '$tool' not found on PATH (are you in the dev shell? 'direnv allow' / 'nix develop')" >&2
+    exit 1
+  }
+done
+
+# A dry run mutates nothing, so it is allowed from any branch / dirty tree — it
+# still exercises the tool checks and the version math. A real run enforces the
+# clean-tree + on-main guards so the release commit contains only the bump +
+# changelog and is cut from the release branch.
+if [ "$DRY_RUN" = false ]; then
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "error: working tree has uncommitted changes; commit or stash them first." >&2
+    git status --short
+    exit 1
+  fi
+
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  if [ "$BRANCH" != "main" ]; then
+    echo "error: releases must be cut from 'main' (currently on '$BRANCH')." >&2
+    exit 1
+  fi
+else
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+fi
+
+CURRENT_VERSION=$(jq -r .version package.json)
+
+# --- Bump version (pure bash semver, no Node) ---
+
+IFS='.' read -r MAJOR MINOR PATCH <<<"$CURRENT_VERSION"
+case "$BUMP" in
+major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+patch) PATCH=$((PATCH + 1)) ;;
+esac
+NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+TAG="v${NEW_VERSION}"
+
+# --- Dry run: print the plan and stop ---
+
+if [ "$DRY_RUN" = true ]; then
+  cat <<EOF
+Dry run — no changes made.
+
+Plan (${BUMP} bump on branch '${BRANCH}'):
+  version   ${CURRENT_VERSION} -> ${NEW_VERSION}
+  tag       ${TAG}
+
+Would then:
+  1. jq: set package.json .version = "${NEW_VERSION}"
+  2. ./contrib/changelog-hook "${NEW_VERSION}"   (git-cliff --unreleased --prepend CHANGELOG.md)
+  3. gates: npm run typecheck && npm test && npm run build && bash scripts/smoke-pack.sh
+  4. git add package.json CHANGELOG.md
+  5. git commit -m "chore(release): ${TAG}"
+  6. git push
+  7. git tag -a "${TAG}" -m "${TAG}" && git push origin "${TAG}"
+
+(A real run additionally requires a clean tree and the 'main' branch.)
+EOF
+  exit 0
+fi
+
+echo "Releasing ${CURRENT_VERSION} -> ${NEW_VERSION} (tag ${TAG}) on branch ${BRANCH}"
+
+# --- Edit package.json (jq into temp file + mv so a jq error cannot truncate) ---
+
+tmp=$(mktemp)
+jq --arg v "$NEW_VERSION" '.version = $v' package.json >"$tmp" && mv "$tmp" package.json
+
+# --- Regenerate changelog via the existing hook ---
+
+echo "Regenerating CHANGELOG.md (tag ${TAG})..."
+./contrib/changelog-hook "$NEW_VERSION"
+
+# --- Run gates BEFORE committing — a broken release commit is worse than no release commit ---
+
+echo "Running gates..."
+npm run typecheck
+npm test
+npm run build
+bash scripts/smoke-pack.sh
+
+# --- Commit the bump ---
+
+git add package.json CHANGELOG.md
+git commit -m "chore(release): ${TAG}"
+
+# --- Push the branch, then create and push the tag ---
+
+echo "Pushing ${BRANCH}..."
+git push
+
+echo "Tagging ${TAG}..."
+git tag -a "$TAG" -m "$TAG"
+git push origin "$TAG"
+
+cat <<EOF
+
+Pushed ${TAG}. The release workflow is running.
+
+Watch it:
+  gh run watch
+
+Verify after it goes green:
+  npm view @procrastivity/duo version
+  gh release view ${TAG}
+  nix run github:procrastivity/duo/${TAG} -- version
+EOF
