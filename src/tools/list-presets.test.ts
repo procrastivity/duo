@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listPresets } from "./list-presets.js";
+import { listPresets, listPresetsHandler } from "./list-presets.js";
 import type { Presets } from "../types/presets.js";
 
 const allEnabled = (): boolean => true;
@@ -43,6 +43,27 @@ describe("listPresets — enumerates configured presets", () => {
   it("empty / undefined presets yields an empty result", () => {
     expect(listPresets(undefined)).toEqual({});
     expect(listPresets({})).toEqual({});
+  });
+});
+
+describe("listPresetsHandler — MCP content envelope", () => {
+  it("wraps the result in a single text content item (not a bare object)", () => {
+    const result = listPresetsHandler(presets);
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: expect.any(String) }],
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it("text payload round-trips to the same object listPresets produces", () => {
+    const result = listPresetsHandler(presets);
+    expect(JSON.parse(result.content[0].text)).toEqual(listPresets(presets));
+  });
+
+  it("still emits a valid envelope for empty presets", () => {
+    const result = listPresetsHandler(undefined);
+    expect(result.content[0].type).toBe("text");
+    expect(JSON.parse(result.content[0].text)).toEqual({});
   });
 });
 

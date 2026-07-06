@@ -166,9 +166,12 @@ describe("DuoServer", () => {
       );
 
       await server.start();
-      const result = (await listHandler?.()) as Record<string, unknown>;
+      const result = (await listHandler?.()) as {
+        content: Array<{ text: string }>;
+      };
       expect(SoloClient.prototype.connect).not.toHaveBeenCalled();
-      expect(Object.keys(result).sort()).toEqual(["medium", "small"]);
+      const data = JSON.parse(result.content[0].text) as Record<string, unknown>;
+      expect(Object.keys(data).sort()).toEqual(["medium", "small"]);
     });
 
     it("returns structured tool errors when startup config failed", async () => {
