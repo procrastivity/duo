@@ -2,11 +2,10 @@
 //
 // buildNpmPackage pins a fixed-output hash of the vendored npm dependencies.
 // That hash changes whenever package-lock.json changes — including the plain
-// version bump `release-it` writes into it at release time. Nothing regenerated
-// it post-release, so building `#duo` from any ref at/after such a release
-// failed with a hash mismatch. The release-bin.yml `update-nix-manifest` job
-// runs this AFTER a tag (same commit as the prebuilt manifest refresh) to keep
-// the from-source build hash in sync.
+// version bump written into it at release time. Nothing regenerated it
+// post-release, so building `#duo` from any ref at/after such a release failed
+// with a hash mismatch. The release-bin.yml `refresh-npm-hash` job runs this
+// AFTER a tag to keep the from-source build hash in sync.
 //
 // Usage:
 //   node scripts/update-nix-npm-hash.mjs

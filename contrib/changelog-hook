@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Accept the new version as $1 (release-it passes ${version} via templating).
+# Accept the new version as $1 (contrib/release passes "$NEW_VERSION").
 # Falls back to NEW_VERSION env var so the same script could run under
 # cargo-release in another repo if that's ever wanted.
 VERSION="${1:-${NEW_VERSION:-}}"
