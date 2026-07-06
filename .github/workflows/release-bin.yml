@@ -119,17 +119,26 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@629b284231c2a82554b724e357e47fc6020833c8 # v3.21.2
+
       - name: Refresh manifest for ${{ github.ref_name }}
         run: node scripts/update-nix-binaries.mjs "${{ github.ref_name }}"
 
-      - name: Commit manifest if changed
+      # The release version bump lands in package-lock.json, which changes the
+      # buildNpmPackage vendored-deps hash. Recompute it here so building `#duo`
+      # from source at/after this tag doesn't fail with a hash mismatch.
+      - name: Refresh npmDepsHash for ${{ github.ref_name }}
+        run: nix shell nixpkgs#prefetch-npm-deps --command node scripts/update-nix-npm-hash.mjs
+
+      - name: Commit nix updates if changed
         run: |
-          if git diff --quiet -- nix/prebuilt-binaries.json; then
-            echo "manifest already up to date for ${{ github.ref_name }}"
+          if git diff --quiet -- nix/prebuilt-binaries.json flake.nix; then
+            echo "nix files already up to date for ${{ github.ref_name }}"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add nix/prebuilt-binaries.json
-          git commit -m "chore(nix): update prebuilt binary manifest for ${{ github.ref_name }}"
+          git add nix/prebuilt-binaries.json flake.nix
+          git commit -m "chore(nix): update prebuilt manifest and npmDepsHash for ${{ github.ref_name }}"
           git push origin HEAD:${{ github.event.repository.default_branch }}
