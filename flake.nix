@@ -57,7 +57,7 @@
           #   1. Set npmDepsHash = lib.fakeHash;
           #   2. Run nix build .#duo
           #   3. Copy the "got: sha256-..." value from the failure output into npmDepsHash
-          npmDepsHash = "sha256-ZAwbLLxjZpaAwMFiVUmG2ftE4Gi/0qQo2QeardnspzE=";
+          npmDepsHash = "sha256-hpVD5VV0mbfAmNNm3Ct0CNoYDH9PmuoRt77nNy8A4bI=";
 
           npmBuildScript = "build";
 
