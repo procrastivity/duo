@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-07-06
+
+### Added
+
+- ci(release): recompute npmDepsHash post-tag by @simensen
+
+### Fixed
+
+- fix(nix): correct npmDepsHash for v0.2.1 by @simensen
+
+### Maintenance
+
+- chore(nix): update prebuilt binary manifest for v0.2.1 by @github-actions[bot]
 ## [0.2.1] - 2026-07-06
 
 ### Added
