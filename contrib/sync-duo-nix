@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# contrib/sync-duo-nix — nudge the duo.nix packaging repo to pick up duo's
+# latest stable release, instead of waiting for its daily cron.
+#
+# Zero-arg and safe to run any time, repeatedly:
+#   - If duo.nix already pins the latest release, it's a no-op.
+#   - If the latest release's binaries aren't all uploaded yet (the release-bin
+#     build is still running), it declines and tells you to re-run — this avoids
+#     firing a duo.nix run that would fail prefetching a missing asset.
+#   - Otherwise it dispatches duo.nix's `cron` workflow (workflow_dispatch),
+#     whose own update.sh is idempotent and only commits/tags on a real change.
+#
+# Run it once the release-bin workflow for a new tag has gone green.
+set -euo pipefail
+
+DUO_REPO="procrastivity/duo"
+NIX_REPO="procrastivity/duo.nix"
+NIX_WORKFLOW="cron.yml"
+# The three assets duo publishes (and duo.nix/update.sh prefetches).
+ASSETS=(duo-darwin-arm64 duo-linux-arm64 duo-linux-x64)
+
+for tool in gh jq; do
+  command -v "$tool" >/dev/null || {
+    echo "error: '$tool' not found on PATH (are you in the dev shell? 'direnv allow' / 'nix develop')" >&2
+    exit 1
+  }
+done
+
+# Latest STABLE release of duo — the same endpoint duo.nix/update.sh uses
+# (releases/latest excludes drafts + prereleases).
+rel=$(gh api "repos/${DUO_REPO}/releases/latest") \
+  || { echo "error: could not query ${DUO_REPO} releases/latest (gh auth?)" >&2; exit 1; }
+latest_tag=$(jq -r '.tag_name // empty' <<<"$rel")
+[ -n "$latest_tag" ] || { echo "error: no .tag_name in releases/latest response" >&2; exit 1; }
+
+# What duo.nix currently pins (raw media type → no base64 decode needed).
+pinned=$(gh api "repos/${NIX_REPO}/contents/VERSION.json" -H "Accept: application/vnd.github.raw" \
+  | jq -r '.rev // empty') \
+  || { echo "error: could not read ${NIX_REPO} VERSION.json" >&2; exit 1; }
+
+echo "duo latest stable : ${latest_tag}"
+echo "duo.nix pins      : ${pinned:-<unknown>}"
+
+if [ "$pinned" = "$latest_tag" ]; then
+  echo "✓ duo.nix already up to date — nothing to do."
+  exit 0
+fi
+
+# Confirm all three binaries are actually attached to the release before we
+# dispatch, so duo.nix's prefetch can't fail on a missing asset.
+have=$(jq -r '.assets[].name' <<<"$rel")
+missing=()
+for a in "${ASSETS[@]}"; do
+  grep -qxF "$a" <<<"$have" || missing+=("$a")
+done
+if [ "${#missing[@]}" -ne 0 ]; then
+  echo "release ${latest_tag} is missing assets: ${missing[*]}"
+  echo "(the release-bin build is probably still running — re-run this once it's green.)"
+  exit 0
+fi
+
+echo "Dispatching duo.nix update for ${latest_tag}..."
+gh workflow run "$NIX_WORKFLOW" -R "$NIX_REPO" --ref main
+echo "✓ dispatched. Watch it:  gh run watch -R ${NIX_REPO}"

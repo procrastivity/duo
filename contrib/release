@@ -155,4 +155,8 @@ Verify after it goes green:
   npm view @procrastivity/duo version
   gh release view ${TAG}
   nix run github:procrastivity/duo/${TAG} -- version
+
+Then point the duo.nix packaging repo at this release (or wait for its daily
+cron). Safe to re-run — it waits until the binaries are uploaded:
+  contrib/sync-duo-nix
 EOF
