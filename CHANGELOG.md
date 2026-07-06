@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-07-06
+
+### Added
+
+- feat(nix): add prebuilt standalone binary install target (#29) by @simensen in [#29](https://github.com/procrastivity/duo/pull/29)
+- fix(server): wrap list_presets result in MCP content envelope (#30) by @simensen in [#30](https://github.com/procrastivity/duo/pull/30)
 ## [0.2.0] - 2026-07-04
 
 Replaces the tier-based agent-selection model with explicit **presets** and **provider** toggles. This is a pre-1.0 clean break with no compatibility aliases — read [Migrating from tiers](README.md#migrating-from-tiers-pre-10-breaking-change) before upgrading.
