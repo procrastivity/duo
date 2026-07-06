@@ -1,6 +1,6 @@
 {
   "name": "@procrastivity/duo",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Solo MCP companion for agent preset selection, provider toggles, and per-launch extra_args.",
   "type": "module",
   "bin": {

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-07-06
+
+### Added
+
+- feat(nix): inject DUO_GIT_SHA so from-source builds report a real git_sha (#34) by @simensen in [#34](https://github.com/procrastivity/duo/pull/34)
+
+### Maintenance
+
+- chore(nix): update prebuilt manifest and npmDepsHash for v0.2.2 by @github-actions[bot]
+- chore: retire in-repo prebuilt path (duo-bin) — Round 3 (#35) by @simensen in [#35](https://github.com/procrastivity/duo/pull/35)
+- feat: clast-style contrib/release, retire release-it — Round 4 (#36) by @simensen in [#36](https://github.com/procrastivity/duo/pull/36)
 ## [0.2.2] - 2026-07-06
 
 ### Added
