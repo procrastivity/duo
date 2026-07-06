@@ -1,21 +1,21 @@
 {
-  "tag": "v0.2.0",
-  "version": "0.2.0",
+  "tag": "v0.2.1",
+  "version": "0.2.1",
   "systems": {
     "aarch64-darwin": {
       "asset": "duo-darwin-arm64",
-      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.0/duo-darwin-arm64",
-      "hash": "sha256-oxqJEuIejQwot5/UjTpYtj0g5qpLlROTgMdqz7AGFb0="
+      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.1/duo-darwin-arm64",
+      "hash": "sha256-fYrAWoGgcYNmUjcMz398wTDoXwPP3pK2D76G+NVO1a8="
     },
     "aarch64-linux": {
       "asset": "duo-linux-arm64",
-      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.0/duo-linux-arm64",
-      "hash": "sha256-2lzj1MZN1iizSZenrBYrV797w0eHNoaRX0gptHhHauU="
+      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.1/duo-linux-arm64",
+      "hash": "sha256-0Qj7/JY0pRydnSdcVggti0kEmkgvslkuRSOFCrKo2Js="
     },
     "x86_64-linux": {
       "asset": "duo-linux-x64",
-      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.0/duo-linux-x64",
-      "hash": "sha256-Al5AKCALeSeyBaTH8vvT5gjlzFkYp/Owu7EaeMwt0Zw="
+      "url": "https://github.com/procrastivity/duo/releases/download/v0.2.1/duo-linux-x64",
+      "hash": "sha256-D0/C+Ka10zIt8JCWaAAlvDtVs2uDR8+xzwpJ4pilzLY="
     }
   }
 }
