@@ -6,7 +6,7 @@ import { resolveTransportCommand } from "./transport/resolve-command.js";
 import { SoloClient } from "./solo-client.js";
 import { createLogger, type Logger } from "./logger.js";
 import { getVersion } from "./cli/version-info.js";
-import { listPresets, ListPresetsInputSchema } from "./tools/list-presets.js";
+import { listPresetsHandler, ListPresetsInputSchema } from "./tools/list-presets.js";
 import {
   resolvePresetHandler,
   ResolvePresetInputSchema,
@@ -147,7 +147,7 @@ export class DuoServer implements MCPServer {
         inputSchema: ListPresetsInputSchema,
       },
       (async () =>
-        this._startupToolError() ?? listPresets(presets)) as any,
+        this._startupToolError() ?? listPresetsHandler(presets)) as any,
     );
 
     this._mcpServer.registerTool(

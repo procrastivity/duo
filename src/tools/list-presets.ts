@@ -25,6 +25,20 @@ export interface PresetAvailability {
 
 export type ListPresetsResult = Record<string, PresetAvailability>;
 
+interface TextContent {
+  type: "text";
+  text: string;
+}
+
+interface ToolResult {
+  content: TextContent[];
+  isError?: boolean;
+}
+
+const ok = (data: unknown): ToolResult => ({
+  content: [{ type: "text", text: JSON.stringify(data) }],
+});
+
 const DEFAULT_PRESET = "default";
 
 const viewDefs = (
@@ -66,4 +80,13 @@ export function listPresets(
     };
   }
   return result;
+}
+
+/**
+ * MCP handler for `list_presets`: wraps {@link listPresets} in the MCP content
+ * envelope so the result is delivered as text content (like the other tools),
+ * rather than a bare object that renders as empty output.
+ */
+export function listPresetsHandler(presets: Presets | undefined): ToolResult {
+  return ok(listPresets(presets));
 }
