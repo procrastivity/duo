@@ -41,6 +41,13 @@
           pname = "duo";
           version = (lib.importJSON ./package.json).version;
 
+          # The build sandbox has no `.git`, so `git rev-parse` in
+          # scripts/build-defines.mjs finds nothing and `duo version` prints
+          # `—`. Inject the flake's own revision as the source SHA. Clean
+          # checkouts get `shortRev`; dirty trees get `dirtyShortRev`; `or ""`
+          # keeps eval from throwing when neither exists (e.g. path builds).
+          DUO_GIT_SHA = self.shortRev or self.dirtyShortRev or "";
+
           # allow-list — extend if `npm run build` starts reading new top-level paths.
           src = lib.fileset.toSource {
             root = ./.;
