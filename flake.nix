@@ -25,13 +25,6 @@
             .github/workflows/release-bin.yml) or pin the nixpkgs input to a
             revision that ships bun ${expectedBunVersion}.
           '';
-
-        # Prebuilt standalone binaries published to the GitHub release by
-        # .github/workflows/release-bin.yml. `packages.duo-bin` fetches the
-        # asset for the host system; regenerate this manifest per release with
-        # `node scripts/update-nix-binaries.mjs <tag>`.
-        prebuilt = lib.importJSON ./nix/prebuilt-binaries.json;
-        prebuiltAsset = prebuilt.systems.${system} or null;
       in
       {
         # From-source build. Bundles nodejs_24 in the closure but builds from
@@ -88,58 +81,12 @@
           };
         };
 
-        # Prebuilt standalone binary (bun --compile output). No node in the
-        # closure — a true self-contained executable. Released tags only:
-        # installing from a non-release ref yields whatever version the pinned
-        # manifest points at, not that ref's source. On systems without a
-        # published asset (e.g. x86_64-darwin) evaluating this errors clearly.
-        packages.duo-bin =
-          if prebuiltAsset == null then
-            throw "duo: no prebuilt binary for ${system}; use packages.duo (built from source)"
-          else
-            pkgs.stdenvNoCC.mkDerivation {
-              pname = "duo-bin";
-              version = prebuilt.version;
-
-              src = pkgs.fetchurl { inherit (prebuiltAsset) url hash; };
-              dontUnpack = true;
-
-              nativeBuildInputs =
-                lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.autoPatchelfHook ];
-
-              # bun-compiled Linux binaries dynamically link glibc/libstdc++.
-              # Darwin (Mach-O) needs no patching.
-              buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-                pkgs.stdenv.cc.cc.lib
-                pkgs.zlib
-              ];
-
-              installPhase = ''
-                runHook preInstall
-                install -Dm755 $src $out/bin/duo
-                runHook postInstall
-              '';
-
-              meta = with lib; {
-                description = "Solo MCP companion + control-plane CLI (prebuilt standalone binary)";
-                homepage = "https://github.com/procrastivity/duo";
-                license = licenses.mit;
-                mainProgram = "duo";
-                platforms = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
-                sourceProvenance = [ sourceTypes.binaryNativeCode ];
-              };
-            };
-
         # From-source stays default so ad-hoc / branch / commit installs work.
         packages.default = self.packages.${system}.duo;
 
         apps.duo = {
           type = "app";
           program = "${self.packages.${system}.duo}/bin/duo";
-        };
-        apps.duo-bin = {
-          type = "app";
-          program = "${self.packages.${system}.duo-bin}/bin/duo";
         };
         apps.default = self.apps.${system}.duo;
 
@@ -166,11 +113,10 @@
       }
     ) // {
       # System-agnostic overlay so downstream flakes can pull duo into their
-      # own nixpkgs: `overlays.default` exposes `duo` (from source) and
-      # `duo-bin` (prebuilt) for the consuming system.
+      # own nixpkgs: `overlays.default` exposes `duo` (from source) for the
+      # consuming system.
       overlays.default = final: _prev: {
         duo = self.packages.${final.stdenv.hostPlatform.system}.duo;
-        duo-bin = self.packages.${final.stdenv.hostPlatform.system}.duo-bin;
       };
     };
 }

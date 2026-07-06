@@ -90,15 +90,15 @@ jobs:
           path: dist/bin/${{ matrix.asset_name }}
           retention-days: 7
 
-  # After the binaries are uploaded to the release, refresh the nix prebuilt
-  # manifest (URLs + sha256 the `#duo-bin` flake output fetches) and commit it
-  # to the default branch. Skipped for prereleases so `#duo-bin` tracks stable
-  # only. Note: the manifest lands on `main` *after* the tag, so a pinned
-  # `github:procrastivity/duo/vX.Y.Z#duo-bin` lags one release; `main` and
-  # unpinned installs always resolve the latest. Build `#duo` from source to
-  # pin an exact ref.
-  update-nix-manifest:
-    name: Update nix prebuilt manifest
+  # The release version bump lands in package-lock.json, which changes the
+  # buildNpmPackage vendored-deps hash for the from-source `#duo` output.
+  # Recompute `npmDepsHash` in flake.nix here and commit it to the default
+  # branch so building `#duo` at/after this tag doesn't fail with a hash
+  # mismatch. Skipped for prereleases. (Prebuilt-binary packaging now lives in
+  # the separate procrastivity/duo.nix repo, which pins the uploaded assets on
+  # its own schedule — this workflow no longer maintains an in-repo manifest.)
+  refresh-npm-hash:
+    name: Refresh npmDepsHash
     needs: build-bin
     if: >-
       github.event_name == 'push'
@@ -122,9 +122,6 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@629b284231c2a82554b724e357e47fc6020833c8 # v3.21.2
 
-      - name: Refresh manifest for ${{ github.ref_name }}
-        run: node scripts/update-nix-binaries.mjs "${{ github.ref_name }}"
-
       # The release version bump lands in package-lock.json, which changes the
       # buildNpmPackage vendored-deps hash. Recompute it here so building `#duo`
       # from source at/after this tag doesn't fail with a hash mismatch.
@@ -133,12 +130,12 @@ jobs:
 
       - name: Commit nix updates if changed
         run: |
-          if git diff --quiet -- nix/prebuilt-binaries.json flake.nix; then
-            echo "nix files already up to date for ${{ github.ref_name }}"
+          if git diff --quiet -- flake.nix; then
+            echo "flake.nix already up to date for ${{ github.ref_name }}"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add nix/prebuilt-binaries.json flake.nix
-          git commit -m "chore(nix): update prebuilt manifest and npmDepsHash for ${{ github.ref_name }}"
+          git add flake.nix
+          git commit -m "chore(nix): refresh npmDepsHash for ${{ github.ref_name }}"
           git push origin HEAD:${{ github.event.repository.default_branch }}
