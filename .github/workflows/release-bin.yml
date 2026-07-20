@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload to GitHub Release
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: dist/bin/${{ matrix.asset_name }}
           body_path: .github/release-template.md
@@ -120,7 +120,7 @@ jobs:
           node-version: 24
 
       - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@629b284231c2a82554b724e357e47fc6020833c8 # v3.21.2
+        uses: DeterminateSystems/determinate-nix-action@2a0be2498974c2b6327e19780488744384637d88 # v3.21.7
 
       # The release version bump lands in package-lock.json, which changes the
       # buildNpmPackage vendored-deps hash. Recompute it here so building `#duo`
