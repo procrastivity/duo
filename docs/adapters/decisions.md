@@ -579,3 +579,181 @@ when the binary is absent. It does not read a transcript, so it never claims
 to have *observed* the on-disk format: `ProtocolOrFormatIdentity` names the
 format this build parses, and every `ReadConversation` re-verifies the actual
 header, including the schema version, on the file it opens.
+
+## Herdr host adapter (`internal/host/herdr`, Step 17)
+
+Normative sources: `duo-vnext-go-architecture.md` §5.1/§5.2 for the shapes,
+and the 2026-08-23 P7 probe session for what Herdr actually does —
+`notes/19-herdr-probes.md` plus `review/05-close-report.md` in the planning
+repository. Where the two disagree, the probes decided; every such decision is
+below.
+
+### Version pin: 0.8.2, against a Workplan that says 0.7.5
+
+The Step 17 text pins "Herdr 0.7.5 (digest pinned in
+`notes/05-herdr-schema-0.7.5.json`)". That text predates P7 and is
+**overridden**: the dogfood implementation targets Herdr 0.8.2, protocol 20,
+schema digest `c48f1f54…b150`, which is what the close report re-pinned and
+what is installed. The override is not cosmetic — four recorded 0.7.5
+behaviors are refuted at 0.8.2 (full `pane.created` backfill, "retry a stalled
+prompt once", `revision` tracking screen content, no `HERDR_BIN_PATH` in the
+pane environment), so building against the 0.7.5 record would have encoded
+three wrong duties. The 0.7.5 fixture stays historical; nothing in this
+package reads it.
+
+`PinnedSchemaDigest` was re-derived live while writing this adapter
+(`herdr api schema --json | sha256sum`) rather than copied from the note, and
+it matched. `--json` on stdout and `--output` to a file produce byte-identical
+schemas, so the probe uses stdout and needs no temp file.
+
+### Evidence mapping, and why `HostServerEpoch` is empty
+
+There is no server epoch at 0.8.2 — `ping`, `herdr status server --json`, and
+`session.snapshot` carry no instance ID, start time, or epoch. The temptation
+is to fill `HostServerEpoch` with something rather than leave a contract field
+blank. This package leaves it blank (`NoServerEpoch`) on purpose: writing a
+pane-scoped value into a server-scoped field would make a guarantee Herdr does
+not offer, and every later consumer would read it as one.
+
+The incarnation lives in `HostContainerID`, which carries `terminal_id`. That
+is a literal reading of "host-container ID" — the terminal is the container of
+the process — and it is the field that actually distinguishes incarnations:
+re-verified live during this step, a server stop/start restored both panes
+with identical `pane_id`s (`w1:p1`, `w1:p6`) and *changed both*
+`terminal_id`s. Pane coordinates alone would have re-enrolled two dead
+runtimes.
+
+`ProcessBirth` needs a second source: `pane.process_info` reports PIDs and
+argv but no start time. The default resolver reads `/proc/<pid>/stat` field 22
+against `/proc/stat`'s `btime`, tagged `procfs`; anything else is tagged
+`unavailable`. `ProcessBirthResolver` is a `Config` field rather than a
+build-tagged function so a non-Linux host or a remote Herdr can supply its
+own without this package pretending procfs is universal.
+
+The rule that falls out: **unprovable continuity resolves to "not the same
+process"**. `sameBirth` returns false unless both sides are procfs-proven and
+equal. That over-issues runtime-instance IDs on a host with no start-time
+source, which is the safe direction — the opposite error silently merges two
+different processes into one identity.
+
+### Discovery reads the pane inventory, never the agent registry
+
+The obvious implementation is `agent.list`: Herdr already knows which panes
+hold agents. P7 refutes it. Agent registration drops **durably** when the
+agent loses the pane foreground (ctrl-Z, a foreground child, a stopped
+process) and never comes back, while the process keeps running — the pane
+falls to `agent_status: unknown` and `agent.explain` answers
+`agent_not_found`. A registry-driven discovery would therefore lose live
+runtimes permanently, with no signal. `Discover` enumerates panes from
+`session.snapshot` and leaves "is this an agent runtime, and which one" to
+§5.3 correlation, where it belongs. `TestDiscoverEnumeratesPanesNotTheAgentRegistry`
+asserts no agent surface is consulted.
+
+### Lifecycle observation: events wake, snapshots decide
+
+Three probed facts force one design. Backfill is partial (a pane restored from
+session persistence never replays, and backfill events are shape-identical to
+real creations); events between subscriptions are lost with no cursor or
+replay token; and agent deregistration can happen spontaneously. So the event
+stream carries exactly one bit of information in this adapter — *something
+changed* — and every emission is derived from a fresh `session.snapshot` diff.
+That is the "snapshot-diff duty" made structural rather than procedural: there
+is no code path that could accidentally treat an event payload as inventory,
+because no event payload is ever decoded. `TestObserveTreatsBackfillAsAWakeUpNotInventory`
+replays two panes that do not exist and asserts silence.
+
+The same reasoning sets the four subscriptions (`pane.created`, `pane.closed`,
+`pane.exited`, `pane.updated`) as global rather than pane-scoped: a
+pane-scoped subscription cannot report its own pane's disappearance any better
+than the snapshot can, and resubscribing whenever the pane set changes (what
+the earlier `herdr-orchestrate` probe did) adds gaps rather than removing
+them.
+
+`LifecycleDetached` maps to "the server stopped answering", not to a client
+detaching: Herdr's client attach/detach is invisible to the API and does not
+touch the pane. Reporting an unreachable server as `Exited` would be a claim
+about a process nobody can see, so detach is the honest kind, and the next
+successful snapshot re-derives attached or exited.
+
+### `revision` is not decoded at all
+
+At 0.8.2 `pane.revision` stopped tracking screen content (visible changes
+leave it at zero; only agent-linked transitions bump it). Rather than write
+"do not use revision" in a comment, `paneInfo` simply does not declare the
+field, and `TestNoRevisionDependence` parses this package's own AST to fail
+the build if any identifier or string literal here mentions it. The
+writer-presence and prompt/terminal-scope guards work the same way
+(`TestNoWriterPresenceSurface`, `TestNoPromptOrTerminalSurface`): writer
+presence is refuted and final for 0.8.x, so the absence of that surface is
+enforced mechanically rather than trusted to review.
+
+### `PrepareLaunch` mutates nothing; `Start` waits for the handover
+
+A Herdr pane cannot be staged — it exists or it does not — so all pane
+creation belongs to `Start`, and a launch that fails validation leaves no
+orphan pane. `PrepareLaunch` only resolves (kind, agent name, split target vs
+new workspace, environment) and returns them in the opaque payload.
+
+`Start` then does something the contract shape does not suggest and the live
+check made necessary: it waits, bounded, for the pane's foreground process to
+differ from the pre-start baseline. `agent.start` is asynchronous at 0.8.2 —
+it returns a `launch_pending` record before the agent process exists — so
+evidence read at that instant names the pane's *shell*. Observed live: the
+foreground PID changed 10 ms after `Start` returned, and the attachment built
+from that evidence failed its own first `ValidateAttachment`. The wait is for
+the observable handover only; interactive readiness (`agent.wait`,
+`interactive_ready`) is a different surface and out of Stage-1 scope. A
+handover that never happens returns the baseline unchanged — weaker evidence,
+not an error.
+
+### Launch mapping is lossy, and the environment seam is the reason
+
+Herdr takes no command line for a pane: `pane.split` and `workspace.create`
+create a shell, and `agent.start` runs whatever its manifest defines as the
+canonical executable for a `kind` (a fixed enum, not a free-form command). So
+`ResolvedLaunchTuple.Command` selects the kind by base name (overridable
+through `Config.KindByCommand`), and the tuple's absolute path is advisory on
+this host.
+
+Which makes `Env` load-bearing, and its limits worth recording. Verified live:
+an ordinary variable set through Herdr's `env` map reaches the pane, but
+`PATH` set the same way was overwritten by the user's shell startup files, and
+Herdr's `env` map cannot unset an inherited variable at all. So the seam
+carries the environment (Step 20 chooses the scrub list) while a scrub that
+must *remove* a marker has to happen on the Herdr server process before Duo
+starts it, or inside the pane command. This matters because the P7 session
+reproduced the conformance §8 failure signature through exactly this path: a
+Herdr server launched from an agent harness propagates `CLAUDECODE` and
+friends into every pane and silently disables Claude Code transcripts.
+
+### Compatibility verdicts
+
+`supported` requires all three of version, protocol, and live schema digest to
+match the pin — a drifted digest under an unchanged version number is exactly
+the 0.7.5 → 0.8.2 gap, so it downgrades. `unverified` covers unknown versions,
+digest drift, and "no schema export available", because *could not check* is
+not *does not match* but it is also not verified. `incompatible` is reserved
+for a protocol below `MinimumKnownProtocol` (17, the oldest this project has
+observed); `New` refuses to build on that and on `unavailable`, but builds
+happily on `unverified` — an unverified integration is one Duo records as
+unverified, not one it hides.
+
+`ConformanceRecordDigest` names the probe record (`notes/19-herdr-probes.md@2026-08-23`)
+rather than a hash, because no digested Herdr conformance-record artifact
+exists in this repository yet. When one lands, this constant becomes its
+digest.
+
+### Tests: a scripted socket, plus an opt-in live suite
+
+`fakeserver_test.go` is a real Unix socket speaking 0.8.2's wire shapes, not a
+transport stub, so the connection-per-request rule, the `agent_pane_busy`
+retry, partial backfill, dropped subscriptions, and a server that stops
+answering are all exercised end to end.
+
+`live_test.go` runs the same surface against a real server and is skipped
+unless `DUO_HERDR_LIVE_SOCKET` names one. It was run for this step against a
+disposable server under an isolated `XDG_CONFIG_HOME`, using an agent kind
+whose executable resolved to `sleep` rather than a real agent, and it exercised
+probe (digest matched, verdict `supported`), launch, discovery, attachment
+validation including a stale-terminal rejection, and observation through to a
+pane exit.
