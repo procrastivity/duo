@@ -23,13 +23,46 @@ const SchemaVersion = 1
 
 // Tool identifies the binary that produced the manifest. Its three fields
 // reuse the exact version/commit/date vars main sets via -ldflags — the
-// same names, the same package path — so `duo version` and a future
-// `duo manifest --json`'s tool object are never two sources for one fact.
+// same names, the same package path — so `duo version` and `duo manifest
+// --json`'s tool object are never two sources for one fact. It is a
+// chassis-internal extra, richer than the contract's own "product" object
+// (see Product) — duo.manifest/v1's additionalProperties: true root
+// permits both to coexist.
 type Tool struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	Commit  string `json:"commit"`
 	Date    string `json:"date"`
+}
+
+// Product is the duo.manifest/v1 contract's required "product" object: just
+// the two fields the schema names (name, version) — commit and build date
+// stay on Tool, which is additive beyond the contract.
+type Product struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// Adapter describes one registered session-host or agent-runtime adapter —
+// the duo.manifest/v1 contract's "adapters" array. No adapter registers
+// itself yet: internal/host and internal/runtime, which own that
+// registration, are later steps' work. Build always emits an empty slice;
+// this shape exists now so that later registration is additive to the
+// manifest wire format, never a breaking rename.
+type Adapter struct {
+	Name              string `json:"name"`
+	Kind              string `json:"kind"` // "session_host" | "agent_runtime"
+	Version           string `json:"version,omitempty"`
+	ConformanceDigest string `json:"conformance_digest,omitempty"`
+}
+
+// HarnessTarget describes one generated-integration harness target — the
+// duo.manifest/v1 contract's "harness_targets" array. No harness renderer
+// exists yet, so Build always emits an empty slice; the shape exists ready
+// for that later work (duo-vnext-installation-contract.md §2).
+type HarnessTarget struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // Arg describes one flag a verb declares on itself (its LocalFlags — the
@@ -59,16 +92,32 @@ type Asset struct {
 	SHA256 string `json:"sha256"`
 }
 
-// Manifest is the flat object a future `duo manifest --json` emits.
-// Operations comes straight from internal/registry — the binary's one
-// operation table — the same way Verbs comes straight from the built root
-// command: the manifest holds no second copy of either registration.
+// WireSchema is the duo.manifest/v1 contract's required "schema" marker —
+// contracts/schemas/duo-manifest-v1.schema.json's properties.schema.const.
+const WireSchema = "duo.manifest/v1"
+
+// Manifest is the object `duo manifest` emits. Its first ten fields are the
+// duo.manifest/v1 contract's required root properties, in the contract's
+// own order; Tool, SchemaVersion, and Verbs are chassis-internal extras the
+// contract's additionalProperties: true root permits. Operations comes
+// straight from internal/registry — the binary's one operation table — the
+// same way Verbs comes straight from the built root command: the manifest
+// holds no second copy of either registration.
 type Manifest struct {
-	Tool          Tool                         `json:"tool"`
-	SchemaVersion int                          `json:"schemaVersion"`
-	Verbs         []Verb                       `json:"verbs"`
-	Operations    []registry.ManifestOperation `json:"operations"`
-	Assets        []Asset                      `json:"assets"`
+	Schema               string                       `json:"schema"`
+	Product              Product                      `json:"product"`
+	ManifestDigest       string                       `json:"manifest_digest"`
+	PublicSchemas        []string                     `json:"public_schemas"`
+	ConfigurationSchemas []string                     `json:"configuration_schemas"`
+	ProjectionFormats    []string                     `json:"projection_formats"`
+	Operations           []registry.ManifestOperation `json:"operations"`
+	Adapters             []Adapter                    `json:"adapters"`
+	Assets               []Asset                      `json:"assets"`
+	HarnessTargets       []HarnessTarget              `json:"harness_targets"`
+
+	Tool          Tool   `json:"tool"`
+	SchemaVersion int    `json:"schemaVersion"`
+	Verbs         []Verb `json:"verbs"`
 }
 
 // Build walks root's registered command tree (the chassis's single
@@ -86,8 +135,21 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, fmt.Errorf("manifest: walking shipped assets: %w", err)
 	}
+	if assets == nil {
+		assets = []Asset{}
+	}
 
-	return Manifest{
+	m := Manifest{
+		Schema:               WireSchema,
+		Product:              Product{Name: "duo", Version: build.Version},
+		PublicSchemas:        cloneStrings(publicSchemas),
+		ConfigurationSchemas: cloneStrings(configurationSchemas),
+		ProjectionFormats:    cloneStrings(projectionFormats),
+		Operations:           registry.ManifestOperations(),
+		Adapters:             []Adapter{},
+		Assets:               assets,
+		HarnessTargets:       []HarnessTarget{},
+
 		Tool: Tool{
 			Name:    root.Name(),
 			Version: build.Version,
@@ -96,7 +158,19 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 		},
 		SchemaVersion: SchemaVersion,
 		Verbs:         verbs,
-		Operations:    registry.ManifestOperations(),
-		Assets:        assets,
-	}, nil
+	}
+
+	digest, err := manifestDigest(m)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("manifest: computing manifest_digest: %w", err)
+	}
+	m.ManifestDigest = digest
+
+	return m, nil
+}
+
+func cloneStrings(s []string) []string {
+	out := make([]string, len(s))
+	copy(out, s)
+	return out
 }
