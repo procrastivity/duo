@@ -1,0 +1,22 @@
+=== RUN   TestBoundaryCrashInjection
+=== RUN   TestBoundaryCrashInjection/EnrollmentTx
+=== RUN   TestBoundaryCrashInjection/CommandAcceptTx
+=== RUN   TestBoundaryCrashInjection/CommandTransitionTx
+=== RUN   TestBoundaryCrashInjection/ObservationTx
+=== RUN   TestBoundaryCrashInjection/CollaborationTx
+=== RUN   TestBoundaryCrashInjection/NotificationTx
+=== RUN   TestBoundaryCrashInjection/ProjectionInstallTx
+=== RUN   TestBoundaryCrashInjection/LaunchResolutionTx
+--- PASS: TestBoundaryCrashInjection (1.29s)
+    --- PASS: TestBoundaryCrashInjection/EnrollmentTx (0.16s)
+    --- PASS: TestBoundaryCrashInjection/CommandAcceptTx (0.16s)
+    --- PASS: TestBoundaryCrashInjection/CommandTransitionTx (0.18s)
+    --- PASS: TestBoundaryCrashInjection/ObservationTx (0.17s)
+    --- PASS: TestBoundaryCrashInjection/CollaborationTx (0.17s)
+    --- PASS: TestBoundaryCrashInjection/NotificationTx (0.14s)
+    --- PASS: TestBoundaryCrashInjection/ProjectionInstallTx (0.16s)
+    --- PASS: TestBoundaryCrashInjection/LaunchResolutionTx (0.15s)
+=== RUN   TestBoundaryListMatchesArchitecture
+--- PASS: TestBoundaryListMatchesArchitecture (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/store	1.296s

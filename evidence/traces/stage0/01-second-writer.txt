@@ -1,0 +1,10 @@
+=== RUN   TestSecondWriterRefused
+--- PASS: TestSecondWriterRefused (0.08s)
+=== RUN   TestExpiredLeaseTakeover
+--- PASS: TestExpiredLeaseTakeover (0.13s)
+=== RUN   TestDeadHolderTakeover
+--- PASS: TestDeadHolderTakeover (0.14s)
+=== RUN   TestUsurpedWriterCannotCommit
+--- PASS: TestUsurpedWriterCannotCommit (0.08s)
+PASS
+ok  	github.com/procrastivity/duo/internal/store	0.436s

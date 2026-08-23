@@ -1,0 +1,93 @@
+=== RUN   TestIntegrationNameNeutralityGate
+=== RUN   TestIntegrationNameNeutralityGate/CLI
+=== RUN   TestIntegrationNameNeutralityGate/MCP
+=== RUN   TestIntegrationNameNeutralityGate/presentation
+=== RUN   TestIntegrationNameNeutralityGate/presentation_sse
+--- PASS: TestIntegrationNameNeutralityGate (0.00s)
+    --- PASS: TestIntegrationNameNeutralityGate/CLI (0.00s)
+    --- PASS: TestIntegrationNameNeutralityGate/MCP (0.00s)
+    --- PASS: TestIntegrationNameNeutralityGate/presentation (0.00s)
+    --- PASS: TestIntegrationNameNeutralityGate/presentation_sse (0.00s)
+=== RUN   TestEncodersContainNoIntegrationNameLiteral
+--- PASS: TestEncodersContainNoIntegrationNameLiteral (0.00s)
+=== RUN   TestProjectionCasesValueEquality
+=== RUN   TestProjectionCasesValueEquality/session_list
+=== RUN   TestProjectionCasesValueEquality/session_inspect
+=== RUN   TestProjectionCasesValueEquality/conversation_history
+=== RUN   TestProjectionCasesValueEquality/conversation_subscribe
+=== RUN   TestProjectionCasesValueEquality/runtime_configuration_subscribe
+=== RUN   TestProjectionCasesValueEquality/prompt_deliver
+=== RUN   TestProjectionCasesValueEquality/command_inspect
+=== RUN   TestProjectionCasesValueEquality/lease_acquire
+=== RUN   TestProjectionCasesValueEquality/terminal_read
+--- PASS: TestProjectionCasesValueEquality (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/session_list (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/session_inspect (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/conversation_history (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/conversation_subscribe (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/runtime_configuration_subscribe (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/prompt_deliver (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/command_inspect (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/lease_acquire (0.00s)
+    --- PASS: TestProjectionCasesValueEquality/terminal_read (0.00s)
+=== RUN   TestFixtureRoundTrip
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/command-inspect.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/command-result-stream-item.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/condition-stream-item.json
+    roundtrip_test.go:26: skipped: stream family "session.condition" has no registered subscribe operation (docs/registry/decisions.md, stream families section)
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/config.json
+    roundtrip_test.go:26: skipped: duo.config/v2 fixture is local configuration input, not a wire operation envelope
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/conversation-page.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/cursor-expired.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/lease-acquired.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/lease-refused.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/manifest.json
+    roundtrip_test.go:26: skipped: duo.manifest/v1 fixture is manifest.show's CLI-only result body (manifest.show is registered local_admin-shaped: no MCP tool or presentation route)
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/projection-cases.json
+    roundtrip_test.go:26: skipped: duo.projection-conformance/v1 fixture (projection-cases.json) is consumed by TestProjectionCasesValueEquality, not this per-fixture round trip
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/projection-stamp.json
+    roundtrip_test.go:26: skipped: duo.projection-stamp/v1 fixture is a harness installation stamp, not an operation envelope
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/prompt-queued.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/runtime-configuration-effective.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/runtime-configuration-selected.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/session-inspect.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/session-launch-exhausted.json
+    roundtrip_test.go:26: skipped: operation "session.launch" is registered local_admin: no MCP tool or presentation route to compare (CLI-only projection)
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/session-launch.json
+    roundtrip_test.go:26: skipped: operation "session.launch" is registered local_admin: no MCP tool or presentation route to compare (CLI-only projection)
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/session-list.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/terminal-snapshot.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/usage-stream-item.json
+    roundtrip_test.go:26: skipped: stream family "usage" has no registered subscribe operation (docs/registry/decisions.md, stream families section)
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/version-conflict.json
+    roundtrip_test.go:26: skipped: operation "collaboration.value.replace" is deferred: attested only by the version-conflict.json error envelope; the collaboration families' permission split, CLI paths, and v1 routes are not in the synced set
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/working-mode-effective.json
+=== RUN   TestFixtureRoundTrip/fixtures/duo-external-v1/working-mode-selected.json
+=== NAME  TestFixtureRoundTrip
+    roundtrip_test.go:34: fixture round trip: 14 applicable, 9 skipped, 23 total
+--- PASS: TestFixtureRoundTrip (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/command-inspect.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/command-result-stream-item.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/condition-stream-item.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/config.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/conversation-page.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/cursor-expired.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/lease-acquired.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/lease-refused.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/manifest.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/projection-cases.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/projection-stamp.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/prompt-queued.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/runtime-configuration-effective.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/runtime-configuration-selected.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/session-inspect.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/session-launch-exhausted.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/session-launch.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/session-list.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/terminal-snapshot.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/usage-stream-item.json (0.00s)
+    --- SKIP: TestFixtureRoundTrip/fixtures/duo-external-v1/version-conflict.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/working-mode-effective.json (0.00s)
+    --- PASS: TestFixtureRoundTrip/fixtures/duo-external-v1/working-mode-selected.json (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/conformance	0.009s

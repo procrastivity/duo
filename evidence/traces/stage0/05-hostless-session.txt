@@ -1,0 +1,12 @@
+=== RUN   TestHostlessFakeSessionReachesNonterminalState
+--- PASS: TestHostlessFakeSessionReachesNonterminalState (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/sessioncore	0.002s
+=== RUN   TestRoleSeparation
+=== RUN   TestRoleSeparation/host_does_not_import_runtime
+=== RUN   TestRoleSeparation/runtime_does_not_import_host
+--- PASS: TestRoleSeparation (0.07s)
+    --- PASS: TestRoleSeparation/host_does_not_import_runtime (0.04s)
+    --- PASS: TestRoleSeparation/runtime_does_not_import_host (0.04s)
+PASS
+ok  	github.com/procrastivity/duo/internal/adapter	0.078s
