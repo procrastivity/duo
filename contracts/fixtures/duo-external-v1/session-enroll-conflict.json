@@ -1,0 +1,12 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_enroll_conflict",
+  "operation": "session.enroll",
+  "error": {
+    "class": "conflict",
+    "code": "session.target_exited",
+    "message": "The session target exited before enrollment completed.",
+    "retry": {"safe": false, "action": "create_new_session"},
+    "effect": "no_effect"
+  }
+}

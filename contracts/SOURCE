@@ -1,6 +1,6 @@
 # contracts/SOURCE — written by contrib/sync-contracts; do not edit.
-source-sha: bda26c48b4dfaba7d05c99901c07f399bcab108d
-5efb00c882c499f9f5184aa4222f614966b905d06eb0d821501be7660b20be85  fixtures/duo-external-v1/README.md
+source-sha: fa26b1abfc621d66df339bb0b901e0c12a046e46
+7ee2f7e4aabee16ee378b7ca959f8bce59dff2cd5c851f295ca3d56f04658ea6  fixtures/duo-external-v1/README.md
 562e3625dde7a2fc19b83e0c94fc037c109ef8937aae02d3dfd4780ad439b9f0  fixtures/duo-external-v1/command-inspect.json
 57afbee93eaf6c3e0e16ca795b0eb85fdcb4f678e2e90804c0069d34aeb37f7d  fixtures/duo-external-v1/command-result-stream-item.json
 91ca8a7db0eab863b4ee7d9fed89618ac45dcd5c1e0097fc56e28177603f5b71  fixtures/duo-external-v1/condition-stream-item.json
@@ -15,8 +15,15 @@ caa203ca1c4a8459dfdf0234e7d90de217872c7aadd07eac36b7f592f87c5fae  fixtures/duo-e
 0363bfb8298bd60c08edc56a914c8ba54d426056c47dad03c351afe6def7d23e  fixtures/duo-external-v1/prompt-queued.json
 e065b47eb2f76d364ce5df068f28c038d4ec63449af665549263c9000f47acba  fixtures/duo-external-v1/runtime-configuration-effective.json
 c3ee5cdf85829c7beb0206f8d722041c8abc50dbc4df9d1f50f553977758b4b9  fixtures/duo-external-v1/runtime-configuration-selected.json
+a577ce2217dc49471e5ffa4db31413b83511e55748d2953b36a33a0162af184a  fixtures/duo-external-v1/session-enroll-conflict.json
+e16707b75e06fa3fdc2705aedacbba2fcf3f315aad22e3cab27e28df409a412e  fixtures/duo-external-v1/session-enroll.json
 93b5e51afb3297966cdb34d0c92db89afea4e0bb166929fcbbbc6e3b0368617b  fixtures/duo-external-v1/session-inspect.json
+aafa57d582d1cf13037bcfed164d5956cb28c334850a2cce148e978613cb82fa  fixtures/duo-external-v1/session-launch-distinct-model-line.json
 387bd7dff540cc8bfc4d31a7e974b14a950b583fa2b010c9effde1901f4d46c9  fixtures/duo-external-v1/session-launch-exhausted.json
+0b4bdbfa8f09be45ca689fa99b4474998276fb817d1424c331d912cf97dc4a9a  fixtures/duo-external-v1/session-launch-mixed-leaf.json
+592d26f9556cbfca2ab9facdef3962c5423b7e8d9333136d1b65638aa8aaac3e  fixtures/duo-external-v1/session-launch-model-line-relent.json
+e3c6c145ccfbd4ae86d693bf2b54e99f417a5c2f1085c461f523631f8a5bb4c9  fixtures/duo-external-v1/session-launch-random-mode.json
+dc49668a6b934b21f2923a7dcea6b8c09a9eef02aa6aa4257cc0c8e3f96af32a  fixtures/duo-external-v1/session-launch-runtime-relent.json
 822ea3ba93669d49c46208ba7ad1ab9c2ab30e4f651f46280e82fc47902c7a59  fixtures/duo-external-v1/session-launch.json
 d0c2fc09d2d5c3df1ec0bd7dddf809f89f1bbc1097cab2047cc73f9549266959  fixtures/duo-external-v1/session-list.json
 3d1c80e486dedae143439eba586197f1733ab89199d4727b4c778adb1c6bb3e3  fixtures/duo-external-v1/terminal-snapshot.json

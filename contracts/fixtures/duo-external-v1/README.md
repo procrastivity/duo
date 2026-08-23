@@ -34,6 +34,13 @@ because the configuration and installation contracts sanction them there.
 | `config.json` | Strict successor configuration root: determined `review` composition with authored `model_line`, plus additive `presets.review`. |
 | `session-launch.json` | Ordinary `session.launch` success: chosen leaf, resolved model line, and launch-resolution reference. |
 | `session-launch-exhausted.json` | `launch.constraints_exhausted`: rejected candidate, elimination reason, and zero surviving assignments. |
+| `session-launch-model-line-relent.json` | Model-line soft avoid relent: avoid eliminated all candidates, relent restores pre-avoid pool, and chosen candidate reported with relented constraint. |
+| `session-launch-runtime-relent.json` | Agent-runtime soft avoid relent: avoid eliminated all candidates, relent restores pre-avoid pool, and chosen candidate reported with relented constraint. |
+| `session-launch-random-mode.json` | Random selection: explicit `"random"` selection mode, picked assignment, and no relented constraints on ordered chosen candidate. |
+| `session-launch-mixed-leaf.json` | Multi-leaf atomic resolution: two leaves, distinct compositions, both selected and reported with atomic whole-plan semantics. |
+| `session-launch-distinct-model-line.json` | Cross-leaf distinct-model-line relation: two leaves with different model lines satisfy the relation, rejected tuples match same-line pairs. |
+| `session-enroll.json` | Ordinary `session.enroll` success: opaque session and runtime-instance IDs assigned. |
+| `session-enroll-conflict.json` | `session.target_exited`: enrollment conflict with safe retry guidance and no_effect result. |
 | `projection-cases.json` | Equivalent canonical requests through CLI, MCP, and presentation forms. |
 
 An implementation test must decode each applicable external result through the

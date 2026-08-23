@@ -1,0 +1,22 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch_random",
+  "operation": "session.launch",
+  "result": {
+    "session_id": "ses_fixture_4",
+    "launch_resolution_id": "lrr_fixture_4",
+    "selection": "random",
+    "leaves": [
+      {
+        "name": "reviewer",
+        "agent_runtime": "opencode",
+        "model_line": "gpt-5.6",
+        "declared_kind": "open",
+        "outcome": "selected",
+        "relented_avoids": []
+      }
+    ]
+  },
+  "warnings": [],
+  "features": []
+}
