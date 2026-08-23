@@ -10,7 +10,7 @@ import (
 func TestRun_MissingStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "duo.db")
 
-	report := Run(path)
+	report := Run(path, nil)
 
 	if report.Store.Present {
 		t.Error("Present = true for a store file that was never created")
@@ -44,7 +44,7 @@ func TestRun_PresentNoWriter(t *testing.T) {
 		t.Fatalf("Close (setup): %v", err)
 	}
 
-	report := Run(path)
+	report := Run(path, nil)
 
 	if !report.Store.Present {
 		t.Error("Present = false for a store file that exists")
@@ -65,7 +65,7 @@ func TestRun_PresentNoWriter(t *testing.T) {
 	// The probe must not have left a lingering lease: a second probe must
 	// see the same "no writer" result, not "active" because a lease row
 	// leaked.
-	again := Run(path)
+	again := Run(path, nil)
 	if again.Store.Writer == nil || again.Store.Writer.Active {
 		t.Errorf("second probe saw a lingering lease: %+v", again.Store.Writer)
 	}
@@ -80,7 +80,7 @@ func TestRun_ActiveWriter(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = authority.Close() })
 
-	report := Run(path)
+	report := Run(path, nil)
 
 	if !report.Store.Present {
 		t.Error("Present = false for a store file that exists")

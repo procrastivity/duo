@@ -1,18 +1,50 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/adapter"
+
 	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/doctor"
 	"github.com/procrastivity/duo/internal/duoerr"
+	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/iostreams"
+	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	"github.com/procrastivity/duo/internal/surface"
 )
+
+// registeredAdapters reports the adapter factories this composition root
+// registers, probed for their compatibility verdict. Stage 0 registers the
+// permanent fake pair (the cross-composition gate adapters); real host and
+// runtime adapters join this list in Stage 1. A probe error reports the
+// adapter as unavailable rather than dropping the row — doctor's job is to
+// show what is registered, not only what is healthy.
+func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
+	hostFactory := hostfake.Factory{}
+	runtimeFactory := runtimefake.Factory{}
+
+	out := make([]doctor.Adapter, 0, 2)
+	for _, probe := range []struct {
+		descriptor func() adapter.Descriptor
+		probe      func(context.Context) (adapter.Probe, error)
+	}{
+		{hostFactory.Descriptor, hostFactory.Probe},
+		{runtimeFactory.Descriptor, runtimeFactory.Probe},
+	} {
+		compatibility := adapter.CompatibilityUnavailable
+		if p, err := probe.probe(cmd.Context()); err == nil {
+			compatibility = p.Compatibility
+		}
+		out = append(out, doctor.FromDescriptor(probe.descriptor(), compatibility))
+	}
+	return out
+}
 
 // doctorCommand constructs the `duo doctor` verb: internal/registry's
 // "doctor.run" operation, CLI path {"doctor"}. Step 10 wires the core
@@ -44,7 +76,7 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 				}
 			}
 
-			report := doctor.Run(path)
+			report := doctor.Run(path, registeredAdapters(cmd))
 
 			if flags.JSON {
 				b, err := json.Marshal(report)
@@ -92,6 +124,9 @@ func humanReport(report doctor.Report) string {
 	fmt.Fprintf(&b, "  adapters: %d registered\n", len(report.Adapters.Registered))
 	if len(report.Adapters.Registered) == 0 {
 		b.WriteString("    (no session-host or agent-runtime adapter registers yet)\n")
+	}
+	for _, a := range report.Adapters.Registered {
+		fmt.Fprintf(&b, "    %s (%s): %s\n", a.Name, a.Kind, a.Status)
 	}
 
 	return b.String()

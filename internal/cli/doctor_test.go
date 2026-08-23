@@ -33,7 +33,11 @@ func TestDoctorCommand_JSON(t *testing.T) {
 			Healthy bool `json:"healthy"`
 		} `json:"store"`
 		Adapters struct {
-			Registered []any `json:"registered"`
+			Registered []struct {
+				Name   string `json:"name"`
+				Kind   string `json:"kind"`
+				Status string `json:"status"`
+			} `json:"registered"`
 		} `json:"adapters"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
@@ -45,8 +49,17 @@ func TestDoctorCommand_JSON(t *testing.T) {
 	if !report.Store.Healthy {
 		t.Error("Store.Healthy = false for a merely-missing store")
 	}
-	if report.Adapters.Registered == nil || len(report.Adapters.Registered) != 0 {
-		t.Errorf("Adapters.Registered = %v, want an empty array", report.Adapters.Registered)
+	if len(report.Adapters.Registered) != 2 {
+		t.Fatalf("Adapters.Registered has %d rows, want the fake pair", len(report.Adapters.Registered))
+	}
+	want := map[string]string{"fake-host": "session_host", "fake-runtime": "agent_runtime"}
+	for _, a := range report.Adapters.Registered {
+		if want[a.Name] != a.Kind {
+			t.Errorf("adapter %q has kind %q, want %q", a.Name, a.Kind, want[a.Name])
+		}
+		if a.Status != "supported" {
+			t.Errorf("adapter %q has status %q, want \"supported\"", a.Name, a.Status)
+		}
 	}
 }
 

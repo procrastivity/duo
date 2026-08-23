@@ -8,8 +8,9 @@
 //
 // This package reads internal/store's public API only (Open, OpenAuthority,
 // the lease error types) and never touches internal/host or
-// internal/runtime — those own real adapter registration, which does not
-// exist yet, so AdaptersStatus is always empty.
+// internal/runtime. Adapter rows arrive from the caller — the composition
+// root owns which adapter factories exist, and hands doctor their §5.1
+// descriptors through FromDescriptor; doctor itself stays neutral.
 package doctor
 
 import (
@@ -18,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/procrastivity/duo/internal/adapter"
 	"github.com/procrastivity/duo/internal/store"
 )
 
@@ -61,22 +63,41 @@ type WriterStatus struct {
 	ExpiresAt   string `json:"expiresAt,omitempty"`
 }
 
-// AdaptersStatus is the registered-adapters section: shaped for later
-// registration, always empty today (no session-host or agent-runtime
-// adapter registers itself yet).
+// AdaptersStatus is the registered-adapters section: the adapter factories
+// the composition root registered, as reported to doctor's caller.
 type AdaptersStatus struct {
 	Registered []Adapter `json:"registered"`
 }
 
 // Adapter describes one registered session-host or agent-runtime adapter.
-// Nothing constructs one yet; the shape exists so wiring a real registry
-// later is additive to this JSON output, not a breaking rename.
 type Adapter struct {
 	Name              string `json:"name"`
 	Kind              string `json:"kind"` // "session_host" | "agent_runtime"
 	Version           string `json:"version,omitempty"`
 	ConformanceDigest string `json:"conformanceDigest,omitempty"`
 	Status            string `json:"status,omitempty"`
+}
+
+// FromDescriptor maps one §5.1 adapter descriptor plus its probe's
+// compatibility verdict into doctor's report row. The Role vocabulary
+// ("host"/"runtime") widens to the report's kind vocabulary
+// ("session_host"/"agent_runtime"); an unknown role passes through verbatim
+// rather than being guessed.
+func FromDescriptor(d adapter.Descriptor, compatibility adapter.CompatibilityState) Adapter {
+	kind := string(d.Role)
+	switch d.Role {
+	case adapter.RoleHost:
+		kind = "session_host"
+	case adapter.RoleRuntime:
+		kind = "agent_runtime"
+	}
+	return Adapter{
+		Name:              d.AdapterID,
+		Kind:              kind,
+		Version:           d.BuildVersion,
+		ConformanceDigest: d.ConformanceRecordDigest,
+		Status:            string(compatibility),
+	}
 }
 
 // DefaultStorePath resolves the authority store's default path:
@@ -97,11 +118,16 @@ func DefaultStorePath() (string, error) {
 	return filepath.Join(base, "duo", "duo.db"), nil
 }
 
-// Run performs duo doctor's core checks against the store at path.
-func Run(path string) Report {
+// Run performs duo doctor's core checks against the store at path and
+// reports the adapters the caller registered. A nil slice reports as an
+// empty array, never null.
+func Run(path string, adapters []Adapter) Report {
+	if adapters == nil {
+		adapters = []Adapter{}
+	}
 	return Report{
 		Store:    probeStore(path),
-		Adapters: AdaptersStatus{Registered: []Adapter{}},
+		Adapters: AdaptersStatus{Registered: adapters},
 	}
 }
 
