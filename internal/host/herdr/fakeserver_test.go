@@ -35,6 +35,7 @@ type fakeHerdr struct {
 	agentStartBusy int
 	agentStartPID  int
 	agentStartErr  *wireError
+	paneCloseErr   *wireError
 	connections    int
 	calls          []string
 	lastRequestID  string
@@ -237,6 +238,23 @@ func (f *fakeHerdr) dispatch(method string, params json.RawMessage) (any, *wireE
 		f.lastSplit = p
 		pane := f.addPaneLocked("w1")
 		return map[string]any{"type": "pane_info", "pane": paneJSON(pane)}, nil
+	case "pane.close":
+		var p paneTargetParams
+		_ = json.Unmarshal(params, &p)
+		if f.paneCloseErr != nil {
+			return nil, f.paneCloseErr
+		}
+		if _, ok := f.findLocked(p.PaneID); !ok {
+			return nil, &wireError{Code: CodePaneNotFound, Message: "pane " + p.PaneID + " not found"}
+		}
+		kept := f.panes[:0]
+		for _, pane := range f.panes {
+			if pane.paneID != p.PaneID {
+				kept = append(kept, pane)
+			}
+		}
+		f.panes = kept
+		return map[string]any{"type": "pane_closed", "pane_id": p.PaneID}, nil
 	case "agent.start":
 		var p agentStartParams
 		_ = json.Unmarshal(params, &p)
@@ -383,6 +401,18 @@ func (f *fakeHerdr) setAgentStartError(code, message string) {
 	f.agentStartErr = &wireError{Code: code, Message: message}
 }
 
+func (f *fakeHerdr) setPaneCloseError(code, message string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.paneCloseErr = &wireError{Code: code, Message: message}
+}
+
+func (f *fakeHerdr) paneCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.panes)
+}
+
 func (f *fakeHerdr) lastID() string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -521,6 +551,16 @@ func fakeBirth(_ context.Context, info processInfo) host.ProcessBirthEvidence {
 	}
 }
 
+// cleanPaneEnviron is the default PaneEnvironResolver for host tests: a
+// pane whose inherited environment carries no scrub marker. It is the
+// default rather than procfs so every launch test that is not about the
+// scrub gate keeps testing what it was written to test, while still going
+// through the gate rather than around it — the fake PIDs the fake server
+// mints have no /proc entry, and the gate refuses what it cannot read.
+func cleanPaneEnviron(_ context.Context, _ int) ([]string, error) {
+	return []string{"PATH=/usr/bin", "HOME=/home/tester", "TERM=xterm-256color"}, nil
+}
+
 func unprovenBirth(_ context.Context, info processInfo) host.ProcessBirthEvidence {
 	return host.ProcessBirthEvidence{PID: pidFor(info), StartTimeSource: StartTimeSourceUnavailable}
 }
@@ -537,6 +577,7 @@ func testHost(t *testing.T, f *fakeHerdr, mutate ...func(*Config)) *Host {
 		LaunchSettleTimeout:   30 * time.Millisecond,
 		LaunchSettlePoll:      2 * time.Millisecond,
 		ResolveProcessBirth:   fakeBirth,
+		ResolvePaneEnviron:    cleanPaneEnviron,
 	}
 	for _, m := range mutate {
 		m(&cfg)

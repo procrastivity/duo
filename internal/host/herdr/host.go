@@ -73,6 +73,11 @@ type Config struct {
 	// ResolveProcessBirth supplies birth evidence for a pane's process.
 	// Defaults to procfs.
 	ResolveProcessBirth ProcessBirthResolver
+	// ResolvePaneEnviron supplies the environment a pane's process
+	// actually inherited, for the Stage-1 spawn-environment gate in
+	// scrubgate.go. Defaults to procfs. A resolver that returns an error
+	// refuses the launch; it never downgrades the gate to a warning.
+	ResolvePaneEnviron PaneEnvironResolver
 	// Now is the clock, injectable for tests.
 	Now func() time.Time
 }
@@ -113,6 +118,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.ResolveProcessBirth == nil {
 		c.ResolveProcessBirth = procfsBirth
+	}
+	if c.ResolvePaneEnviron == nil {
+		c.ResolvePaneEnviron = procfsEnviron
 	}
 	if c.Now == nil {
 		c.Now = func() time.Time { return time.Now().UTC() }
@@ -196,8 +204,9 @@ func (h *Host) Discover(ctx context.Context, req host.DiscoveryRequest) ([]host.
 //
 // It is where the environment-scrub seam lives: Env is the environment
 // Start sets on the pane, applied to the pane's shell at creation time and
-// therefore before any agent process starts. Step 20 decides what belongs
-// in it.
+// therefore before any agent process starts. Setting is all this map can
+// do — it cannot unset an inherited variable — so the scrub policy reaches
+// this host as a gate rather than as a scrub; see scrubgate.go.
 type preparedLaunch struct {
 	AgentName       string
 	Kind            string
@@ -224,6 +233,13 @@ func (h *Host) PrepareLaunch(ctx context.Context, req host.HostLaunchRequest) (h
 	}
 	kind, err := h.kindFor(tuple.Command)
 	if err != nil {
+		return host.PreparedHostLaunch{}, err
+	}
+	// The cheap half of the scrub gate (scrubgate.go): Duo must not set a
+	// marker through the one environment channel it does control. Refusing
+	// here, before any server call, means this leg of the gate creates
+	// nothing it then has to tear down.
+	if err := verifyRequestEnv(tuple.Env); err != nil {
 		return host.PreparedHostLaunch{}, err
 	}
 
@@ -253,8 +269,9 @@ func (h *Host) PrepareLaunch(ctx context.Context, req host.HostLaunchRequest) (h
 	}, nil
 }
 
-// Start implements host.HostLauncher: create the pane, register the agent,
-// then read back the evidence that proves what is now live.
+// Start implements host.HostLauncher: create the pane, gate it on the
+// spawn-environment scrub policy, register the agent, then read back the
+// evidence that proves what is now live.
 func (h *Host) Start(ctx context.Context, launch host.PreparedHostLaunch) (host.HostLaunchEvidence, error) {
 	if err := h.requireInstance(launch.IntegrationInstanceID); err != nil {
 		return host.HostLaunchEvidence{}, err
@@ -274,6 +291,15 @@ func (h *Host) Start(ctx context.Context, launch host.PreparedHostLaunch) (host.
 	baseline, err := h.processBirth(ctx, pane.PaneID)
 	if err != nil {
 		return host.HostLaunchEvidence{}, err
+	}
+	// The Stage-1 spawn-environment gate (scrubgate.go), between "the pane
+	// exists" and "an agent starts in it" — the only window where the
+	// environment the agent will inherit is both observable and not yet
+	// inherited by anything. A marker here cannot be removed on this host,
+	// so the verdict is a refused launch and a torn-down pane, never a
+	// warning (conformance §8's hard Stage-1 gate).
+	if err := h.verifyPaneEnvironment(ctx, pane.PaneID, baseline); err != nil {
+		return host.HostLaunchEvidence{}, h.closePaneAfterRefusal(ctx, pane.PaneID, err)
 	}
 	if err := h.startAgent(ctx, prepared, pane.PaneID); err != nil {
 		return host.HostLaunchEvidence{}, err

@@ -145,7 +145,11 @@ func TestPreparedLaunchCarriesEnvironmentToThePane(t *testing.T) {
 	ctx := context.Background()
 
 	tuple := testTuple()
-	tuple.Env = map[string]string{"CLAUDE_CODE_ENTRYPOINT": "duo", "DUO_SESSION": "s1"}
+	// Both names are deliberately outside internal/scrub's deny list. This
+	// test is about the env map reaching the pane at all; a marker-named
+	// variable in a launch request is now its own refusal, covered by
+	// TestPrepareLaunchRefusesARequestEnvironmentThatSetsAMarker.
+	tuple.Env = map[string]string{"DUO_WORKSPACE": "/tmp", "DUO_SESSION": "s1"}
 	prepared, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: tuple})
 	if err != nil {
 		t.Fatalf("PrepareLaunch: %v", err)
@@ -161,7 +165,7 @@ func TestPreparedLaunchCarriesEnvironmentToThePane(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	sent := f.envOfLastCreate()
-	if sent["DUO_SESSION"] != "s1" || sent["CLAUDE_CODE_ENTRYPOINT"] != "duo" {
+	if sent["DUO_SESSION"] != "s1" || sent["DUO_WORKSPACE"] != "/tmp" {
 		t.Fatalf("env sent to Herdr = %v, want the prepared launch's env", sent)
 	}
 }

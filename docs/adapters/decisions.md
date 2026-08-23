@@ -757,3 +757,22 @@ whose executable resolved to `sleep` rather than a real agent, and it exercised
 probe (digest matched, verdict `supported`), launch, discovery, attachment
 validation including a stale-terminal rejection, and observation through to a
 pane exit.
+
+### The spawn-environment gate lives here, and refuses (Step 22b, 2026-08-23)
+
+The environment seam recorded above is one-directional, so this adapter
+consumes `internal/scrub` as a **gate**, not as a scrub:
+`internal/host/herdr/scrubgate.go` reads the new pane's pre-agent foreground
+process environment between `createPane` and `agent.start`, and a surviving
+marker refuses the launch (`*scrub.RefusalError`) and closes the pane.
+`PrepareLaunch` separately refuses a launch request whose own `Env` map sets
+a marker, before any server call.
+
+Neither of `internal/scrub`'s two scrubbing shapes is reachable on this
+path: Stage 1 attaches to a server Duo did not start, so there is no spawn
+environment for `Guard` to build, and `agent.start` names a `kind` rather
+than a command line, so there is no argv for `PaneCommand` to wrap. An
+environment that cannot be read refuses too — `Config.ResolvePaneEnviron` is
+a seam for a different source, not an off switch. The full reasoning, the
+alternatives weighed, the known exec-time limit of `/proc/<pid>/environ`,
+and the test list are in `docs/scrub/decisions.md`'s 2026-08-23 section.

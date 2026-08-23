@@ -183,3 +183,175 @@ domain socket path-length overflow from `t.TempDir()`'s nested subtest
 path, and a project-directory encoding bug — Claude Code replaces every
 non-alphanumeric, non-hyphen character, not just `/` and `.`) are in
 `testdata/scrub-live-2026-08-23.md`.
+
+## 2026-08-23: the consumption point is a gate in the Herdr adapter, not a scrub
+
+*Appended by Step 22b. Everything above describes the policy and its two
+scrubbing shapes; this section records where the live launch path consumes
+them, and why the live path can use neither shape as written.*
+
+Until this step nothing outside `internal/scrub` imported it. `duo session
+launch` → `internal/launch.Launcher.spawn` →
+`internal/host/herdr.Host.PrepareLaunch`/`Start` → `agent.start` scrubbed
+nothing and verified nothing, so a marker-carrying Herdr server reproduced
+the conformance §8 interactive transcript loss with no refusal anywhere.
+The consumption point now lives in one file,
+`internal/host/herdr/scrubgate.go`, whose package comment carries the same
+reasoning in the place a reader of the code will look for it.
+
+### Neither shape (a) nor shape (b) is available on this path
+
+- **Shape (a), `Guard`,** builds a clean environment *before* something
+  starts, and the "something" that would matter here is the Herdr server
+  itself. Stage 1 attaches to a server Duo did not start: `Config.SocketPath`
+  names an existing socket and nothing in the adapter spawns a server. There
+  is no spawn environment for `Guard` to build. (`Guard` is still the right
+  answer the day Duo owns a server's launch, which is why it stays exported
+  and tested.)
+- **Shape (b), `PaneCommand`,** wraps a command line so the scrub runs inside
+  the pane at exec time. Herdr's `agent.start` takes a `kind` from a fixed
+  manifest enum, not a command line — the "launch mapping is lossy" finding
+  in `docs/adapters/decisions.md`. There is no argv on that method for
+  `PaneCommand` to wrap. Reaching shape (b) would mean abandoning
+  `agent.start` and typing the wrapper line into the pane through
+  `pane.send_text` instead, which gives up Herdr's agent registration, the
+  `agent_pane_busy` pre-delivery refusal this adapter already relies on, and
+  the kind→executable resolution the manifest owns. That is a larger
+  redesign than a scrub, and it was not taken here.
+
+And Herdr's own `env` map is one-directional (verified live at 0.8.2, Step
+17): it can set a variable in the new pane's shell but cannot unset one the
+pane inherited from the server process. So on this host, at this stage, an
+inherited marker cannot be removed by anything Duo can call.
+
+### Therefore: verify-and-refuse, between `createPane` and `agent.start`
+
+`Start` already reads the new pane's pre-agent foreground process for its
+launch-evidence baseline. That instant — the pane exists, no agent has
+started in it — is the only window where the environment the agent will
+inherit is both observable and not yet inherited by anything. The gate reads
+that process's environment (`/proc/<pid>/environ` by default) and calls
+`scrub.Gate`. A non-nil result is a refused launch: the pane is closed and a
+typed `*scrub.RefusalError` propagates.
+
+A gate whose only available verdict is "no" is still a gate. §8 rules out
+warning-and-continuing, not refusing.
+
+Considered and rejected: sampling an *existing* pane's environment during
+`PrepareLaunch`, which would refuse before creating anything. It is a proxy,
+wrong in both directions — an older pane may have been created under a
+different `env` map — and unavailable at all in the empty-session case,
+where this adapter creates the workspace itself. The exact answer costs one
+procfs read and, on the refusal path only, one `pane.close`.
+
+Also considered and rejected: setting each marker to the empty string
+through Herdr's `env` map. Setting a variable to `""` is not unsetting it,
+and no live evidence says a runtime reads an empty-valued marker as absent.
+
+### `Gate`/`RefusalError` are separate from `Verify`/`Guard` on purpose
+
+`Verify` answers an internal question — "does this slice still carry a
+marker?" — and a `Guard` failure means a bug in this package, not an
+operator situation. `Gate` (`refusal.go`) is the operator-facing half: it
+names *which* environment failed, carries the remedy, and is what a CLI maps
+to a `refusal.*` code and exit 3. `Unreadable` is its answer for an
+environment that could not be observed at all. Callers of the launch path
+use `Gate`/`Unreadable`; `Guard` remains the entry point for an environment
+Duo builds.
+
+Neither prints a variable's *value*. §6.8 keeps environment values behind
+`diagnostics.read`, and §8 requires marker reporting "without printing secret
+values", so `Survivors` carries names only
+(`TestGateRefusalNeverPrintsAValue`).
+
+### Unreadable is a refusal, explicitly
+
+No procfs entry, a permission failure, a process that exited between two
+calls, a host that reports no PID: all refuse. Fail-open would make the gate
+silently vacuous on exactly the deployments where it cannot look, which is
+the shape of failure §8 exists to stop — a transcript quietly lost with no
+refusal anywhere. It is also the verdict this adapter already reaches for
+the other unprovable question it faces: unproven process birth is never
+"same process". `Config.ResolvePaneEnviron` is the honest seam for a
+deployment that needs a different source (a remote server, a non-Linux
+host); it is not an off switch, because a resolver that errors still
+refuses.
+
+Known limit, recorded rather than papered over: `/proc/<pid>/environ` is the
+*exec-time* environment. That is the correct reading for this gate — the
+inherited set is fixed when the pane's shell execs, and it is exactly what
+Herdr's `env` map cannot unset — but a marker a user's own shell startup
+file exports afterwards is invisible to it. Shape (b) would catch that case;
+see above for why shape (b) is not reachable through `agent.start`.
+
+### The second, cheaper leg: Duo must not re-introduce a marker
+
+`PrepareLaunch` also gates the launch request's own `Env` map, before any
+server call. Herdr's `env` map is the one environment channel Duo does
+control, and a gate that refuses an inherited marker while letting Duo set
+one itself would have a hole in the middle. This refusal creates nothing and
+tears nothing down.
+
+The tension is real and worth naming: the deny list is deliberately broad
+(`CLAUDE_*`), so a launch that deliberately wants to set, say, a
+`CLAUDE_`-prefixed config-directory variable is refused today. §8's own
+answer is the piece this build does not have yet — "the launch variant
+defines an allow list for ordinary variables and an explicit secret source".
+Until that allow list exists there is no declared way for a marker-named
+variable in a launch request to be legitimate, and the fail-closed reading
+is a refusal with a message naming the variable, not a silent drop
+(`scrub.Environ` on the caller's own map would discard operator intent
+without saying so) and not a warning.
+
+### Where the seam is not
+
+Not the generic launcher: `internal/launch` has no pane, no PID, and no
+window between "the pane exists" and "the agent starts" — that window is
+inside one `HostLauncher.Start` call. Reaching it generically would mean
+splitting `Start` in two on the `host` interface and giving every host an
+"observe the spawn environment" method. `internal/host/fake` has no
+inherited environment at all, so its implementation would either be a
+vacuous `return nil, nil` — a gate that passes by construction, in the
+adapter every cross-composition gate runs — or a procfs concept in a fake
+that has no processes. Neither is worth a generic seam whose only real
+implementor is Herdr.
+
+Not the CLI either: it holds no pane handle between prepare and start, and
+`internal/cli` is where a *projection* belongs, not a policy. What the CLI
+does own is the projection: `launchDuoErr` maps a `*scrub.RefusalError` to
+`refusal.spawn_environment` (exit 3, per `internal/exitcode` and
+`docs/cli/decisions.md`). That is a local diagnostic token like
+`refusal.session_guard`, not a member of `internal/registry`'s closed stable
+set — no planning document registers a v1 wire code for this gate.
+
+### Tests
+
+`internal/scrub/refusal_test.go` covers the typed refusal itself: a clean
+environment passes, a marker-carrying one names every survivor and the
+remedy, no value is ever printed, an unreadable environment refuses with the
+cause reachable through `errors.Is`, and a teardown failure reaches the
+message.
+
+`internal/host/herdr/scrubgate_test.go` covers the live path against the
+package's scripted socket: `TestStartRefusesAPaneThatInheritedAMarker`
+(no `agent.start`, pane closed, every marker named),
+`TestStartProceedsWhenThePaneEnvironmentIsClean`,
+`TestStartRefusesWhenThePaneEnvironmentCannotBeRead`,
+`TestStartRefusesWhenTheHostNamesNoProcessForThePane`,
+`TestStartReadsThePanesOwnProcessEnvironment`,
+`TestRefusalRecordsAFailedTeardown`,
+`TestPrepareLaunchRefusesARequestEnvironmentThatSetsAMarker`, and two
+`procfsEnviron` tests. Its marker fixtures are built from `scrub.Markers`
+and `scrub.WildcardPrefixes`, never retyped — the zero-tolerance tripwire
+bans a marker literal here, and a test that duplicated the policy would stop
+testing it the moment `markers.go` changed.
+
+`internal/cli/session_launch_test.go` pins the projection: a
+`*scrub.RefusalError` wrapped by the launcher still reaches `refusal.*` and
+exit 3 with the marker name and the remedy intact.
+
+No live test was added for this step. The live proof is the Step 23 gate — a
+real launch through a deliberately marker-carrying server expecting a
+refusal, and through a clean server expecting success — and standing up a
+second disposable marker-carrying server here would duplicate
+`internal/scrub/live_test.go` without proving anything that gate will not.

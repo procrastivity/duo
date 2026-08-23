@@ -21,6 +21,7 @@ import (
 	"github.com/procrastivity/duo/internal/launchrecord"
 	"github.com/procrastivity/duo/internal/runtime/claude"
 	"github.com/procrastivity/duo/internal/runtime/pi"
+	"github.com/procrastivity/duo/internal/scrub"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
@@ -204,13 +205,25 @@ func parseConstraints(raw []string) ([]launch.Constraint, error) {
 
 // launchDuoErr projects a launch-resolution failure onto the chassis's
 // structured error. A *launch.Error carries its own registered stable code
-// (internal/launch/errors.go); anything else reached here from
-// Launcher.Launch's host-side spawn step, which this package's host set
-// and Stage-1 support oracle raise as plain errors.
+// (internal/launch/errors.go); a *scrub.RefusalError is the spawn-environment
+// gate tripping, which is a guard refusal and not an internal failure;
+// anything else reached here from Launcher.Launch's host-side spawn step,
+// which this package's host set and Stage-1 support oracle raise as plain
+// errors.
 func launchDuoErr(err error) *duoerr.Error {
 	var lerr *launch.Error
 	if errors.As(err, &lerr) {
 		return lerr.Duo()
+	}
+	var refusal *scrub.RefusalError
+	if errors.As(err, &refusal) {
+		// "refusal." is the chassis's exit-3 prefix (internal/exitcode, and
+		// docs/cli/decisions.md's mapping): a guard tripped, the operator
+		// can act on it, and nothing partial was left behind. The code is a
+		// local diagnostic token like refusal.session_guard, not a member of
+		// internal/registry's closed stable set — no planning document
+		// registers a v1 wire code for this gate.
+		return duoerr.New("refusal.spawn_environment", refusal.Error())
 	}
 	return duoerr.New("internal.launch_failed", err.Error())
 }
