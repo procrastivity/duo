@@ -1,6 +1,7 @@
 package storerepo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -208,6 +209,125 @@ func TestEveryDomainBoundaryIsAtomic(t *testing.T) {
 	}
 }
 
+// launchBody is a launch-resolution record body written the way a resolver's
+// encoder happened to write it: keys out of alphabetical order, a trailing
+// newline, and a byte that is not valid UTF-8. None of that is meaningful —
+// that is the point. The kernel promises to hand back the bytes it was
+// given, so a body that would survive re-encoding proves nothing.
+var launchBody = []byte("{\"id\":\"lrr_replay\",\"selection\":\"ordered\",\"assignment\":[],\"eligible_assignments\":1}\n\xff")
+
+// TestLaunchResolutionSurvivesCrashAndReplay is §4.2's launch-resolution
+// boundary and §6.9's immutable record, together: a crashed launch leaves no
+// session and no record, and a committed one comes back byte-identical from
+// the log alone after the writer died.
+//
+// The body matters more than the fact envelope here. The kernel stores it
+// opaquely, so nothing downstream would notice a re-encoding until someone
+// tried to verify a digest or replay a resolution — long after the evidence
+// had quietly changed.
+func TestLaunchResolutionSurvivesCrashAndReplay(t *testing.T) {
+	ctx := context.Background()
+	injected := errors.New("injected crash")
+	path := filepath.Join(t.TempDir(), "duo.db")
+	s := openStore(t, path)
+	repo := New(s)
+
+	a, err := domain.Open(ctx, repo)
+	if err != nil {
+		t.Fatalf("domain.Open: %v", err)
+	}
+	request := func() domain.LaunchRequest {
+		return domain.LaunchRequest{
+			RootPath: "/home/dev/Code/duo",
+			Actor:    "user:beau",
+			Reason:   "launch of preset review",
+			Resolution: &domain.LaunchResolution{
+				ID:   "lrr_replay",
+				Body: append([]byte(nil), launchBody...),
+			},
+		}
+	}
+
+	repo.beforeCommit = func() error { return injected }
+	if _, err := a.Launch(ctx, request()); !errors.Is(err, injected) {
+		t.Fatalf("pre-commit crash: err = %v, want the injected error", err)
+	}
+	assertNothingRecorded(t, s, "after a crashed launch")
+	if _, ok := a.LaunchResolution("lrr_replay"); ok {
+		t.Fatal("a crashed launch left a launch-resolution record in the kernel")
+	}
+	if n := len(a.Sessions()); n != 0 {
+		t.Fatalf("a crashed launch left %d sessions in the kernel", n)
+	}
+
+	repo.beforeCommit = nil
+	res, err := a.Launch(ctx, request())
+	if err != nil {
+		t.Fatalf("clean Launch: %v", err)
+	}
+
+	// Reopen the database under a new authority: the record has to come
+	// back from the durable log, not from the kernel that wrote it.
+	if err := s.Close(); err != nil {
+		t.Fatalf("closing the store: %v", err)
+	}
+	recovered, err := domain.Open(ctx, New(openStore(t, path)))
+	if err != nil {
+		t.Fatalf("reopening: %v", err)
+	}
+	record, ok := recovered.LaunchResolution("lrr_replay")
+	if !ok {
+		t.Fatal("the launch-resolution record did not survive the reopen")
+	}
+	if !bytes.Equal(record.Body, launchBody) {
+		t.Fatalf("recovered body = %q, want %q — the record body is not byte-identical", record.Body, launchBody)
+	}
+
+	// The links §6.9 asks for: the record explains the session the same
+	// transaction created.
+	bySession, ok := recovered.SessionLaunchResolution(res.Session)
+	if !ok || bySession.ID != "lrr_replay" {
+		t.Fatalf("SessionLaunchResolution(%s) = %+v, %v; want the committed record", res.Session, bySession, ok)
+	}
+
+	// The record is immutable, and the accessor hands out copies: writing
+	// to what it returned must not reach the stored evidence.
+	record.Body[0] = 'X'
+	again, _ := recovered.LaunchResolution("lrr_replay")
+	if !bytes.Equal(again.Body, launchBody) {
+		t.Fatalf("a caller's write reached the stored record: %q", again.Body)
+	}
+}
+
+// TestHalfALaunchResolutionIsRefused: an ID with no body, or a body with no
+// ID, is evidence that cannot be resolved back to the choice it explains.
+// The kernel refuses before the boundary opens, so the launch commits
+// nothing at all.
+func TestHalfALaunchResolutionIsRefused(t *testing.T) {
+	ctx := context.Background()
+	s := openStore(t, filepath.Join(t.TempDir(), "duo.db"))
+	a, err := domain.Open(ctx, New(s))
+	if err != nil {
+		t.Fatalf("domain.Open: %v", err)
+	}
+
+	halves := map[string]domain.LaunchResolution{
+		"id with no body": {ID: "lrr_1"},
+		"body with no id": {Body: launchBody},
+	}
+	for name, half := range halves {
+		t.Run(name, func(t *testing.T) {
+			_, err := a.Launch(ctx, domain.LaunchRequest{
+				RootPath: "/home/dev/Code/duo", Actor: "user:beau", Resolution: &half,
+			})
+			if !errors.Is(err, domain.ErrLaunchResolutionIncomplete) {
+				t.Fatalf("Launch err = %v, want ErrLaunchResolutionIncomplete", err)
+			}
+			assertNothingRecorded(t, s, "after a refused launch")
+		})
+	}
+}
+
 // TestFactRoundTrip proves the durable encoding keeps every field the kernel
 // replays. A field lost here would silently change the model on the next
 // authority restart rather than failing a commit.
@@ -231,6 +351,9 @@ func TestFactRoundTrip(t *testing.T) {
 			Epoch:     domain.HostEpoch{Kind: "herdr.terminal_id", Value: "term_a", Scope: domain.EpochScopePane},
 			Container: "w1:p1", State: domain.Attached,
 			Continuity: domain.ContinuityUnverified, ContinuityInstance: "ri_1",
+		},
+		LaunchResolution: &domain.LaunchResolution{
+			ID: "lrr_1", Body: []byte("{\"z\":1,\"a\":2}\n\xff"),
 		},
 		Parked: &domain.ParkedReport{
 			ID: "park_1", Session: "ses_1", Instance: "ri_1", Source: domain.SourceOwner,
@@ -294,6 +417,10 @@ func compareFacts(want, got domain.Fact) string {
 		return "the claim"
 	case *want.Parked != *got.Parked:
 		return "the parked report"
+	case want.LaunchResolution.ID != got.LaunchResolution.ID:
+		return "the launch-resolution record id"
+	case !bytes.Equal(want.LaunchResolution.Body, got.LaunchResolution.Body):
+		return "the launch-resolution record body"
 	case want.WorkspaceID != got.WorkspaceID || want.SessionID != got.SessionID ||
 		want.InstanceID != got.InstanceID || want.AttachmentID != got.AttachmentID ||
 		want.ActorID != got.ActorID || want.CorrelationID != got.CorrelationID:

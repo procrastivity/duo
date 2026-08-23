@@ -356,3 +356,82 @@ No store migration and no store change: the new facts ride the existing
 stream log, and the incarnation comes from the store's existing public
 `Incarnation()`. Nothing outside `internal/domain` and
 `internal/domain/storerepo` moved.
+
+## The launch-resolution record: carried, never read
+
+`docs/launch/decisions.md` recorded the gap this closes — `Authority.Launch`
+committed through the right boundary but had nowhere to put the
+launch-resolution record, so a domain-backed `launch.Recorder` would have had
+to drop the record body or smuggle it through `Reason`.
+
+The fact is `launch.resolved`, carrying `LaunchResolution{ID, Body}`. It is
+emitted by `Launch` when `LaunchRequest.Resolution` is set, in the same
+`Change` as `session.created`, `instance.started`, and `session.launched` —
+one boundary, one transaction, §7.4's "a failed resolution creates no session
+and therefore no launch-resolution record" enforced by there being nothing
+else to fail.
+
+**The body is opaque, and that is a rule rather than a convenience.** The
+kernel stores the bytes it was handed and returns the same bytes; it does not
+decode, validate, re-encode, or interpret them. Two reasons:
+
+- The record's schema is `internal/launch`'s (§6.9), and the §3
+  responsibility table forbids the kernel to own another component's format.
+  A kernel that decoded the record would have to be edited whenever the
+  resolver's record grew a field.
+- Re-encoding would break the one property the fact exists for. The record is
+  immutable evidence a spawn was gated on; a digest computed over it, or a
+  replay compared against it, is only meaningful if the bytes are the ones
+  that were committed. `wireLaunchResolution.Body` is therefore a `[]byte`
+  (base64 on the wire), not nested JSON, so no encoder ever walks the
+  document.
+
+Immutability is enforced in three places, because "immutable" is otherwise
+just a comment: no verb alters a record, replay keeps the **first** body
+recorded for an ID, and every accessor returns a deep copy so a caller cannot
+write through the returned slice into the index.
+
+Half a record is refused. `ErrLaunchResolutionIncomplete` rejects an ID with
+no body (evidence that was never written) and a body with no ID (evidence
+nothing can cite), before the boundary opens.
+
+### The links go on the fact, not in the body
+
+§6.9 wants the record to carry its "eventual session/runtime-instance links",
+and the body cannot: it commits in the same transaction that mints those IDs,
+so they do not exist when it is serialized. The links live on the fact
+envelope (`Fact.SessionID`, `Fact.InstanceID`) and are queryable through
+`Authority.SessionLaunchResolution`; `launch.Launcher` fills the same links
+into its own in-memory copy from the `Commit` the recorder returns, which is
+what reaches the caller and the ordinary result. Nothing rewrites the durable
+body afterwards, which is the point.
+
+### The glue is its own package
+
+`internal/launchrecord` holds the only `launch.Recorder` backed by the
+kernel. It imports both `internal/launch` and `internal/domain`, and neither
+imports it, so the resolver stays a pure decision component and the kernel
+stays free of the record's schema.
+
+Two shapes it forced:
+
+- **The workspace path is a construction input.** `launch.Recorder`'s method
+  takes the record and nothing else — placement is not part of a resolution
+  (§3.3: a path is a placement input, never an identity) — so one `Recorder`
+  belongs to one workspace root, which is the granularity a `launch.Launcher`
+  is built at anyway.
+- **`Options.OnLaunch` exists for the reporter credential.** `launch.Commit`
+  is a fixed contract carrying only the session and instance IDs, while
+  `domain.Launch` also returns the instance-scoped reporter credential the
+  kernel returns exactly once and never stores in the clear. Without a way
+  out it would be dropped at the seam, so a caller that will accept a later
+  `SessionStart` report takes it through this callback.
+
+One known narrowing: the kernel's launch verb mints **one** starting runtime
+instance, so a multi-leaf resolution reports one instance ID in its `Commit`
+today. Per-leaf executions correlate to it as they report in. A record whose
+assignment covers several leaves is committed whole regardless — the body is
+the resolver's, complete.
+
+This step likewise needed no store migration: the new fact rides the same
+stream log, through the `LaunchResolutionTx` boundary `launch` already used.

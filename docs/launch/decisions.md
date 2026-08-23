@@ -102,6 +102,15 @@ somebody owns that change:
 Until then the durable record is whatever a caller wires behind `Recorder`,
 and the ordering guarantee holds regardless of which implementation that is.
 
+**Resolved.** The kernel took that change: `launch.resolved` carries
+`domain.LaunchResolution{ID, Body}`, `LaunchRequest.Resolution` emits it in
+the same `Change` as the session and instance facts, and the body is opaque —
+stored and returned byte-identical, never decoded by the kernel.
+`internal/launchrecord` is the `Recorder` over it; nothing in this package
+changed, and its `Recorder` interface is still the seam. See
+`docs/domain/decisions.md`, "The launch-resolution record: carried, never
+read", for what the kernel does and does not promise about the body.
+
 ## `Support` is required, because a permissive default would change the rung
 
 §7.1 accepts the middle rung: configuration **plus installed evidence**. A

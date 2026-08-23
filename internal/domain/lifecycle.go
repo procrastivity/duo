@@ -18,6 +18,18 @@ type LaunchRequest struct {
 	// separate attestation is needed for it.
 	BindActor ActorID
 	Reason    string
+	// Resolution is the launch-resolution record this launch was gated on,
+	// or nil for a launch that resolved nothing (a caller with a single
+	// determined plan, or a test).
+	//
+	// When it is set, the record commits in the same Change — the same
+	// store boundary, the same transaction — as the session and the
+	// starting runtime instance. §7.4: a failed resolution creates no
+	// session and therefore no record, and a record that is durable stays
+	// durable even if the spawn that followed it failed. Reason stays what
+	// it always was: one phrase for history. The record carries the
+	// explanation.
+	Resolution *LaunchResolution
 }
 
 // LaunchResult is what launch returns. There is no attachment and no claim
@@ -57,6 +69,14 @@ func (a *Authority) Launch(ctx context.Context, req LaunchRequest) (LaunchResult
 				ErrActorBound, req.BindActor, bound)
 		}
 	}
+	if req.Resolution != nil {
+		if req.Resolution.ID == "" || len(req.Resolution.Body) == 0 {
+			// Half a record is worse than none: an ID with no body points
+			// at evidence that was never written, and a body with no ID
+			// cannot be referenced by the result that cites it.
+			return LaunchResult{}, ErrLaunchResolutionIncomplete
+		}
+	}
 
 	b := a.change(actor)
 	workspace := a.ensureWorkspace(b, root)
@@ -84,6 +104,16 @@ func (a *Authority) Launch(ctx context.Context, req LaunchRequest) (LaunchResult
 			Reason: "instance-scoped reporter credential",
 		}).
 		auditEntry(AuditEntry{Target: string(sessionID), Reason: "launch", Detail: req.Reason})
+	if req.Resolution != nil {
+		record := req.Resolution.clone()
+		b.fact(FactLaunchResolved, Fact{
+			LaunchResolution: &record,
+			SessionID:        sessionID,
+			InstanceID:       instanceID,
+			Evidence:         "launch-resolution record " + string(record.ID),
+			Reason:           "recorded before spawn",
+		})
+	}
 	if req.BindActor != "" {
 		b.fact(FactActorBound, Fact{
 			SessionID: sessionID, InstanceID: instanceID, ActorID: req.BindActor,

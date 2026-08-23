@@ -28,6 +28,13 @@ type (
 	FactID string
 	// ParkedReportID names one report held as unresolved evidence.
 	ParkedReportID string
+	// LaunchResolutionID names one launch-resolution record. It is the one
+	// Duo ID in this list the kernel does not mint: launch resolution
+	// happens before the kernel is called, and the resolver authors the ID
+	// so the record can be referenced by the thing that produced it. The
+	// kernel stores it and compares it, and parses it no more than it parses
+	// any other ID.
+	LaunchResolutionID string
 )
 
 // ID prefixes. They are diagnostic sugar only: nothing parses an ID, and a

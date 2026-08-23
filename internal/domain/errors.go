@@ -37,6 +37,12 @@ var (
 	// ErrRootPathRequired reports an enrollment or launch with no workspace
 	// root path. The path is not identity, but it is the placement input.
 	ErrRootPathRequired = errors.New("domain: workspace root path is required")
+	// ErrLaunchResolutionIncomplete reports a launch that offered half a
+	// launch-resolution record. §6.9's record is an ID and a body together;
+	// either alone is evidence that cannot be resolved back to the choice
+	// it explains.
+	ErrLaunchResolutionIncomplete = errors.New(
+		"domain: a launch-resolution record requires both an id and a body")
 	// ErrContinuityUnverified reports a session whose host attachment
 	// continuity is not proven. Its instance reports are parked and its
 	// exact-target writes are disabled until the host proves the same live

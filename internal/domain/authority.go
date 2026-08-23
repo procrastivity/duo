@@ -49,6 +49,12 @@ type Authority struct {
 	actorBinding map[ActorID]SessionID
 	// recovering is a startup view, never durable (§5.1).
 	recovering map[InstanceID]bool
+	// launchResolutions holds every committed launch-resolution record by
+	// ID, and sessionLaunch indexes the record that explains one session.
+	// Both are a replay of durable facts; nothing mutates a record once it
+	// is here.
+	launchResolutions map[LaunchResolutionID]*recordedLaunchResolution
+	sessionLaunch     map[SessionID]LaunchResolutionID
 	// parked holds the unresolved instance reports each session collected
 	// while its attachment continuity was unverified. It is a replay of
 	// durable facts like everything else here; nothing in it has been
@@ -88,6 +94,9 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 		actorBinding:   map[ActorID]SessionID{},
 		recovering:     map[InstanceID]bool{},
 		parked:         map[SessionID][]*ParkedReport{},
+
+		launchResolutions: map[LaunchResolutionID]*recordedLaunchResolution{},
+		sessionLaunch:     map[SessionID]LaunchResolutionID{},
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -186,6 +195,12 @@ func (a *Authority) apply(f Fact) {
 		if at, ok := a.attachments[f.AttachmentID]; ok {
 			at.Continuity = ContinuityState(f.State)
 			at.ContinuityInstance = f.InstanceID
+		}
+	case FactLaunchResolved:
+		// The record is evidence, not state: it is retained exactly as it
+		// was committed and applied to nothing else.
+		if f.LaunchResolution != nil {
+			a.recordLaunchResolution(*f.LaunchResolution, f.SessionID, f.InstanceID)
 		}
 	case FactReportParked:
 		// A parked report is applied to nothing but the parked list. That

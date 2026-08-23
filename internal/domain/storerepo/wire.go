@@ -34,6 +34,8 @@ type wireFact struct {
 	Claim       *wireClaim       `json:"claim,omitempty"`
 	Parked      *wireParked      `json:"parked,omitempty"`
 
+	LaunchResolution *wireLaunchResolution `json:"launch_resolution,omitempty"`
+
 	WorkspaceID   string `json:"workspace_id,omitempty"`
 	SessionID     string `json:"session_id,omitempty"`
 	InstanceID    string `json:"instance_id,omitempty"`
@@ -106,6 +108,19 @@ type wireParked struct {
 	Evidence                 string `json:"evidence,omitempty"`
 	Reason                   string `json:"reason,omitempty"`
 	ReceivedAt               string `json:"received_at"`
+}
+
+// wireLaunchResolution is one launch-resolution record on the wire.
+//
+// Body is a []byte, so encoding/json base64-encodes it: the record's own
+// bytes are carried as data rather than spliced into this document as JSON.
+// That is what makes the durable body byte-identical to the one the resolver
+// produced. Nesting it as raw JSON would re-encode it — key order, number
+// formatting, escaping — and the kernel is not allowed to interpret the
+// record at all, let alone rewrite it.
+type wireLaunchResolution struct {
+	ID   string `json:"id"`
+	Body []byte `json:"body,omitempty"`
 }
 
 type wireCorrelation struct {
@@ -192,6 +207,9 @@ func toWire(f domain.Fact) wireFact {
 			Transcript:               v.Transcript, Evidence: v.Evidence,
 			Reason: v.Reason, ReceivedAt: v.ReceivedAt,
 		}
+	}
+	if v := f.LaunchResolution; v != nil {
+		w.LaunchResolution = &wireLaunchResolution{ID: string(v.ID), Body: v.Body}
 	}
 	if v := f.Correlation; v != nil {
 		w.Correlation = &wireCorrelation{
@@ -280,6 +298,11 @@ func fromWire(w wireFact) domain.Fact {
 			},
 			Transcript: v.Transcript, Evidence: v.Evidence,
 			Reason: v.Reason, ReceivedAt: v.ReceivedAt,
+		}
+	}
+	if v := w.LaunchResolution; v != nil {
+		f.LaunchResolution = &domain.LaunchResolution{
+			ID: domain.LaunchResolutionID(v.ID), Body: v.Body,
 		}
 	}
 	if v := w.Correlation; v != nil {

@@ -19,6 +19,14 @@ const (
 	FactSessionState    FactKind = "session.state"
 	FactSessionOwner    FactKind = "session.owner"
 
+	// FactLaunchResolved records the launch-resolution record a launch was
+	// gated on: §6.9's immutable, Duo-authored evidence of the complete
+	// choice made before anything spawned. It commits in the same Change as
+	// session.created, instance.started, and session.launched, because the
+	// record and the identities it explains are one transaction (§4.2's
+	// launch-resolution boundary, §7.4).
+	FactLaunchResolved FactKind = "launch.resolved"
+
 	// Host-attachment facts (§7 bullet 2: detach and reattach).
 	FactAttachmentCreated FactKind = "attachment.created"
 	FactAttachmentState   FactKind = "attachment.state"
@@ -111,6 +119,10 @@ type Fact struct {
 	Correlation *Correlation
 	Claim       *Claim
 	Parked      *ParkedReport
+	// LaunchResolution is the launch-resolution record on a launch.resolved
+	// fact. Its body is opaque: the kernel carries the bytes and never
+	// interprets them (see LaunchResolution).
+	LaunchResolution *LaunchResolution
 
 	// Transition targets. A transition fact names the object it changes and
 	// the new value.
