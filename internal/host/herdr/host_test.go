@@ -529,3 +529,32 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 	t.Fatalf("timed out waiting for %s", what)
 }
+
+// Herdr 0.8.2 validates agent names at agent.start: lowercase start,
+// [a-z0-9_-] only, 1-32 characters. invalid_agent_name was observed live
+// at the Stage 1 gate with a full-length resolution-ID suffix, so this
+// pins the generated name to the live rules for every ID shape the domain
+// mints.
+func TestAgentNameFitsHerdrsLiveRules(t *testing.T) {
+	cases := []struct{ prefix, id string }{
+		{"duo", "lr_0123456789abcdef0123456789abcdef"},
+		{"duo", "LR_UPPER-Case.and/odd chars"},
+		{"duo", "short"},
+	}
+	for _, tc := range cases {
+		got := agentName(tc.prefix, tc.id)
+		if len(got) == 0 || len(got) > 32 {
+			t.Errorf("agentName(%q, %q) = %q: length %d, want 1-32", tc.prefix, tc.id, got, len(got))
+		}
+		if got[0] < 'a' || got[0] > 'z' {
+			t.Errorf("agentName(%q, %q) = %q: must start with a lowercase letter", tc.prefix, tc.id, got)
+		}
+		for _, r := range got {
+			switch {
+			case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+			default:
+				t.Errorf("agentName(%q, %q) = %q: invalid rune %q", tc.prefix, tc.id, got, r)
+			}
+		}
+	}
+}

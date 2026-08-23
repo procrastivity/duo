@@ -556,16 +556,31 @@ func splitTarget(snap sessionSnapshot) string {
 // agentName builds a Herdr agent name from a launch-resolution ID. Herdr
 // agent names are a flat per-server namespace, so the resolution ID (which
 // is unique per launch) is what keeps two launches apart.
+//
+// Herdr 0.8.2 validates the name at agent.start: lowercase start,
+// [a-z0-9_-] only, 1–32 characters (invalid_agent_name observed live at
+// the Stage 1 gate — "duo-" plus a full lr_<32 hex> ID is 39 characters
+// and was refused). Uppercase folds to lowercase, and the name truncates
+// to the 32-character cap: it only has to be unique among agents on one
+// server, and the surviving ~24 hex characters of a 128-bit random ID are
+// far more entropy than that needs.
 func agentName(prefix, launchResolutionID string) string {
 	safe := strings.Map(func(r rune) rune {
 		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
 			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
 		default:
 			return '-'
 		}
 	}, launchResolutionID)
-	return prefix + "-" + safe
+	name := prefix + "-" + safe
+	const herdrAgentNameMax = 32
+	if len(name) > herdrAgentNameMax {
+		name = name[:herdrAgentNameMax]
+	}
+	return name
 }
 
 func copyEnv(env map[string]string) map[string]string {
