@@ -1,0 +1,31 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "session.runtime_configuration",
+  "scope": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1"
+  },
+  "item_id": "sti_fixture_rc_selected",
+  "position": "15",
+  "recorded_at": "2026-08-13T12:03:00Z",
+  "kind": "view.changed",
+  "subject": {"kind": "runtime_configuration", "id": "ses_fixture_1"},
+  "data": {
+    "revision": "4",
+    "confidence": "reported",
+    "freshness": "fresh",
+    "effective_at": "2026-08-13T12:02:58Z",
+    "computed_at": "2026-08-13T12:02:58Z",
+    "determining_observations": ["obs_fixture_rc_1"],
+    "selected": {
+      "source_model_key": "Auto",
+      "source_provider_key": "openrouter"
+    },
+    "gaps": [
+      {"field": "source_effort", "reason": "no_source"},
+      {"field": "context_limit", "reason": "alias_unresolved"},
+      {"field": "vendor_key", "reason": "alias_unresolved"}
+    ],
+    "reasons": []
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "schema": "duo.projection-conformance/v1",
+  "cases": [
+    {
+      "name": "session_list",
+      "semantic": {"operation": "session.list", "input": {}},
+      "cli": {"arguments": ["session", "list", "--output", "json"]},
+      "mcp": {"tool": "duo_session_list", "arguments": {}},
+      "presentation": {"method": "GET", "path": "/v1/sessions"}
+    },
+    {
+      "name": "session_inspect",
+      "semantic": {
+        "operation": "session.inspect",
+        "input": {"session_id": "ses_fixture_1"}
+      },
+      "cli": {"arguments": ["session", "show", "ses_fixture_1", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_session_inspect",
+        "arguments": {"session_id": "ses_fixture_1"}
+      },
+      "presentation": {"method": "GET", "path": "/v1/sessions/ses_fixture_1"}
+    },
+    {
+      "name": "conversation_history",
+      "semantic": {
+        "operation": "conversation.list",
+        "input": {"session_id": "ses_fixture_1", "limit": 50}
+      },
+      "cli": {"arguments": ["conversation", "list", "ses_fixture_1", "--limit", "50", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_conversation_read",
+        "arguments": {"session_id": "ses_fixture_1", "limit": 50}
+      },
+      "presentation": {"method": "GET", "path": "/v1/sessions/ses_fixture_1/conversation?limit=50"}
+    },
+    {
+      "name": "conversation_subscribe",
+      "semantic": {
+        "operation": "conversation.subscribe",
+        "input": {"session_id": "ses_fixture_1", "after": "41"}
+      },
+      "cli": {"arguments": ["conversation", "subscribe", "ses_fixture_1", "--after", "41", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_subscription_open",
+        "arguments": {"stream": "conversation", "session_id": "ses_fixture_1", "after": "41"}
+      },
+      "presentation": {"method": "GET", "path": "/v1/streams/conversation?session_id=ses_fixture_1&after=41"}
+    },
+    {
+      "name": "runtime_configuration_subscribe",
+      "semantic": {
+        "operation": "runtime_configuration.subscribe",
+        "input": {"session_id": "ses_fixture_1", "after": "14"}
+      },
+      "cli": {"arguments": ["session", "runtime-configuration", "subscribe", "ses_fixture_1", "--after", "14", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_subscription_open",
+        "arguments": {"stream": "session.runtime_configuration", "session_id": "ses_fixture_1", "after": "14"}
+      },
+      "presentation": {"method": "GET", "path": "/v1/streams/session.runtime_configuration?session_id=ses_fixture_1&after=14"}
+    },
+    {
+      "name": "prompt_deliver",
+      "semantic": {
+        "operation": "prompt.deliver",
+        "input": {
+          "session_id": "ses_fixture_1",
+          "runtime_instance_id": "run_fixture_1",
+          "idempotency_key": "fixture-prompt-1",
+          "text": "Run the focused checks.",
+          "queue_policy": "queue_until_safe",
+          "expires_at": "2026-08-13T12:10:00Z"
+        }
+      },
+      "cli": {
+        "arguments": ["prompt", "send", "ses_fixture_1", "--runtime-instance", "run_fixture_1", "--idempotency-key", "fixture-prompt-1", "--text", "Run the focused checks.", "--queue-policy", "queue_until_safe", "--expires-at", "2026-08-13T12:10:00Z", "--output", "json"]
+      },
+      "mcp": {
+        "tool": "duo_prompt_deliver",
+        "arguments": {
+          "session_id": "ses_fixture_1",
+          "runtime_instance_id": "run_fixture_1",
+          "idempotency_key": "fixture-prompt-1",
+          "text": "Run the focused checks.",
+          "queue_policy": "queue_until_safe",
+          "expires_at": "2026-08-13T12:10:00Z"
+        }
+      },
+      "presentation": {
+        "method": "POST",
+        "path": "/v1/sessions/ses_fixture_1/prompt-commands",
+        "headers": {"Idempotency-Key": "fixture-prompt-1"},
+        "body": {
+          "runtime_instance_id": "run_fixture_1",
+          "idempotency_key": "fixture-prompt-1",
+          "text": "Run the focused checks.",
+          "queue_policy": "queue_until_safe",
+          "expires_at": "2026-08-13T12:10:00Z"
+        }
+      }
+    },
+    {
+      "name": "command_inspect",
+      "semantic": {
+        "operation": "command.inspect",
+        "input": {"command_id": "cmd_fixture_1"}
+      },
+      "cli": {"arguments": ["prompt", "show", "cmd_fixture_1", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_command_inspect",
+        "arguments": {"command_id": "cmd_fixture_1"}
+      },
+      "presentation": {"method": "GET", "path": "/v1/commands/cmd_fixture_1"}
+    },
+    {
+      "name": "lease_acquire",
+      "semantic": {
+        "operation": "prompt.lease.acquire",
+        "input": {
+          "session_id": "ses_fixture_2",
+          "runtime_instance_id": "run_fixture_2",
+          "idempotency_key": "fixture-lease-1",
+          "ttl_ms": 300000
+        }
+      },
+      "cli": {
+        "arguments": ["prompt", "lease", "acquire", "ses_fixture_2", "--runtime-instance", "run_fixture_2", "--idempotency-key", "fixture-lease-1", "--ttl-ms", "300000", "--output", "json"]
+      },
+      "mcp": {
+        "tool": "duo_lease_manage",
+        "arguments": {
+          "operation": "acquire",
+          "session_id": "ses_fixture_2",
+          "runtime_instance_id": "run_fixture_2",
+          "idempotency_key": "fixture-lease-1",
+          "ttl_ms": 300000
+        }
+      },
+      "presentation": {
+        "method": "POST",
+        "path": "/v1/sessions/ses_fixture_2/composer-lease",
+        "headers": {"Idempotency-Key": "fixture-lease-1"},
+        "body": {
+          "runtime_instance_id": "run_fixture_2",
+          "idempotency_key": "fixture-lease-1",
+          "ttl_ms": 300000
+        }
+      }
+    },
+    {
+      "name": "terminal_read",
+      "semantic": {
+        "operation": "terminal.read",
+        "input": {"session_id": "ses_fixture_1"}
+      },
+      "cli": {"arguments": ["terminal", "read", "ses_fixture_1", "--output", "json"]},
+      "mcp": {
+        "tool": "duo_terminal_read",
+        "arguments": {"session_id": "ses_fixture_1"}
+      },
+      "presentation": {"method": "GET", "path": "/v1/sessions/ses_fixture_1/terminal/snapshot"}
+    }
+  ]
+}

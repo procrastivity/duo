@@ -1,0 +1,32 @@
+{
+  "schema": "duo.manifest/v1",
+  "product": {"name": "duo", "version": "0.1.0"},
+  "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "public_schemas": ["duo.external/v1"],
+  "configuration_schemas": ["duo.config/v1"],
+  "projection_formats": ["duo.projection-stamp/v1"],
+  "operations": [
+    {
+      "name": "prompt.deliver",
+      "projectability": "deterministic",
+      "request_schema": "duo.external/v1#prompt-deliver-request",
+      "result_schema": "duo.external/v1#command-result",
+      "permissions": ["prompt.deliver"],
+      "idempotency": "required",
+      "stream_family": "command.results",
+      "audit": "sensitive_write"
+    },
+    {
+      "name": "session.remove",
+      "projectability": "local_admin",
+      "request_schema": "duo.external/v1#session-remove-request",
+      "result_schema": "duo.external/v1#command-result",
+      "permissions": ["session.manage"],
+      "idempotency": "required",
+      "audit": "privileged_write"
+    }
+  ],
+  "adapters": [],
+  "assets": [],
+  "harness_targets": []
+}

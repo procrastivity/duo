@@ -1,0 +1,20 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "command.results",
+  "scope": {"command_id": "cmd_fixture_1"},
+  "item_id": "sti_fixture_command_1",
+  "position": "3",
+  "recorded_at": "2026-08-13T12:01:01Z",
+  "kind": "responsibility.changed",
+  "subject": {"kind": "prompt_command", "id": "cmd_fixture_1"},
+  "data": {
+    "responsibility_state": "delivered",
+    "attempt_id": "att_fixture_1",
+    "target": {
+      "session_id": "ses_fixture_1",
+      "runtime_instance_id": "run_fixture_1"
+    },
+    "activity_observed": false,
+    "acknowledged": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "session.condition",
+  "scope": {"session_id": "ses_fixture_1"},
+  "item_id": "sti_fixture_condition_1",
+  "position": "1842",
+  "recorded_at": "2026-08-13T12:00:02Z",
+  "kind": "view.changed",
+  "subject": {"kind": "session_condition", "id": "ses_fixture_1"},
+  "data": {
+    "value": "working",
+    "revision": "8",
+    "runtime_instance_id": "run_fixture_1",
+    "confidence": "reported",
+    "freshness": "fresh",
+    "determining_observations": ["obs_fixture_2"]
+  }
+}

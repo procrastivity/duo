@@ -1,0 +1,23 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_terminal",
+  "operation": "terminal.read",
+  "result": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1",
+    "host_attachment_id": "hat_fixture_1",
+    "terminal_epoch": "tep_fixture_1",
+    "fidelity": "repaint_only",
+    "snapshot_revision": "22",
+    "snapshot": {
+      "kind": "terminal_snapshot",
+      "id": "trm_fixture_1",
+      "uri": "duo://local/terminal-snapshots/trm_fixture_1",
+      "schema": "duo.external/v1",
+      "media_type": "application/vnd.duo.terminal-screen+json",
+      "expires_at": "2026-08-13T12:01:00Z"
+    }
+  },
+  "warnings": [],
+  "features": []
+}

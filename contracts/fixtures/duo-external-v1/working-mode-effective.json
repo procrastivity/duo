@@ -1,0 +1,27 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "session.runtime_configuration",
+  "scope": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1"
+  },
+  "item_id": "sti_fixture_wm_effective",
+  "position": "18",
+  "recorded_at": "2026-08-13T12:04:10Z",
+  "kind": "working_mode.effective.recorded",
+  "subject": {"kind": "conversation_record", "id": "rec_fixture_2"},
+  "data": {
+    "effective_working_mode": {
+      "source_key": "collaboration_mode.mode",
+      "source_value": "plan",
+      "normalized_class": {
+        "class": "plan",
+        "vocabulary_version": "duo.working_mode.v1",
+        "evidence": "named_source_plan_mode"
+      }
+    },
+    "source_record": {"kind": "conversation_record", "id": "rec_fixture_2"},
+    "observed_at": "2026-08-13T12:04:05Z",
+    "freshness": "fresh"
+  }
+}

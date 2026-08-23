@@ -1,0 +1,29 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "session.runtime_configuration",
+  "scope": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1"
+  },
+  "item_id": "sti_fixture_wm_selected",
+  "position": "17",
+  "recorded_at": "2026-08-13T12:04:00Z",
+  "kind": "working_mode.view_changed",
+  "subject": {"kind": "runtime_configuration", "id": "ses_fixture_1"},
+  "data": {
+    "revision": "2",
+    "confidence": "reported",
+    "freshness": "fresh",
+    "effective_at": "2026-08-13T12:03:58Z",
+    "computed_at": "2026-08-13T12:03:58Z",
+    "determining_observations": ["obs_fixture_wm_1"],
+    "selected_working_mode": {
+      "components": [
+        {"source_key": "session.agent", "source_value": "build"},
+        {"source_key": "data.mode", "source_value": "build"}
+      ]
+    },
+    "gaps": [],
+    "reasons": []
+  }
+}

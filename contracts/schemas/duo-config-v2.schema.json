@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:config:v2",
+  "title": "Duo configuration v2 root",
+  "type": "object",
+  "required": ["schema"],
+  "properties": {
+    "schema": {"const": "duo.config/v2"},
+    "authority": {"type": "object"},
+    "workspaces": {"$ref": "#/$defs/named_objects"},
+    "session_hosts": {"$ref": "#/$defs/named_objects"},
+    "agent_runtimes": {"$ref": "#/$defs/named_objects"},
+    "launch_variants": {"$ref": "#/$defs/named_objects"},
+    "compositions": {"$ref": "#/$defs/compositions"},
+    "presets": {"$ref": "#/$defs/presets"},
+    "control": {"type": "object"},
+    "collaboration": {"type": "object"},
+    "presentation_clients": {"$ref": "#/$defs/named_objects"},
+    "assets": {"type": "object"},
+    "projections": {"$ref": "#/$defs/named_objects"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "named_objects": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"type": "object"}
+    },
+    "compositions": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/composition"}
+    },
+    "composition": {
+      "type": "object",
+      "required": ["launch_variant", "model_line"],
+      "properties": {
+        "launch_variant": {"type": "string", "minLength": 1},
+        "model_line": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "presets": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/preset"}
+    },
+    "preset": {
+      "type": "object",
+      "required": ["leaves"],
+      "properties": {
+        "selection": {"enum": ["ordered", "random"]},
+        "leaves": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "additionalProperties": {"$ref": "#/$defs/preset_leaf"}
+        },
+        "relations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/preset_relation"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "preset_leaf": {
+      "type": "object",
+      "required": ["candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["composition"],
+            "properties": {
+              "composition": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "preset_relation": {
+      "type": "object",
+      "required": ["kind", "leaves"],
+      "properties": {
+        "kind": {"const": "distinct_model_line"},
+        "leaves": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

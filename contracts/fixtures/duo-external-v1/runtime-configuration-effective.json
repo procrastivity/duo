@@ -1,0 +1,31 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "session.runtime_configuration",
+  "scope": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1"
+  },
+  "item_id": "sti_fixture_rc_effective",
+  "position": "16",
+  "recorded_at": "2026-08-13T12:03:10Z",
+  "kind": "effective.recorded",
+  "subject": {"kind": "conversation_record", "id": "rec_fixture_1"},
+  "data": {
+    "effective": {
+      "source_provider_key": "openrouter",
+      "source_model_key": "anthropic/claude-opus-5[1m]",
+      "source_effort": "high",
+      "normalized_family": {
+        "name": "claude-opus-5",
+        "mapping_version": "duo.model.v1",
+        "evidence": "vendor_prefix_and_embedded_variant_preserved_as_opaque"
+      },
+      "execution_modifiers": [
+        {"source_key": "service_tier", "source_value": "flex"}
+      ]
+    },
+    "source_record": {"kind": "conversation_record", "id": "rec_fixture_1"},
+    "observed_at": "2026-08-13T12:03:05Z",
+    "freshness": "fresh"
+  }
+}

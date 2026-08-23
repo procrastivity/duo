@@ -1,0 +1,51 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_inspect",
+  "operation": "session.inspect",
+  "result": {
+    "session_id": "ses_fixture_1",
+    "workspace_id": "wsp_fixture_1",
+    "lifecycle": "active",
+    "runtime_instance_id": "run_fixture_1",
+    "condition": {
+      "value": "idle",
+      "revision": "7",
+      "runtime_instance_id": "run_fixture_1",
+      "confidence": "reported",
+      "freshness": "fresh",
+      "effective_at": "2026-08-13T12:00:00Z",
+      "computed_at": "2026-08-13T12:00:00Z",
+      "determining_observations": ["obs_fixture_1"],
+      "reasons": []
+    },
+    "operations": [
+      {
+        "operation": "prompt.deliver",
+        "revision": "3",
+        "availability": "available",
+        "quality": "exact",
+        "realization": "adapted",
+        "constraints": [],
+        "authorization": {
+          "allowed": true,
+          "policy_version": "12"
+        }
+      },
+      {
+        "operation": "terminal.read",
+        "revision": "2",
+        "availability": "available",
+        "quality": "degraded",
+        "realization": "adapted",
+        "terminal_fidelity": "repaint_only",
+        "constraints": [],
+        "authorization": {
+          "allowed": true,
+          "policy_version": "12"
+        }
+      }
+    ]
+  },
+  "warnings": [],
+  "features": []
+}

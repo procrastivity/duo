@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:config:v1",
+  "title": "Duo configuration v1 root",
+  "type": "object",
+  "required": ["schema"],
+  "properties": {
+    "schema": {"const": "duo.config/v1"},
+    "authority": {"type": "object"},
+    "workspaces": {"$ref": "#/$defs/named_objects"},
+    "session_hosts": {"$ref": "#/$defs/named_objects"},
+    "agent_runtimes": {"$ref": "#/$defs/named_objects"},
+    "launch_variants": {"$ref": "#/$defs/named_objects"},
+    "compositions": {"$ref": "#/$defs/named_objects"},
+    "control": {"type": "object"},
+    "collaboration": {"type": "object"},
+    "presentation_clients": {"$ref": "#/$defs/named_objects"},
+    "assets": {"type": "object"},
+    "projections": {"$ref": "#/$defs/named_objects"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "named_objects": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"type": "object"}
+    }
+  }
+}

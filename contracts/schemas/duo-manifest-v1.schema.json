@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:manifest:v1",
+  "title": "Duo manifest v1",
+  "type": "object",
+  "required": ["schema", "product", "manifest_digest", "public_schemas", "configuration_schemas", "projection_formats", "operations", "adapters", "assets", "harness_targets"],
+  "properties": {
+    "schema": {"const": "duo.manifest/v1"},
+    "product": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "duo"},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "public_schemas": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "configuration_schemas": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "projection_formats": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "projectability", "request_schema", "result_schema", "permissions", "idempotency", "audit"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "projectability": {"enum": ["deterministic", "local_admin", "human_llm_porcelain"]},
+          "request_schema": {"type": "string"},
+          "result_schema": {"type": "string"},
+          "permissions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "idempotency": {"enum": ["required", "optional", "not_applicable"]},
+          "stream_family": {"type": "string"},
+          "audit": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "adapters": {"type": "array", "items": {"type": "object"}},
+    "assets": {"type": "array", "items": {"type": "object"}},
+    "harness_targets": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

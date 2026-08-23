@@ -1,0 +1,24 @@
+{
+  "schema": "duo.projection-stamp/v1",
+  "product_version": "0.1.0",
+  "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "projection_format": "1",
+  "target": {
+    "harness": "codex",
+    "tested_version_range": ">=0.147.0 <0.148.0"
+  },
+  "installation_id": "ins_fixture_1",
+  "generated_at": "2026-08-13T12:00:00Z",
+  "source_assets": [
+    {
+      "path": "skills/duo/SKILL.md.tmpl",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "files": [
+    {
+      "path": "skills/duo/SKILL.md",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+}

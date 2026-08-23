@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:projection-stamp:v1",
+  "title": "Duo generated projection stamp v1",
+  "type": "object",
+  "required": ["schema", "product_version", "manifest_digest", "projection_format", "target", "installation_id", "generated_at", "source_assets", "files"],
+  "properties": {
+    "schema": {"const": "duo.projection-stamp/v1"},
+    "product_version": {"type": "string", "minLength": 1},
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "projection_format": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "required": ["harness", "tested_version_range"],
+      "properties": {
+        "harness": {"enum": ["claude_code", "codex", "opencode", "pi"]},
+        "tested_version_range": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "installation_id": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_assets": {"$ref": "#/$defs/digested_paths"},
+    "files": {"$ref": "#/$defs/digested_paths"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digested_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "digest"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

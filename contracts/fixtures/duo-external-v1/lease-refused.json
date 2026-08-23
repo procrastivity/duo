@@ -1,0 +1,17 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_lease_refused",
+  "operation": "prompt.lease.acquire",
+  "error": {
+    "class": "unsupported",
+    "code": "lease.unsupported_topology",
+    "message": "The host cannot verify the no-human-writer precondition.",
+    "target": {"kind": "session", "id": "ses_fixture_1"},
+    "retry": {"safe": true, "action": "use_manual_release"},
+    "effect": "no_effect",
+    "details": {
+      "human_writer_evidence_grade": "turn_derived",
+      "constraint": "writer_presence_unverified"
+    }
+  }
+}

@@ -1,0 +1,423 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:external:v1",
+  "title": "Duo external v1 core wire document",
+  "oneOf": [
+    {"$ref": "#/$defs/success"},
+    {"$ref": "#/$defs/failure"},
+    {"$ref": "#/$defs/stream_item"}
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": ["stream", "kind"],
+        "properties": {
+          "stream": {"const": "session.condition"},
+          "kind": {"const": "view.changed"}
+        }
+      },
+      "then": {
+        "properties": {"data": {"$ref": "#/$defs/condition_view_data"}}
+      }
+    },
+    {
+      "if": {
+        "required": ["stream"],
+        "properties": {"stream": {"const": "command.results"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "responsibility_state": {"$ref": "#/$defs/responsibility_state"},
+              "queue_policy": {"$ref": "#/$defs/queue_policy"},
+              "effect": {"$ref": "#/$defs/effect"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["stream"],
+        "properties": {"stream": {"const": "usage"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {"freshness": {"$ref": "#/$defs/freshness"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["stream"],
+        "properties": {"stream": {"const": "session.runtime_configuration"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "revision": {"$ref": "#/$defs/decimal"},
+              "selected": {"$ref": "#/$defs/model_identity"},
+              "effective": {"$ref": "#/$defs/model_identity"},
+              "selected_working_mode": {"$ref": "#/$defs/working_mode"},
+              "effective_working_mode": {"$ref": "#/$defs/working_mode"},
+              "source_record": {"$ref": "#/$defs/target"},
+              "freshness": {"$ref": "#/$defs/freshness"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["operation", "result"],
+        "properties": {"operation": {"const": "session.inspect"}}
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "lifecycle": {"$ref": "#/$defs/lifecycle"},
+              "condition": {"$ref": "#/$defs/condition_view_data"},
+              "runtime_configuration": {"$ref": "#/$defs/runtime_configuration_view"},
+              "operations": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/support_view"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["operation", "result"],
+        "properties": {
+          "operation": {"enum": ["prompt.deliver", "command.inspect"]}
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "responsibility_state": {"$ref": "#/$defs/responsibility_state"},
+              "queue_policy": {"$ref": "#/$defs/queue_policy"},
+              "effect": {"$ref": "#/$defs/effect"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["operation", "result"],
+        "properties": {
+          "operation": {
+            "enum": [
+              "prompt.lease.acquire",
+              "prompt.lease.renew",
+              "prompt.lease.release",
+              "prompt.lease.inspect"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {"state": {"$ref": "#/$defs/lease_state"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["operation", "result"],
+        "properties": {"operation": {"const": "session.launch"}}
+      },
+      "then": {
+        "properties": {"result": {"$ref": "#/$defs/launch_resolution_report"}}
+      }
+    }
+  ],
+  "$defs": {
+    "schema": {"const": "duo.external/v1"},
+    "opaque_id": {"type": "string", "minLength": 1},
+    "decimal": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "effect": {"enum": ["no_effect", "unknown_effect"]},
+    "condition_value": {"enum": ["idle", "working", "blocked", "done", "exited", "unknown"]},
+    "confidence": {"enum": ["reported", "inferred", "heuristic", "unknown"]},
+    "freshness": {"enum": ["fresh", "stale", "expired", "unknown"]},
+    "responsibility_state": {"enum": ["accepted", "queued", "attempting", "delivered", "expired", "canceled", "failed"]},
+    "queue_policy": {"enum": ["require_ready", "queue_until_safe", "hold_for_release"]},
+    "availability": {"enum": ["available", "temporarily_unavailable", "unsupported"]},
+    "quality": {"enum": ["exact", "degraded", "heuristic"]},
+    "realization": {"enum": ["native", "adapted", "synthesized"]},
+    "terminal_fidelity": {"enum": ["incremental", "repaint_only", "snapshot_only", "absent"]},
+    "lifecycle": {"enum": ["active", "archived", "removed"]},
+    "collaboration_kind": {"enum": ["shared_value", "shared_document", "inbox", "timer", "subscription"]},
+    "lease_state": {"enum": ["active", "released", "expired", "revoked", "void"]},
+    "launch_constraint_axis": {"enum": ["agent_runtime", "model_line"]},
+    "launch_constraint_predicate": {
+      "type": "object",
+      "required": ["axis", "value"],
+      "properties": {
+        "axis": {"$ref": "#/$defs/launch_constraint_axis"},
+        "value": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "launch_resolution_leaf": {
+      "type": "object",
+      "required": ["name", "agent_runtime", "model_line", "declared_kind", "outcome", "relented_avoids"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "agent_runtime": {"type": "string", "minLength": 1},
+        "model_line": {"type": "string", "minLength": 1},
+        "declared_kind": {"enum": ["determined", "open"]},
+        "outcome": {"enum": ["selected"]},
+        "relented_avoids": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/launch_constraint_predicate"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "launch_resolution_report": {
+      "type": "object",
+      "required": ["selection", "leaves"],
+      "properties": {
+        "session_id": {"$ref": "#/$defs/opaque_id"},
+        "launch_resolution_id": {"$ref": "#/$defs/opaque_id"},
+        "selection": {"enum": ["ordered", "random"]},
+        "leaves": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/launch_resolution_leaf"}
+        }
+      },
+      "additionalProperties": true
+    },
+    "human_writer_evidence_grade": {"enum": ["attributed", "writer_presence", "turn_derived", "none"]},
+    "condition_view_data": {
+      "type": "object",
+      "properties": {
+        "value": {"$ref": "#/$defs/condition_value"},
+        "confidence": {"$ref": "#/$defs/confidence"},
+        "freshness": {"$ref": "#/$defs/freshness"}
+      }
+    },
+    "model_identity": {
+      "type": "object",
+      "properties": {
+        "source_provider_key": {"type": "string", "minLength": 1},
+        "source_model_key": {"type": "string", "minLength": 1},
+        "vendor_key": {"type": "string"},
+        "source_display_name": {"type": "string"},
+        "normalized_family": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "mapping_version": {"type": "string"},
+            "evidence": {"type": "string"}
+          },
+          "additionalProperties": true
+        },
+        "context_limit": {"type": "integer", "minimum": 0},
+        "execution_modifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_key": {"type": "string", "minLength": 1},
+              "source_value": {},
+              "normalized_meaning": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "source_effort": {"type": "string"},
+        "normalized_effort": {
+          "type": "object",
+          "properties": {
+            "level": {"type": "string"},
+            "vocabulary_version": {"type": "string"},
+            "unknown_behavior": {"type": "string"}
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "runtime_configuration_view": {
+      "type": "object",
+      "properties": {
+        "session_id": {"$ref": "#/$defs/opaque_id"},
+        "runtime_instance_id": {"$ref": "#/$defs/opaque_id"},
+        "revision": {"$ref": "#/$defs/decimal"},
+        "confidence": {"$ref": "#/$defs/confidence"},
+        "freshness": {"$ref": "#/$defs/freshness"},
+        "effective_at": {"$ref": "#/$defs/timestamp"},
+        "computed_at": {"$ref": "#/$defs/timestamp"},
+        "determining_observations": {"type": "array", "items": {"$ref": "#/$defs/opaque_id"}},
+        "selected": {"$ref": "#/$defs/model_identity"},
+        "selected_working_mode": {"$ref": "#/$defs/working_mode"},
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {"field": {"type": "string"}, "reason": {"type": "string"}}
+          }
+        },
+        "reasons": {"type": "array"}
+      },
+      "additionalProperties": true
+    },
+    "working_mode": {
+      "type": "object",
+      "properties": {
+        "source_key": {"type": "string", "minLength": 1},
+        "source_value": {"type": "string"},
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_key": {"type": "string", "minLength": 1},
+              "source_value": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "normalized_class": {
+          "type": "object",
+          "properties": {
+            "class": {"type": "string"},
+            "vocabulary_version": {"type": "string"},
+            "evidence": {"type": "string"}
+          },
+          "additionalProperties": true
+        },
+        "source_display_name": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "effective_configuration_record": {
+      "type": "object",
+      "properties": {
+        "effective": {"$ref": "#/$defs/model_identity"},
+        "source_record": {"$ref": "#/$defs/target"},
+        "observed_at": {"$ref": "#/$defs/timestamp"},
+        "freshness": {"$ref": "#/$defs/freshness"}
+      },
+      "additionalProperties": true
+    },
+    "support_view": {
+      "type": "object",
+      "properties": {
+        "availability": {"$ref": "#/$defs/availability"},
+        "quality": {"$ref": "#/$defs/quality"},
+        "realization": {"$ref": "#/$defs/realization"},
+        "terminal_fidelity": {"$ref": "#/$defs/terminal_fidelity"}
+      }
+    },
+    "retry": {
+      "type": "object",
+      "required": ["safe", "action"],
+      "properties": {
+        "safe": {"type": "boolean"},
+        "action": {"type": "string", "minLength": 1},
+        "after_ms": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "target": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/opaque_id"}
+      },
+      "additionalProperties": true
+    },
+    "error": {
+      "type": "object",
+      "required": ["class", "code", "message", "retry", "effect"],
+      "properties": {
+        "class": {
+          "enum": [
+            "invalid",
+            "not_found",
+            "conflict",
+            "unsupported",
+            "unavailable",
+            "degraded",
+            "unauthorized",
+            "disconnected",
+            "timeout",
+            "indeterminate",
+            "internal"
+          ]
+        },
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+        "message": {"type": "string", "minLength": 1},
+        "target": {"$ref": "#/$defs/target"},
+        "retry": {"$ref": "#/$defs/retry"},
+        "effect": {"$ref": "#/$defs/effect"},
+        "details": {"type": "object"},
+        "diagnostics": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "success": {
+      "type": "object",
+      "required": ["schema", "request_id", "operation", "result"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/schema"},
+        "request_id": {"$ref": "#/$defs/opaque_id"},
+        "operation": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+        "result": {"type": "object"},
+        "warnings": {"type": "array", "items": {"type": "object"}},
+        "features": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      },
+      "additionalProperties": true
+    },
+    "failure": {
+      "type": "object",
+      "required": ["schema", "request_id", "operation", "error"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/schema"},
+        "request_id": {"$ref": "#/$defs/opaque_id"},
+        "operation": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+        "error": {"$ref": "#/$defs/error"}
+      },
+      "additionalProperties": true
+    },
+    "stream_item": {
+      "type": "object",
+      "required": ["schema", "stream", "scope", "item_id", "position", "recorded_at", "kind", "subject", "data"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/schema"},
+        "stream": {"type": "string", "minLength": 1},
+        "scope": {"type": "object", "minProperties": 1},
+        "item_id": {"$ref": "#/$defs/opaque_id"},
+        "position": {"$ref": "#/$defs/decimal"},
+        "recorded_at": {"$ref": "#/$defs/timestamp"},
+        "kind": {"type": "string", "minLength": 1},
+        "subject": {"$ref": "#/$defs/target"},
+        "data": {}
+      },
+      "additionalProperties": true
+    }
+  }
+}

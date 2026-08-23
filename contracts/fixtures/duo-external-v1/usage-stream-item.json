@@ -1,0 +1,27 @@
+{
+  "schema": "duo.external/v1",
+  "stream": "usage",
+  "scope": {
+    "session_id": "ses_fixture_1",
+    "runtime_instance_id": "run_fixture_1",
+    "measurement_scope": "service_window"
+  },
+  "item_id": "sti_fixture_usage_1",
+  "position": "12",
+  "recorded_at": "2026-08-13T12:02:00Z",
+  "kind": "sample.recorded",
+  "subject": {"kind": "usage_view", "id": "ses_fixture_1"},
+  "data": {
+    "source": "runtime_statusline",
+    "measurement_scope": "service_window",
+    "freshness": "fresh",
+    "observed_at": "2026-08-13T12:01:58Z",
+    "window": {"used_percent": 41, "resets_at": "2026-08-13T16:00:00Z"},
+    "gaps": [
+      {
+        "measurement_scope": "account_aggregate",
+        "reason": "no_local_source"
+      }
+    ]
+  }
+}

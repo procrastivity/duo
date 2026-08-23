@@ -1,0 +1,30 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_list",
+  "operation": "session.list",
+  "result": {
+    "items": [
+      {
+        "session_id": "ses_fixture_1",
+        "workspace_id": "wsp_fixture_1",
+        "lifecycle": "active",
+        "runtime_instance_id": "run_fixture_1",
+        "condition": {
+          "value": "idle",
+          "revision": "7",
+          "confidence": "reported",
+          "freshness": "fresh"
+        },
+        "links": {
+          "self": "duo://local/sessions/ses_fixture_1",
+          "conversation": "duo://local/sessions/ses_fixture_1/conversation",
+          "support": "duo://local/sessions/ses_fixture_1/operations"
+        }
+      }
+    ],
+    "next_page": null,
+    "barrier": null
+  },
+  "warnings": [],
+  "features": []
+}

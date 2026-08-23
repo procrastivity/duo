@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# contrib/sync-contracts — pull the external contract set from the planning
+# repo into contracts/, with provenance.
+#
+# Copies:
+#   $SRC/schemas/*.schema.json            -> contracts/schemas/
+#   $SRC/fixtures/duo-external-v1/        -> contracts/fixtures/duo-external-v1/
+#
+# and writes contracts/SOURCE: the source repo's git HEAD SHA plus one
+# "sha256  path" line per copied file, sorted, so the output is
+# deterministic and a re-run over an unchanged source is a no-op
+# (git diff --exit-code contracts/ stays clean).
+#
+# The source checkout defaults to ~/Code/terminal-multiplexers; override
+# with DUO_CONTRACTS_SRC.
+set -euo pipefail
+
+src="${DUO_CONTRACTS_SRC:-$HOME/Code/terminal-multiplexers}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+dst="$repo_root/contracts"
+
+if [[ ! -d "$src/schemas" || ! -d "$src/fixtures/duo-external-v1" ]]; then
+	echo "sync-contracts: source $src has no schemas/ + fixtures/duo-external-v1/ — set DUO_CONTRACTS_SRC" >&2
+	exit 1
+fi
+
+src_sha="$(git -C "$src" rev-parse HEAD)"
+
+# Replace, don't overlay: a file deleted at the source must not linger here.
+rm -rf "$dst/schemas" "$dst/fixtures/duo-external-v1"
+mkdir -p "$dst/schemas" "$dst/fixtures/duo-external-v1"
+
+for f in "$src"/schemas/*.schema.json; do
+	cp "$f" "$dst/schemas/"
+done
+cp -R "$src/fixtures/duo-external-v1/." "$dst/fixtures/duo-external-v1/"
+
+{
+	echo "# contracts/SOURCE — written by contrib/sync-contracts; do not edit."
+	echo "source-sha: $src_sha"
+	(
+		cd "$dst"
+		find schemas fixtures -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+	)
+} > "$dst/SOURCE"
+
+count="$(($(wc -l < "$dst/SOURCE") - 2))"
+echo "sync-contracts: $count files from $src @ ${src_sha:0:12} -> contracts/"

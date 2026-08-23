@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:projection-conformance:v1",
+  "title": "Duo cross-projection conformance cases v1",
+  "type": "object",
+  "required": ["schema", "cases"],
+  "properties": {
+    "schema": {"const": "duo.projection-conformance/v1"},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "semantic", "cli", "mcp", "presentation"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "semantic": {
+            "type": "object",
+            "required": ["operation", "input"],
+            "properties": {
+              "operation": {"type": "string", "minLength": 1},
+              "input": {"type": "object"}
+            },
+            "additionalProperties": false
+          },
+          "cli": {
+            "type": "object",
+            "required": ["arguments"],
+            "properties": {
+              "arguments": {"type": "array", "items": {"type": "string"}}
+            },
+            "additionalProperties": false
+          },
+          "mcp": {
+            "type": "object",
+            "required": ["tool", "arguments"],
+            "properties": {
+              "tool": {"type": "string", "minLength": 1},
+              "arguments": {"type": "object"}
+            },
+            "additionalProperties": false
+          },
+          "presentation": {
+            "type": "object",
+            "required": ["method", "path"],
+            "properties": {
+              "method": {"enum": ["GET", "POST"]},
+              "path": {"type": "string", "pattern": "^/v1/"},
+              "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+              "body": {"type": "object"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

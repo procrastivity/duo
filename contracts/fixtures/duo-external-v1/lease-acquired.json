@@ -1,0 +1,17 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_lease_acquire",
+  "operation": "prompt.lease.acquire",
+  "result": {
+    "lease_id": "lea_fixture_1",
+    "session_id": "ses_fixture_2",
+    "runtime_instance_id": "run_fixture_2",
+    "holder_subject_id": "sub_fixture_1",
+    "state": "active",
+    "acquired_at": "2026-08-13T12:00:00Z",
+    "expires_at": "2026-08-13T12:05:00Z",
+    "precondition": "tmux_zero_attached_clients"
+  },
+  "warnings": [],
+  "features": []
+}
