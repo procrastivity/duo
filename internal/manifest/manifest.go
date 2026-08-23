@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/procrastivity/duo/internal/buildinfo"
+	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
@@ -59,11 +60,15 @@ type Asset struct {
 }
 
 // Manifest is the flat object a future `duo manifest --json` emits.
+// Operations comes straight from internal/registry — the binary's one
+// operation table — the same way Verbs comes straight from the built root
+// command: the manifest holds no second copy of either registration.
 type Manifest struct {
-	Tool          Tool    `json:"tool"`
-	SchemaVersion int     `json:"schemaVersion"`
-	Verbs         []Verb  `json:"verbs"`
-	Assets        []Asset `json:"assets"`
+	Tool          Tool                         `json:"tool"`
+	SchemaVersion int                          `json:"schemaVersion"`
+	Verbs         []Verb                       `json:"verbs"`
+	Operations    []registry.ManifestOperation `json:"operations"`
+	Assets        []Asset                      `json:"assets"`
 }
 
 // Build walks root's registered command tree (the chassis's single
@@ -91,6 +96,7 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 		},
 		SchemaVersion: SchemaVersion,
 		Verbs:         verbs,
+		Operations:    registry.ManifestOperations(),
 		Assets:        assets,
 	}, nil
 }
