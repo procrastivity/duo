@@ -369,3 +369,213 @@ package's `Probe` to launch the binary.
   18 spec; `Correlate` is built to accept a claim that already carries
   hook-reported identity, not to produce the hook configuration that
   reports it.
+
+## Pi runtime adapter (`internal/runtime/pi`, Step 19)
+
+Normative sources: terminal-multiplexers `notes/18-opencode-pi-refresh.md`
+(the P6-Pi probe), `review/05-close-report.md` (the re-pin and the
+refinements), `notes/07-pi.md` including its 2026-08-23 amendments, and the
+ported parser in `apps/transcript-tail/adapter_pi.go`. Scope matches the
+package's own Stage-1 cut: `RuntimeCorrelator` and `ConversationProvider`
+only, plus a §5.1 factory. Version pin: pi **0.83.0**, the version every
+piece of evidence below was gathered at.
+
+### Branch: build the in-process extension, not the filesystem-skill fallback
+
+Fixed by the P6 verdict — the probe built the extension and proved it, so
+the fallback is not a live option here. The consequence for this package is
+that correlation evidence originates *inside* the agent process
+(`ctx.sessionManager.getSessionId()` / `.getSessionFile()`, `ctx.cwd`),
+which is the only channel on Pi that can produce a session id nobody had to
+guess from the filesystem. The generated extension is a harness component,
+not part of the Go authority (conformance §7.4): its failure removes its own
+paths and nothing else, which is why `Correlate` still has a credential-less
+fallback grade and `ReadConversation` works without it entirely.
+
+### The asset is guarded by string assertions, on purpose
+
+`extension/duo-pi-reporter.ts` is embedded source Duo generates and never
+executes, so no Go test can exercise its behavior. Three of its lines encode
+findings that each cost a live probe session, and each is one plausible edit
+away from a silently wrong reporter, so `extension_test.go` asserts them as
+text:
+
+- **`ctx.mode === "tui"`, never `ctx.hasUI`.** At 0.83.0 rpc mode installs a
+  real extension UI context, so `ctx.hasUI` is true there too; a hasUI gate
+  lets an rpc-driven pi present itself as the pane's session. The test allows
+  `ctx.hasUI` only on the line that reports it as a diagnostic field, and in
+  comments. The check is deliberately duplicated Duo-side in
+  `ReportedClaim.Validate`, which refuses a non-`tui` claim: the extension
+  file lives on the user's disk and can be edited, and a future rpc-driven
+  launch variant should have to widen the gate deliberately, in both places.
+- **`session_shutdown` is terminal only on `reason === "quit"`.** `/reload`,
+  `/new`, `/resume`, and `/fork` tear down and rebind the extension runtime
+  while the agent process lives on.
+- **`agent_settled`, never `agent_end`.** After `agent_end` pi may still
+  auto-retry, auto-compact, or run a queued follow-up. Stage 1 only stamps
+  `lastSettledAt` on the claim record from that event; condition observation
+  is Stage 2, and subscribing to `agent_end` at all is a test failure.
+
+Two more asset rules are guarded the same way: the `session_start` dedupe (an
+rpc rebind emits `session_start` twice in the same millisecond) and the
+absence of any prompt-delivery call. A separate test extracts the key set
+from the asset's `JSON.stringify` literal and compares it to
+`ReportedClaim`'s JSON tags, because those two are one wire contract and the
+decoder is strict (`DisallowUnknownFields`) — a field added on one side alone
+must fail loudly rather than silently drop.
+
+### Credential: environment at module load, then scrubbed
+
+The verified shape (notes/18 §6). The spawn builder adds two variables
+(`ReporterEnvironment`); the extension reads both at module load — before any
+turn can run — holds them in module scope, and deletes them from
+`process.env`. What that buys is exact and worth stating: no tool subprocess
+pi spawns inherits the token. What it does not buy: the token authenticates
+the *process*, not the extension; any code in that process can read it. The
+scrub is guarded by an ordering test (read before delete, both before the
+default export, and no `process.env` access inside any handler).
+
+`ValidateSocketPath` enforces the 108-byte `sun_path` limit at
+path-construction time. That is a live failure mode, not hygiene: the probe's
+first `listen` died with `EINVAL` on a long scratchpad path, where the error
+is least legible.
+
+### Correlate: two grades, and a deliberate divergence from the Claude adapter
+
+`ConfidenceExtensionExact` when the claim presents the credential issued to
+this instance; `ConfidenceTranscriptHeuristic` when no credential was issued
+at all (a pi Duo did not spawn) and the session id is taken at face value
+from the transcript channel. No claim without an `ExternalAgentSessionID`
+ever binds — checked first, so §5.3's "a transcript path or working directory
+cannot bind a runtime instance" cannot be routed around. On Pi that rule has
+teeth beyond the contract's letter: the cwd slug that names a transcript
+directory is shared by every session ever run in that directory *and* is
+lossy (a `-` in the cwd is indistinguishable from a separator), so a
+path-or-cwd binding would be wrong in ordinary use, not just in principle.
+
+**Divergence, flagged for the contract owner.** A `ReporterCredential` that
+is present but wrong is `Bound: false` here, where `internal/runtime/claude`
+raises an error for the same input. The reasoning here: the adapter did
+attempt the claim and reached a verdict — "these identifiers do not resolve
+to *this* instance" — which is what `Bound: false` documents, while §5.3
+reserves the error channel for a claim that cannot be attempted at all. Both
+readings are defensible and the two adapters should not stay split; this is a
+conformance question to pin, not a difference either adapter should resolve
+unilaterally inside the other's package.
+
+A claim whose transcript path names a different session id than the claim
+itself is contradictory evidence and does not bind, whatever the credential
+says.
+
+### TranscriptID is the transcript's absolute path, and may legitimately be empty
+
+§5.3 fixes no `TranscriptID` shape. On Pi the path *is* the transcript's
+identity: there is no transcript id anywhere else, and the file name's second
+component is the session id. Unlike the Claude adapter, this one also
+resolves a path from a bare session id — `<sessions-root>/<cwd-slug>/*_<id>.jsonl`,
+narrowed by the slug when a cwd is known and swept across the tree when it is
+not, refusing on more than one match. That is safe here only because the
+resolution is verifiable: `ReadConversation` re-reads the header line of
+every file it opens and refuses one whose `id` is not the session it was
+asked for. The slug is a lookup hint; the header is the proof.
+
+A bound correlation with an empty `TranscriptID` is a valid result: `pi
+--no-session` writes no transcript at all, and a just-started session may not
+have one yet. Binding is about identity; a missing transcript becomes an
+error only when someone tries to read it.
+
+### ConversationTurn: one turn per message entry that has text
+
+The projection rule is one turn per pi `message` entry with text content,
+with pi's own role as the turn's role (`user`, `assistant`, `toolResult`) —
+no Duo-side role vocabulary is invented, because §5.3 fixes none and a second
+unpinned vocabulary is a second thing to keep in sync. Two block kinds are
+dropped: `thinking`, because `ConversationTurn` has no content-kind
+discriminator and emitting reasoning as `Text` would present it as something
+the agent said; and `toolCall`, which carries a tool name and arguments and
+no text at all. Multiple `text` blocks in one entry are joined rather than
+split into turns, since they share one entry id and one timestamp.
+
+This diverges from `internal/runtime/claude`, which drops tool results
+entirely. The difference is format-driven rather than a disagreement:
+Claude's `tool_result` is a content block *inside a user message*, so
+projecting it would label tool output as the user speaking, while Pi's
+`toolResult` is a top-level message role that can be labeled correctly. The
+ported `adapter_pi.go` also surfaces tool results (as their own event kind),
+so keeping them is the smaller departure from the prior art. Flagged for the
+same conformance pass as the credential divergence above.
+
+**Missing field, reported not added.** Both drops exist because
+`ConversationTurn` has no content-kind discriminator. That is a shared
+contract shape (`internal/runtime/runtime.go`), which this step does not own
+and did not edit; the observation is recorded here for whichever step owns
+the eventual `conversation.subscribe` schema.
+
+### Cursor is a line count, and every read rescans
+
+`After` is an opaque decimal count of transcript lines. Pi appends — `pi -c`
+resumes into the *same* file with no new header — so a line count stays valid
+across a resume, which the `basic-with-resume` fixture pins. A fork is a
+different file with a different session id into which pi *copies* the
+parent's entries with their original entry ids, so reading a forked
+transcript returns the inherited history too (pinned by the `forked`
+fixture); the parent's session id will not open the child's file, because the
+header check refuses it.
+
+`ReadConversation` re-parses the whole file on every call, like the fake and
+like the Claude adapter. Recorded as a known Stage-1 cost: a live tail is a
+Stage 2 concern that belongs with the streaming contract that would justify
+it.
+
+### Unsupported at 0.83.0, recorded rather than worked around
+
+- **Blocked condition evidence is structurally absent.** Pi has no permission
+  system and emits no blocked-family event; the only channel is the
+  cooperative `herdr:blocked` EventBus convention, and the 2026-08-23 sweep
+  found one listener and zero emitters, with nothing in the pi dist. A
+  reporter cannot lift evidence that is not produced, so a future
+  `ConditionProvider` must degrade this facet explicitly. This is a stronger
+  statement than "ungraded": the evidence does not exist to grade.
+- **Working mode is unsupported.** Pi has no built-in working-mode concept.
+  Its `--mode` flag is an execution surface (`tui`/`rpc`/`json`/`print`) —
+  the same value this package gates the pane session on — and plan behavior
+  is extension-only. A future `RuntimeConfigurationProvider` must report the
+  facet unsupported rather than map `--mode` onto it, which would conflate
+  two namespaces the conformance record keeps separate.
+
+Both are also stated in the package doc comment, so a reader of the code
+meets the constraint without finding this file.
+
+### Native prompt delivery: proven, documented, not implemented
+
+The probe proved that this same extension shape delivers text as a real user
+turn labelled `input.source: "extension"` — native provenance the PTY channel
+cannot produce — and interrupts a running tool call over the same socket.
+That is Duo's Stage 2+ prompt surface. The asset documents the capability in
+a comment and `TestExtensionHasNoPromptDeliveryCall` fails if a delivery call
+appears in it. Note for whoever implements it: the transcript records an
+injected turn as an ordinary `user` entry (the `injected-abort` fixture is
+exactly that session), so provenance lives on the event channel only — the
+conversation channel cannot tell an injected turn from a typed one.
+
+### Fixture provenance
+
+Recorded per file in `internal/runtime/pi/testdata/README.md`. Two
+transcripts are the research repo's pinned 0.83.0 fixtures, unmodified,
+re-verified against 0.83.0 on 2026-08-23. The third is new here: the actual
+P6-Pi probe session that notes/18 §2 and §5 quote by id, which carries the
+natively injected turn, an abort, and the zero-content aborted assistant
+entry in one file. `reported-claim-tui.json` is the one constructed artifact
+— probe-recorded field *values*, but this package's own wire framing, since
+`duo.pi.reporter/v1` did not exist when the probe ran. It says so in its own
+provenance note rather than presenting as captured evidence.
+
+### Probe asks the binary, and claims nothing about the format
+
+`Factory.Probe` runs `pi --version` and reports `supported` only for the
+pinned 0.83.0, `unverified` for any other version (the format may well be
+unchanged — but nothing here has been checked against it), and `unavailable`
+when the binary is absent. It does not read a transcript, so it never claims
+to have *observed* the on-disk format: `ProtocolOrFormatIdentity` names the
+format this build parses, and every `ReadConversation` re-verifies the actual
+header, including the schema version, on the file it opens.
