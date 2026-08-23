@@ -1,0 +1,59 @@
+# Release for duo. Pushing an annotated `vX.Y.Z` tag is the only human
+# action; this workflow derives everything else. CHANGELOG.md is generated
+# here per release and never committed, so nothing in the repo can disagree
+# with the tag it was built from.
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history and tags, both load-bearing: git-cliff walks the commit
+      # graph to build the changelog, and the Makefile's `git describe`
+      # stamps the version from the tag.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      # A tag can be pushed at a commit that never went through CI, so gate
+      # the release on the same lint+test the branch workflow runs.
+      - name: check
+        run: nix develop --command make check
+
+      - name: cross-compile
+        run: nix develop --command make cross-compile
+
+      - name: changelog
+        run: |
+          nix develop --command make changelog
+          nix develop --command make release-notes TAG=${{ github.ref_name }}
+
+      # Attached alongside the binaries so a curl-fetched binary can be
+      # verified without trusting the transport.
+      - name: checksums
+        working-directory: dist
+        run: sha256sum duo-darwin-arm64 duo-linux-amd64 > SHA256SUMS
+
+      # Assets are named explicitly, never globbed: dist/ also holds
+      # RELEASE_NOTES.md, which is the body and not an asset.
+      - name: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file dist/RELEASE_NOTES.md \
+            dist/duo-darwin-arm64 \
+            dist/duo-linux-amd64 \
+            dist/SHA256SUMS \
+            dist/CHANGELOG.md

@@ -1,0 +1,59 @@
+# CI for duo.
+#
+# Releasing lives in release.yml, on its own tag trigger — this workflow
+# never publishes. Keeping the two apart is what lets the release gate on
+# `make check` without either workflow having to know the other's schedule.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - run: nix develop --command make lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - run: nix develop --command make test
+
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - run: nix build
+
+  # Build-only, not executed — no native darwin runner; cross-compilation
+  # means the linux runner is sufficient.
+  cross-compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - { os: darwin, arch: arm64 }
+          - { os: linux, arch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - name: build ${{ matrix.target.os }}/${{ matrix.target.arch }}
+        run: |
+          nix develop --command env \
+            CGO_ENABLED=0 GOOS=${{ matrix.target.os }} GOARCH=${{ matrix.target.arch }} \
+            go build -o dist/duo-${{ matrix.target.os }}-${{ matrix.target.arch }} ./cmd/duo

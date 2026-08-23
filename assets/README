@@ -1,0 +1,6 @@
+Shipped default assets for duo. Every non-.go file in this directory is
+embedded into the binary (assets.go) as the last-resort fallback of the
+asset-resolution chain (user override -> installed share tree -> embedded),
+and is copied to <prefix>/share/duo/assets by the Nix package. This README
+is itself a shipped asset and doubles as the chassis's placeholder content
+until duo earns real assets.

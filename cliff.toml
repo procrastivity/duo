@@ -1,0 +1,49 @@
+# cliff.toml — git-cliff config for duo's CHANGELOG.md.
+#
+# Adapted from wip's go-branch cliff.toml: this repo's history is
+# conventional-commits from commit one, so conventional parsing is on and
+# conventional_commits handles grouping natively.
+
+[changelog]
+header = "# Changelog\n\nAll notable changes to this project are documented here.\n\n"
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}\
+### {{ group | upper_first }}
+
+{% for commit in commits %}\
+- {{ commit.message | split(pat="\n") | first | upper_first | trim }}
+{% endfor %}
+{% endfor %}\
+"""
+footer = ""
+trim = true
+# Collapse any run of 3+ newlines to a single blank line.
+postprocessors = [{ pattern = '\n{3,}', replace = "\n\n" }]
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^docs?", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^chore", group = "Internal" },
+  { message = "^ci", group = "Internal" },
+  { message = "^build", group = "Internal" },
+  { message = "^revert", group = "Reverted" },
+  { message = ".*", group = "Other" },
+]
+filter_commits = false
+tag_pattern = "v[0-9]*"
+ignore_tags = ""
+topo_order = false
+sort_commits = "oldest"

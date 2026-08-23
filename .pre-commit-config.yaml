@@ -1,0 +1,42 @@
+# .pre-commit-config.yaml — fast per-commit gates.
+# Stock hygiene hooks from pre-commit-hooks, plus local hooks for the fast
+# half of `make check` (lint). The full test suite is intentionally NOT run
+# per-commit — it's slow, and "run tests before you commit" is a norm, not a
+# per-commit enforcement. Run `make test` (or `make check`) before pushing.
+#
+# A commit-msg hook enforces conventional commits from commit one.
+#
+# Bootstrap once: `make hooks` (runs `pre-commit install`). This only
+# installs the pre-commit stage by default; the commit-msg hook also needs
+# `pre-commit install --hook-type commit-msg` (run once, alongside `make
+# hooks`). Run on demand: `pre-commit run --all-files`.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+
+  - repo: local
+    hooks:
+      - id: gofumpt
+        name: gofumpt -l
+        entry: contrib/check-gofumpt
+        language: system
+        files: '\.go$'
+
+      - id: golangci-lint
+        name: golangci-lint run
+        entry: golangci-lint run
+        language: system
+        pass_filenames: false
+        files: '\.go$'
+
+      - id: conventional-commit-msg
+        name: conventional commit message
+        entry: contrib/check-commit-msg
+        language: system
+        stages: [commit-msg]

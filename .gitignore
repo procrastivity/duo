@@ -1,0 +1,13 @@
+# Private, uncommitted project instructions
+/CLAUDE.local.md
+
+# Build artifacts
+/bin/
+/dist/
+
+# Nix
+/result
+/result-*
+.direnv/
+
+.DS_Store

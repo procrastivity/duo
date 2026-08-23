@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - unused
+    - revive
+    - forbidigo
+  settings:
+    forbidigo:
+      forbid:
+        # stdout/stderr discipline: every verb receives a writer pair at
+        # construction and writes through it — never straight to
+        # os.Stdout/os.Stderr via the fmt shorthands. Fprint* variants
+        # (which take an explicit writer) are unaffected.
+        - pattern: 'fmt\.Print\('
+          msg: "write through the verb's iostreams.Streams writer pair (fmt.Fprint), not fmt.Print"
+        - pattern: 'fmt\.Println\('
+          msg: "write through the verb's iostreams.Streams writer pair (fmt.Fprintln), not fmt.Println"
+        - pattern: 'fmt\.Printf\('
+          msg: "write through the verb's iostreams.Streams writer pair (fmt.Fprintf), not fmt.Printf"
+
+formatters:
+  enable:
+    - gofumpt

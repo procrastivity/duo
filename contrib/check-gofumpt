@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# contrib/check-gofumpt — pre-commit hook entry. Fails if any staged .go file
+# is not gofumpt-formatted; `gofumpt -l` alone only lists files, it doesn't
+# fail on its own.
+set -euo pipefail
+
+unformatted="$(gofumpt -l "$@")"
+if [[ -n "$unformatted" ]]; then
+	echo "not gofumpt-formatted:" >&2
+	echo "$unformatted" >&2
+	exit 1
+fi

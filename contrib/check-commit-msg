@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# contrib/check-commit-msg — pre-commit commit-msg hook entry. Rejects any
+# commit message that isn't conventional-commit shaped (enforced from commit
+# one). pre-commit passes the commit-msg file path as $1.
+set -euo pipefail
+
+msg_file="$1"
+first_line="$(head -n 1 "$msg_file")"
+
+pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_.-]+\))?!?: .+'
+
+if ! [[ "$first_line" =~ $pattern ]]; then
+	echo "commit message must be conventional-commit shaped:" >&2
+	echo "  <type>(<scope>)?: <description>" >&2
+	echo "  types: feat fix chore docs style refactor perf test build ci revert" >&2
+	echo "got: $first_line" >&2
+	exit 1
+fi

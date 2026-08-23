@@ -1,0 +1,5 @@
+# duo tool config — shipped default (tool config only, resolved
+# user-override -> shipped-default, same mechanism as any other asset).
+# No keys are owned by the chassis itself; later work adds its own tool
+# config here as it earns it.
+{}
