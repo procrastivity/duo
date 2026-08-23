@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver, registered as "sqlite"
 )
@@ -19,11 +20,8 @@ type migration struct {
 }
 
 // register is the ordered migration register, embedded in the binary. Its
-// last entry is the version a fresh store is created at. It is empty until
-// duo's first durable schema is designed — the machinery is exercised
-// against a fixture register in store_test.go, so the first real migration
-// lands as an increment, never a retrofit.
-var register = []migration{}
+// last entry is the version a fresh store is created at.
+var register = []migration{substrateV1}
 
 // latestVersion is the highest migration this binary carries.
 func latestVersion(reg []migration) int {
@@ -33,11 +31,21 @@ func latestVersion(reg []migration) int {
 	return reg[len(reg)-1].version
 }
 
-// Store is duo's store handle.
+// Store is duo's store handle. A handle from Open can only read; a handle
+// from OpenAuthority additionally holds the writer lease and can run the
+// named transaction boundaries.
 type Store struct {
 	db      *sql.DB
 	path    string
 	version int
+
+	// incarnation is non-empty only on a handle that acquired the writer
+	// lease (OpenAuthority). It stamps audit rows and work claims.
+	incarnation string
+
+	// beforeCommit, when set, runs after a boundary's body and before its
+	// commit. Test-only crash-injection hook; production never sets it.
+	beforeCommit func(op string) error
 }
 
 // Open opens the store at path, creating and migrating it if needed.
@@ -83,8 +91,26 @@ func openAt(path string, reg []migration, target int) (*Store, error) {
 // Version reports the schema version the open database is at.
 func (s *Store) Version() int { return s.version }
 
-// Close releases the underlying database handle.
-func (s *Store) Close() error { return s.db.Close() }
+// Incarnation reports the writer incarnation minted when this handle
+// acquired the lease, or "" for a read-only handle.
+func (s *Store) Incarnation() string { return s.incarnation }
+
+// Close releases the writer lease this handle holds, if any, then the
+// underlying database handle. Lease release is best-effort: a crash skips
+// it and the stale-lease rules in lease.go recover.
+func (s *Store) Close() error {
+	if s.incarnation != "" {
+		_, _ = s.db.ExecContext(context.Background(),
+			`DELETE FROM writer_lease WHERE id = 1 AND incarnation = ?`, s.incarnation)
+	}
+	return s.db.Close()
+}
+
+// timestampLayout is the store's canonical UTC timestamp: fixed-width, so
+// values sort lexically and SQL can compare them as strings.
+const timestampLayout = "2006-01-02T15:04:05.000Z"
+
+func timestamp(t time.Time) string { return t.UTC().Format(timestampLayout) }
 
 // migrate brings db up to target and returns the version reached.
 // Migrations are versioned, forward-only, numbered, and embedded in the

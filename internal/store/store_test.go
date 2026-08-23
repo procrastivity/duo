@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
-// fixtureRegister stands in for the (currently empty) real register so the
-// migrate machinery is exercised end-to-end: apply, idempotent reopen, and
+// fixtureRegister is a throwaway two-step register — the real one is a
+// single substrate migration, so it cannot exercise a multi-step upgrade.
+// It drives the migrate machinery end-to-end: apply, idempotent reopen, and
 // the forward-only downgrade refusal.
 var fixtureRegister = []migration{
 	{version: 1, name: "baseline", stmts: []string{
@@ -62,16 +63,50 @@ func TestOpenRefusesDowngrade(t *testing.T) {
 	}
 }
 
-func TestOpenFreshWithEmptyRegister(t *testing.T) {
-	// The real register is empty until duo's first schema lands; a fresh
-	// open must still succeed at v0.
+func TestOpenFreshRealRegister(t *testing.T) {
+	// A fresh open applies the real register up to its latest version.
 	path := filepath.Join(t.TempDir(), "duo.db")
 	s, err := Open(path)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	if s.Version() != 0 {
-		t.Fatalf("empty-register open reached v%d, want v0", s.Version())
+	if want := latestVersion(register); s.Version() != want {
+		t.Fatalf("fresh open reached v%d, want v%d", s.Version(), want)
 	}
 	_ = s.Close()
+}
+
+// TestStartupPragmas pins §4.1's startup requirements. They are set through
+// DSN parameters, which fail silently when mistyped or when the driver stops
+// honouring them, so assert the effective values rather than the string.
+func TestStartupPragmas(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "duo.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+
+	for _, want := range []struct{ pragma, value string }{
+		{"journal_mode", "wal"},
+		{"foreign_keys", "1"},
+		{"busy_timeout", "5000"},
+	} {
+		var got string
+		if err := s.db.QueryRowContext(ctx, "PRAGMA "+want.pragma).Scan(&got); err != nil {
+			t.Fatalf("PRAGMA %s: %v", want.pragma, err)
+		}
+		if got != want.value {
+			t.Errorf("PRAGMA %s = %q, want %q", want.pragma, got, want.value)
+		}
+	}
+
+	// foreign_keys=1 has to actually bite: the substrate's only foreign key
+	// is work_attempt.work_id, and §4.3 reconciliation reads attempt rows
+	// expecting their work item to exist.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO work_attempt (work_id, attempt, incarnation, started_at)
+		 VALUES (9999, 1, 'x', '2026-01-01T00:00:00.000Z')`); err == nil {
+		t.Fatal("attempt row referencing a missing work item was accepted, want FK refusal")
+	}
 }
