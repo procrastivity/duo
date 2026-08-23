@@ -214,7 +214,7 @@ func TestEveryDomainBoundaryIsAtomic(t *testing.T) {
 func TestFactRoundTrip(t *testing.T) {
 	original := domain.Fact{
 		ID: "fact_1", Kind: domain.FactSessionCreated, At: "2026-08-23T10:00:00.000Z",
-		Actor: "user:beau", Reason: "enroll", Evidence: "integration=herdr",
+		Actor: "user:beau", Incarnation: "9f2c1d", Reason: "enroll", Evidence: "integration=herdr",
 		Workspace: &domain.Workspace{ID: "ws_1", RootPath: "/home/dev", CreatedAt: "t"},
 		Session: &domain.Session{
 			ID: "ses_1", Workspace: "ws_1", State: domain.SessionActive, Owner: "o",
@@ -230,6 +230,15 @@ func TestFactRoundTrip(t *testing.T) {
 			ID: "att_1", Session: "ses_1", IntegrationInstance: "herdr@sock",
 			Epoch:     domain.HostEpoch{Kind: "herdr.terminal_id", Value: "term_a", Scope: domain.EpochScopePane},
 			Container: "w1:p1", State: domain.Attached,
+			Continuity: domain.ContinuityUnverified, ContinuityInstance: "ri_1",
+		},
+		Parked: &domain.ParkedReport{
+			ID: "park_1", Session: "ses_1", Instance: "ri_1", Source: domain.SourceOwner,
+			AgentSession: domain.AgentSessionRef{
+				IntegrationInstance: "claude@default", SessionID: "agent-abc",
+			},
+			Transcript: "/home/dev/.claude/t.jsonl", Evidence: "source=owner",
+			Reason: "continuity unverified", ReceivedAt: "t",
 		},
 		Correlation: &domain.Correlation{
 			ID: "corr_1", TargetKind: domain.TargetInstance, TargetID: "ri_1",
@@ -267,6 +276,8 @@ func compareFacts(want, got domain.Fact) string {
 		return "the fact envelope"
 	case want.Actor != got.Actor || want.Reason != got.Reason || want.Evidence != got.Evidence:
 		return "the attribution fields"
+	case want.Incarnation != got.Incarnation:
+		return "the authority incarnation"
 	case *want.Workspace != *got.Workspace:
 		return "the workspace"
 	case *want.Session != *got.Session:
@@ -281,6 +292,8 @@ func compareFacts(want, got domain.Fact) string {
 		return "the correlation"
 	case *want.Claim != *got.Claim:
 		return "the claim"
+	case *want.Parked != *got.Parked:
+		return "the parked report"
 	case want.WorkspaceID != got.WorkspaceID || want.SessionID != got.SessionID ||
 		want.InstanceID != got.InstanceID || want.AttachmentID != got.AttachmentID ||
 		want.ActorID != got.ActorID || want.CorrelationID != got.CorrelationID:

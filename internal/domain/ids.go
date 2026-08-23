@@ -26,6 +26,8 @@ type (
 	CorrelationID string
 	// FactID names one lifecycle fact. It is also the fact log's dedup key.
 	FactID string
+	// ParkedReportID names one report held as unresolved evidence.
+	ParkedReportID string
 )
 
 // ID prefixes. They are diagnostic sugar only: nothing parses an ID, and a
@@ -38,6 +40,7 @@ const (
 	attachmentPrefix  = "att"
 	correlationPrefix = "corr"
 	factPrefix        = "fact"
+	parkedPrefix      = "park"
 	credentialPrefix  = "duocred"
 )
 

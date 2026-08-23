@@ -65,11 +65,22 @@ func (a *Authority) ResolveRecovery(ctx context.Context, id InstanceID, ev Recov
 		return fmt.Errorf("%w: instance %s", ErrInstanceExited, id)
 	}
 
+	session, err := a.requireSession(instance.Session)
+	if err != nil {
+		return err
+	}
+
 	b := a.change(actor)
 	switch ev.Outcome {
 	case RecoverySameLive:
 		if err := a.proveContinuity(instance, ev); err != nil {
-			return err
+			// The host answered and the answer did not prove that this
+			// execution is the one Duo claimed. That is the conformance
+			// matrix's "missing identity or continuity evidence" row, not a
+			// bare refusal: record the degradation durably, then return the
+			// refusal. Nothing is resolved — the instance stays in the
+			// recovering view.
+			return a.degrade(ctx, actor, session, instance, err)
 		}
 		// Rule 1: keep the runtime-instance ID and reactivate its
 		// correlations.
@@ -81,6 +92,11 @@ func (a *Authority) ResolveRecovery(ctx context.Context, id InstanceID, ev Recov
 				})
 			}
 		}
+		// Rule 1 is also the re-proof this kernel recognizes: same host
+		// object, same process birth. A session that had degraded to
+		// unverified continuity leaves that state here and nowhere else.
+		a.markContinuity(b, session, instance.ID, ContinuityVerified,
+			"host proved the same host object and process birth")
 
 	case RecoveryExited:
 		// Rule 2: the host proves exit.
@@ -92,24 +108,45 @@ func (a *Authority) ResolveRecovery(ctx context.Context, id InstanceID, ev Recov
 		// explicit restart or resume, because pane-ID reuse is not
 		// continuity.
 		a.exitInstance(b, instance, "recovery: process birth changed behind a surviving host container")
+		a.markContinuity(b, session, instance.ID, ContinuityUnverified,
+			"process birth changed behind a surviving host container")
 
 	case RecoveryUnreachable:
 		// Rule 4: keep the reservation, report disconnected, infer nothing.
+		// Inferring nothing is not the same as carrying on: an unreachable
+		// host is precisely a host that has not proven continuity, so the
+		// attachment degrades even though the claim and the instance state
+		// stay exactly where they were.
+		a.markContinuity(b, session, instance.ID, ContinuityUnverified,
+			"host unreachable during recovery; continuity not proven")
 
 	case RecoveryConflicted:
 		// Rule 5: quarantine both claims from automatic control.
+		//
+		// Two judgments here. The quarantine is recorded per *session*
+		// rather than per claim: a claim is not a control target, and every
+		// verb §4.4 withholds ("automatic control") is addressed to a
+		// session. And no claim is released — releasing one would let the
+		// contested runtime be enrolled again, which is the automatic merge
+		// §4.2 forbids. The claims stay held and inert until an owner
+		// resolves the conflict.
 		b.fact(FactSessionQuarantined, Fact{
 			SessionID: instance.Session, State: "true",
 			Reason: "recovery found a conflicting live claim", Detail: string(ev.Conflicting),
 		})
+		a.markContinuity(b, session, instance.ID, ContinuityUnverified,
+			"a conflicting live claim contests this attachment")
 		if ev.Conflicting != "" {
-			if _, err := a.requireSession(ev.Conflicting); err != nil {
+			other, err := a.requireSession(ev.Conflicting)
+			if err != nil {
 				return err
 			}
 			b.fact(FactSessionQuarantined, Fact{
 				SessionID: ev.Conflicting, State: "true",
 				Reason: "recovery found a conflicting live claim", Detail: string(instance.Session),
 			})
+			a.markContinuity(b, other, other.Current, ContinuityUnverified,
+				"a conflicting live claim contests this attachment")
 		}
 
 	default:

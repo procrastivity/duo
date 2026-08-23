@@ -49,6 +49,12 @@ type Repo struct {
 // New returns a repository over an authority-writer store handle.
 func New(s *store.Store) *Repo { return &Repo{s: s} }
 
+// Incarnation reports the writer incarnation the store minted when this
+// handle acquired the authority lease. It satisfies domain.IncarnationReporter,
+// which is how the kernel stamps §4.4's per-restart incarnation onto every
+// fact it records.
+func (r *Repo) Incarnation() string { return r.s.Incarnation() }
+
 // Load returns every recorded fact in commit order.
 func (r *Repo) Load(ctx context.Context) ([]domain.Fact, error) {
 	var (

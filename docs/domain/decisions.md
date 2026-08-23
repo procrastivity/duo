@@ -222,3 +222,137 @@ nothing at all.
 - **No workspace tombstones.** Session removal keeps its tombstone (the
   record stays, in the `removed` state, so the ID is never reissued);
   workspace removal has no verb yet.
+
+## Step 22: authority restart, quarantine, and degraded continuity
+
+Step 22 completed §4.4. The five recovery rules and the recovering view
+already existed; what follows is what the step added and why.
+
+### The authority incarnation is stamped by the kernel, not the store
+
+§7 requires every fact to record the authority incarnation. The store mints
+one per `OpenAuthority` and stamps it on **audit rows**, but the fact log is a
+stream payload the store does not interpret, so before this step no fact
+carried it: history could not answer "which authority run recorded this",
+which is the first question §4.4 recovery raises.
+
+`Fact.Incarnation` now carries it, stamped once in `changeBuilder.fact`. The
+kernel does not mint it — it reads it back through
+`domain.IncarnationReporter`, an **optional** interface the repository may
+implement, rather than a fifth `Repository` method. Incarnation is a property
+of the durable writer: the writer lease is what actually enforces one
+authority per store, and a repository with no lease (a test double, a later
+read-through implementation) has nothing honest to report. An optional
+interface says that; a required method would force it to invent a value.
+
+### Degraded continuity is one triple, implemented as one rule
+
+§4.4 names five outcomes but leaves the consequence implicit: what may a
+session still *do* while the host has not proven that the execution behind
+its container is the one Duo claimed? The locked "Identity-evidence
+degradation" ledger row and `duo-vnext-integration-conformance.md` §10 answer
+it as a triple — mark attachment continuity unverified, park instance-scoped
+reports as unresolved evidence, disable write paths that need an exact live
+target — and `internal/domain/degraded.go` implements all three from one
+durable fact. The three cannot drift apart, because the parking check and the
+write gate both read the same `HostAttachment.Continuity`.
+
+Which outcomes degrade: `unreachable` (rule 4), `replaced` (rule 3),
+`conflicted` (rule 5), and a **refused** same-live proof. That last one is the
+step's most consequential addition: a host that answers but cannot prove
+process birth used to produce a bare error, which left no durable trace of the
+degradation. It now records the finding and still refuses, resolving nothing —
+the instance stays in the recovering view with its claim reserved.
+
+Rule 4's "does not infer exit" and this degradation are not in tension. Rule 4
+forbids inferring anything about the *runtime*; the instance state, the claim,
+and the correlations all stay exactly where they were. What degrades is Duo's
+own attachment evidence, which is a statement about what Duo knows rather than
+about what the process is doing.
+
+### Degradation is instance-scoped
+
+`Continuity` is stored on the host attachment, as §10 words it, but it names
+the runtime instance it is about (`ContinuityInstance`). That is load-bearing,
+not bookkeeping. A degraded fingerprint can never re-prove continuity: rule 1
+demands process birth, and a fingerprint that gains process birth is a
+different claim key. §6.4 already says what happens next — an explicit restart
+or resume — and a session-scoped mark would park the *new* instance's evidence
+too, leaving a host that cannot report process birth with no way back at all.
+Scoping the mark to the execution generation that lost continuity makes §6.4's
+escape hatch actually work. `TestRefusedContinuityProofDegradesTheAttachment`
+walks that whole path.
+
+A session with no host attachment (the hostless case) has no host continuity
+to lose and never enters the triple.
+
+### Parked reports are durable and inert
+
+A parked report is a `report.parked` fact carrying the whole offered payload.
+Replay puts it in a per-session list and nowhere else: no correlation, no
+claim, no binding. It keeps the scoped agent-runtime identity structurally
+because decision-02's G-03 retroactive-binding rule matches on it; everything
+else is evidence text.
+
+Two entry points park: `Bind`, and a repeat enrollment that carries
+agent-runtime evidence. `Bind` parks the **whole** request rather than only
+its agent-runtime half, because §10 also forbids keeping "a live claim on
+weaker evidence" and a bind that carried a fingerprint would do exactly that.
+Host process-lifecycle evidence (`Exit`, `MarkLive`, `ResolveRecovery`) never
+parks: that is the evidence degraded mode is waiting for, and rule 2 still
+lets a host prove exit while its continuity is unverified.
+
+Exit finality outranks parking. A report about an exited instance is recorded
+as a late report and refused, whatever the attachment's continuity says.
+
+**Not implemented, deliberately:** the retention window, the age and count
+bounds, expiry-to-a-counted-diagnostic, and retroactive binding of a parked
+report when a later enrollment matches it exactly. Decision-02 files those as
+a Stage 2 ingestion concern; this kernel owns the identity half. The backlog
+therefore stays inert after continuity is re-proven — the test asserts that
+rather than leaving it undefined.
+
+### One gate decides exact-target writes
+
+`Authority.ExactTargetWrites` is the single place that answers whether
+identity evidence permits a write to an exact live target. Its refusals are a
+closed vocabulary (`WriteRefusal`) so a caller can map one to an error code
+without matching on prose, and they are ordered broadest-first.
+
+Continuity outranks the recovering view on purpose: an unverified attachment
+is a durable finding about evidence that *was* examined, while recovering only
+means no integration has answered yet. An unreachable host leaves both true,
+and the caller deserves the finding.
+
+The gate deliberately does **not** consider a detached attachment. Detach
+disables Duo's attachment while "the external runtime can continue" (§5.2),
+and choosing a delivery path — host-mediated, agent-native, none — belongs to
+the control and delivery domain. This gate answers only the identity question.
+It does refuse a `starting` instance: §5.1's starting is "launched, not yet
+live", and an exact-target write needs the target to exist.
+
+### Quarantine: sessions, not claims, and an owner verb to leave it
+
+§4.4 rule 5 says Duo "quarantines both claims from automatic control until an
+owner resolves the conflict". The quarantine is recorded per **session**. A
+claim is not a control target; every verb the rule withholds is addressed to a
+session, and the flag has to be readable by the thing that refuses control.
+
+No claim is released. Releasing one would let the contested live runtime be
+enrolled again, which is precisely the automatic merge §4.2 forbids. The
+claims stay held and inert.
+
+"Until an owner resolves" needed a verb, so `ResolveQuarantine` exists, and
+§3.4 makes an explicit owner action its only admissible source. It lifts the
+quarantine and proves **nothing** about the runtime: the conflicted sessions
+also had their continuity marked unverified, so a resolved session still
+cannot take exact-target writes until a host proves the same live execution.
+Two independent gates, lifted by two different kinds of evidence — an owner
+decides which session survives, and only a host can prove a runtime.
+
+### What Step 22 did not need
+
+No store migration and no store change: the new facts ride the existing
+stream log, and the incarnation comes from the store's existing public
+`Incarnation()`. Nothing outside `internal/domain` and
+`internal/domain/storerepo` moved.

@@ -22,6 +22,13 @@ const (
 	// Host-attachment facts (§7 bullet 2: detach and reattach).
 	FactAttachmentCreated FactKind = "attachment.created"
 	FactAttachmentState   FactKind = "attachment.state"
+	// FactAttachmentContinuity records that the attachment's continuity to a
+	// live execution became unverified, or was proven again. It is the
+	// durable half of the degraded-continuity rule: "Mark attachment
+	// continuity unverified, park instance-scoped reports as unresolved
+	// evidence, and disable write paths that need an exact live target"
+	// (duo-vnext-integration-conformance.md §10).
+	FactAttachmentContinuity FactKind = "attachment.continuity"
 
 	// Runtime-instance facts (§7 bullet 3).
 	FactInstanceStarted     FactKind = "instance.started"
@@ -57,6 +64,12 @@ const (
 	FactCredentialIssued FactKind = "credential.issued"
 	FactLateReport       FactKind = "report.after-exit"
 	FactReportRejected   FactKind = "report.rejected"
+	// FactReportParked records an instance report that arrived while the
+	// session's attachment continuity was unverified. The report is durable
+	// evidence; it is deliberately not applied to identity state
+	// (decision-02's 2026-08-14 G-03 amendment, "parked unresolved
+	// evidence").
+	FactReportParked FactKind = "report.parked"
 )
 
 // Fact is one durable, attributable lifecycle change.
@@ -66,14 +79,24 @@ const (
 // changes one carries the target's ID and the new value. Every fact records
 // the responsible actor, the time, and a reason, per §7's "Each fact records
 // the responsible actor or subsystem, target Duo IDs, time, source evidence,
-// authority incarnation, and reason" — the authority incarnation is added by
-// the store, which is the only layer that knows it.
+// authority incarnation, and reason".
+//
+// The authority incarnation is stamped by the kernel from the writer
+// incarnation its repository reports (see IncarnationReporter). The store
+// stamps its own audit rows, but the fact log is a stream payload the store
+// does not interpret, so a fact that did not carry the incarnation could not
+// answer "which authority run recorded this" after a restart — which is
+// exactly the question §4.4 recovery raises.
 type Fact struct {
 	ID   FactID
 	Kind FactKind
 	At   string
 	// Actor is the responsible actor or subsystem.
 	Actor string
+	// Incarnation is the authority incarnation that recorded the fact. It
+	// changes on every authority restart (§4.4: "It assigns a new authority
+	// incarnation ID").
+	Incarnation string
 	// Reason is why the change happened, in one phrase.
 	Reason string
 	// Evidence is the source evidence the change rests on.
@@ -87,6 +110,7 @@ type Fact struct {
 	Attachment  *HostAttachment
 	Correlation *Correlation
 	Claim       *Claim
+	Parked      *ParkedReport
 
 	// Transition targets. A transition fact names the object it changes and
 	// the new value.

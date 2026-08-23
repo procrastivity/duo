@@ -164,6 +164,16 @@ type HostAttachment struct {
 	Epoch               HostEpoch
 	Container           string
 	State               AttachmentState
+	// Continuity records whether the attachment's link to a live execution
+	// is still proven. Empty means verified: it is the state every
+	// attachment is created in, and only a failed or impossible continuity
+	// proof moves it (see degraded.go).
+	Continuity ContinuityState
+	// ContinuityInstance names the runtime instance the unverified mark is
+	// about. Degradation belongs to one execution generation, not to the
+	// container: a later restart or resume creates a new runtime instance,
+	// whose evidence is not tainted by the old one's lost continuity.
+	ContinuityInstance InstanceID
 }
 
 // Correlation is a Duo-owned, time-bounded claim relating a Duo object to an

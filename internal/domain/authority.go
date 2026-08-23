@@ -23,6 +23,13 @@ type Authority struct {
 	repo Repository
 	now  func() time.Time
 
+	// incarnation is the authority incarnation this kernel run stamps its
+	// facts with. §4.4: a restart "assigns a new authority incarnation ID".
+	// The kernel does not mint it — the durable writer does, and the kernel
+	// reads it back through the repository seam, so one authority run and
+	// one writer lease can never disagree about which run is writing.
+	incarnation string
+
 	workspaces   map[WorkspaceID]*Workspace
 	rootIndex    map[string]WorkspaceID
 	sessions     map[SessionID]*Session
@@ -42,6 +49,11 @@ type Authority struct {
 	actorBinding map[ActorID]SessionID
 	// recovering is a startup view, never durable (§5.1).
 	recovering map[InstanceID]bool
+	// parked holds the unresolved instance reports each session collected
+	// while its attachment continuity was unverified. It is a replay of
+	// durable facts like everything else here; nothing in it has been
+	// applied to identity state.
+	parked map[SessionID][]*ParkedReport
 }
 
 // Option configures an Authority.
@@ -75,9 +87,13 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 		instanceClaims: map[InstanceID][]ClaimRef{},
 		actorBinding:   map[ActorID]SessionID{},
 		recovering:     map[InstanceID]bool{},
+		parked:         map[SessionID][]*ParkedReport{},
 	}
 	for _, opt := range opts {
 		opt(a)
+	}
+	if r, ok := repo.(IncarnationReporter); ok {
+		a.incarnation = r.Incarnation()
 	}
 
 	facts, err := repo.Load(ctx)
@@ -97,6 +113,10 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 
 // stamp returns the current domain time in the canonical layout.
 func (a *Authority) stamp() string { return a.now().UTC().Format(timestampLayout) }
+
+// Incarnation reports the authority incarnation this kernel run records its
+// facts under, or "" when the repository reports none.
+func (a *Authority) Incarnation() string { return a.incarnation }
 
 // commit runs one boundary and, only on success, folds its facts into the
 // index. The order is the whole point: a refused or crashed transaction
@@ -161,6 +181,18 @@ func (a *Authority) apply(f Fact) {
 	case FactAttachmentState:
 		if at, ok := a.attachments[f.AttachmentID]; ok {
 			at.State = AttachmentState(f.State)
+		}
+	case FactAttachmentContinuity:
+		if at, ok := a.attachments[f.AttachmentID]; ok {
+			at.Continuity = ContinuityState(f.State)
+			at.ContinuityInstance = f.InstanceID
+		}
+	case FactReportParked:
+		// A parked report is applied to nothing but the parked list. That
+		// is the whole point of the fact: durable, attributable, inert.
+		if f.Parked != nil {
+			p := *f.Parked
+			a.parked[p.Session] = append(a.parked[p.Session], &p)
 		}
 	case FactInstanceStarted:
 		if f.Instance != nil {
@@ -393,6 +425,9 @@ func (b *changeBuilder) fact(kind FactKind, f Fact) *changeBuilder {
 	f.At = b.at
 	if f.Actor == "" {
 		f.Actor = b.actor
+	}
+	if f.Incarnation == "" {
+		f.Incarnation = b.a.incarnation
 	}
 	b.facts = append(b.facts, f)
 	return b

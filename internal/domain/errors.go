@@ -37,6 +37,13 @@ var (
 	// ErrRootPathRequired reports an enrollment or launch with no workspace
 	// root path. The path is not identity, but it is the placement input.
 	ErrRootPathRequired = errors.New("domain: workspace root path is required")
+	// ErrContinuityUnverified reports a session whose host attachment
+	// continuity is not proven. Its instance reports are parked and its
+	// exact-target writes are disabled until the host proves the same live
+	// execution again (§4.4 rule 1), or until an explicit restart or resume
+	// starts a new runtime instance (§6.4). See degraded.go.
+	ErrContinuityUnverified = errors.New(
+		"domain: host attachment continuity is unverified; the report was parked and exact-target writes are disabled")
 )
 
 // ConflictError is §4.2 step 5's outcome: evidence that overlaps two Duo

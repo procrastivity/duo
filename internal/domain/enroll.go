@@ -302,6 +302,18 @@ func (a *Authority) repeatEnrollment(
 		// exit releases claims. Refuse rather than reopen it (§5.3).
 		return EnrollResult{}, fmt.Errorf("%w: instance %s", ErrInstanceExited, instance.ID)
 	}
+	if cand.AgentSession.Valid() && a.degraded(session, instance.ID) {
+		// Returning the existing session changes no identity state, so a
+		// repeat enrollment is still allowed while continuity is
+		// unverified. The agent-runtime evidence it carries is an instance
+		// report, though, and that half parks.
+		return EnrollResult{}, a.park(ctx, actor, session, ParkedReport{
+			Instance: instance.ID, Source: req.Attestation.Source,
+			AgentSession: cand.AgentSession, Transcript: cand.Transcript,
+			Evidence: describeFingerprint(cand.Fingerprint),
+			Reason:   "repeat enrollment carried agent-runtime evidence while continuity was unverified",
+		})
+	}
 
 	b := a.change(actor)
 	b.fact(FactEnrollmentRepeated, Fact{

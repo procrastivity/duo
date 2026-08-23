@@ -17,12 +17,13 @@ type wireToken struct {
 }
 
 type wireFact struct {
-	ID       string `json:"id"`
-	Kind     string `json:"kind"`
-	At       string `json:"at"`
-	Actor    string `json:"actor"`
-	Reason   string `json:"reason,omitempty"`
-	Evidence string `json:"evidence,omitempty"`
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	At          string `json:"at"`
+	Actor       string `json:"actor"`
+	Incarnation string `json:"incarnation,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Evidence    string `json:"evidence,omitempty"`
 
 	Workspace   *wireWorkspace   `json:"workspace,omitempty"`
 	Session     *wireSession     `json:"session,omitempty"`
@@ -31,6 +32,7 @@ type wireFact struct {
 	Attachment  *wireAttachment  `json:"attachment,omitempty"`
 	Correlation *wireCorrelation `json:"correlation,omitempty"`
 	Claim       *wireClaim       `json:"claim,omitempty"`
+	Parked      *wireParked      `json:"parked,omitempty"`
 
 	WorkspaceID   string `json:"workspace_id,omitempty"`
 	SessionID     string `json:"session_id,omitempty"`
@@ -85,6 +87,25 @@ type wireAttachment struct {
 	EpochScope          string `json:"epoch_scope"`
 	Container           string `json:"container"`
 	State               string `json:"state"`
+	Continuity          string `json:"continuity,omitempty"`
+	ContinuityInstance  string `json:"continuity_instance,omitempty"`
+}
+
+// wireParked is one report held as unresolved evidence. The agent-runtime
+// identity keeps its two halves separate because the retroactive-binding rule
+// (decision-02, G-03) matches on the scoped identity, not on a rendering of
+// it.
+type wireParked struct {
+	ID                       string `json:"id"`
+	Session                  string `json:"session"`
+	Instance                 string `json:"instance,omitempty"`
+	Source                   string `json:"source,omitempty"`
+	AgentIntegrationInstance string `json:"agent_integration_instance,omitempty"`
+	AgentSessionID           string `json:"agent_session_id,omitempty"`
+	Transcript               string `json:"transcript,omitempty"`
+	Evidence                 string `json:"evidence,omitempty"`
+	Reason                   string `json:"reason,omitempty"`
+	ReceivedAt               string `json:"received_at"`
 }
 
 type wireCorrelation struct {
@@ -118,6 +139,7 @@ func toWire(f domain.Fact) wireFact {
 		Kind:          string(f.Kind),
 		At:            f.At,
 		Actor:         f.Actor,
+		Incarnation:   f.Incarnation,
 		Reason:        f.Reason,
 		Evidence:      f.Evidence,
 		WorkspaceID:   string(f.WorkspaceID),
@@ -157,6 +179,18 @@ func toWire(f domain.Fact) wireFact {
 			EpochKind:           v.Epoch.Kind, EpochValue: v.Epoch.Value,
 			EpochScope: string(v.Epoch.Scope),
 			Container:  v.Container, State: string(v.State),
+			Continuity:         string(v.Continuity),
+			ContinuityInstance: string(v.ContinuityInstance),
+		}
+	}
+	if v := f.Parked; v != nil {
+		w.Parked = &wireParked{
+			ID: string(v.ID), Session: string(v.Session), Instance: string(v.Instance),
+			Source:                   string(v.Source),
+			AgentIntegrationInstance: v.AgentSession.IntegrationInstance,
+			AgentSessionID:           v.AgentSession.SessionID,
+			Transcript:               v.Transcript, Evidence: v.Evidence,
+			Reason: v.Reason, ReceivedAt: v.ReceivedAt,
 		}
 	}
 	if v := f.Correlation; v != nil {
@@ -184,6 +218,7 @@ func fromWire(w wireFact) domain.Fact {
 		Kind:          domain.FactKind(w.Kind),
 		At:            w.At,
 		Actor:         w.Actor,
+		Incarnation:   w.Incarnation,
 		Reason:        w.Reason,
 		Evidence:      w.Evidence,
 		WorkspaceID:   domain.WorkspaceID(w.WorkspaceID),
@@ -230,6 +265,21 @@ func fromWire(w wireFact) domain.Fact {
 				Scope: domain.EpochScope(v.EpochScope),
 			},
 			Container: v.Container, State: domain.AttachmentState(v.State),
+			Continuity:         domain.ContinuityState(v.Continuity),
+			ContinuityInstance: domain.InstanceID(v.ContinuityInstance),
+		}
+	}
+	if v := w.Parked; v != nil {
+		f.Parked = &domain.ParkedReport{
+			ID: domain.ParkedReportID(v.ID), Session: domain.SessionID(v.Session),
+			Instance: domain.InstanceID(v.Instance),
+			Source:   domain.BindingSource(v.Source),
+			AgentSession: domain.AgentSessionRef{
+				IntegrationInstance: v.AgentIntegrationInstance,
+				SessionID:           v.AgentSessionID,
+			},
+			Transcript: v.Transcript, Evidence: v.Evidence,
+			Reason: v.Reason, ReceivedAt: v.ReceivedAt,
 		}
 	}
 	if v := w.Correlation; v != nil {

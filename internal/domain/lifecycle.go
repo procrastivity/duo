@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	"strings"
 )
 
 // LaunchRequest asks the kernel to create a Duo session and a starting
@@ -153,10 +154,28 @@ func (a *Authority) Bind(ctx context.Context, req BindRequest) error {
 	if instance.State.Terminal() {
 		// §5.3: a late report can enrich history but cannot change an
 		// exited instance. Record that it arrived, then refuse.
+		//
+		// This check outranks the degraded-continuity check below on
+		// purpose: exit finality is a rule about the *instance* and holds
+		// whatever the host can currently prove, and a report about an
+		// exited instance must land in history as a late report rather than
+		// as evidence something might later act on.
 		return a.recordLateReport(ctx, actor, instance, req.Reason)
 	}
 	if err := a.verifyAttestation(instance, req.Attestation); err != nil {
 		return err
+	}
+	if a.degraded(session, instance.ID) {
+		// The whole request is parked, not the agent-runtime half of it.
+		// While continuity is unverified Duo may not "bind or keep a live
+		// claim on weaker evidence", and a bind that carried a fingerprint
+		// would do exactly that.
+		return a.park(ctx, actor, session, ParkedReport{
+			Instance: instance.ID, Source: req.Attestation.Source,
+			AgentSession: req.AgentSession, Transcript: req.Transcript,
+			Evidence: describeBindEvidence(req),
+			Reason:   "bind arrived while host attachment continuity was unverified",
+		})
 	}
 
 	b := a.change(actor)
@@ -615,6 +634,25 @@ func (a *Authority) recordLateReport(ctx context.Context, actor string, instance
 		return err
 	}
 	return fmt.Errorf("%w: instance %s", ErrInstanceExited, instance.ID)
+}
+
+// describeBindEvidence renders everything a bind request carried, so a parked
+// report explains itself without the reader reconstructing the call.
+func describeBindEvidence(req BindRequest) string {
+	parts := []string{"source=" + string(req.Attestation.Source)}
+	if req.Fingerprint != nil {
+		parts = append(parts, describeFingerprint(*req.Fingerprint))
+	}
+	if req.AgentSession.Valid() {
+		parts = append(parts, "agent_session="+req.AgentSession.IntegrationInstance+"/"+req.AgentSession.SessionID)
+	}
+	if req.Transcript != "" {
+		parts = append(parts, "transcript="+req.Transcript)
+	}
+	if req.BindActor != "" {
+		parts = append(parts, "bind_actor="+string(req.BindActor))
+	}
+	return strings.Join(parts, " ")
 }
 
 // verifyAttestation checks a claim's source against §3.4's three admissible

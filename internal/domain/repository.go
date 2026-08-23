@@ -72,6 +72,21 @@ type Repository interface {
 	CommitObservation(ctx context.Context, c Change) error
 }
 
+// IncarnationReporter is the optional half of the durability seam: the
+// authority incarnation the durable writer minted for this run.
+//
+// It is a separate, optionally-implemented interface rather than a fifth
+// Repository method on purpose. Incarnation is a property of the *writer*,
+// not of the domain: §4.4 says the authority "assigns a new authority
+// incarnation ID" per restart, and the writer lease is what actually
+// enforces one writer per store. A repository that has no lease (a test
+// double, a future read-through implementation) has no incarnation to
+// report, and should not be forced to invent one.
+type IncarnationReporter interface {
+	// Incarnation returns the writer incarnation for this authority run.
+	Incarnation() string
+}
+
 // ErrClaimTaken reports that a claim token the kernel believed free was
 // already held durably. The transaction committed nothing. It means the
 // in-memory index disagreed with the store — a second kernel over one
