@@ -1,0 +1,91 @@
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestOrderedResolutionMatchesLaunchFixture
+--- PASS: TestOrderedResolutionMatchesLaunchFixture (0.00s)
+=== RUN   TestExhaustionMatchesLaunchExhaustedFixture
+--- PASS: TestExhaustionMatchesLaunchExhaustedFixture (0.00s)
+=== RUN   TestErrorCodesAreRegistered
+--- PASS: TestErrorCodesAreRegistered (0.00s)
+=== RUN   TestRecordCommitsBeforePrepareLaunch
+--- PASS: TestRecordCommitsBeforePrepareLaunch (0.00s)
+=== RUN   TestPreparedLaunchCarriesTheResolvedTuple
+--- PASS: TestPreparedLaunchCarriesTheResolvedTuple (0.00s)
+=== RUN   TestFailedResolutionCommitsNothingAndLaunchesNothing
+--- PASS: TestFailedResolutionCommitsNothingAndLaunchesNothing (0.00s)
+=== RUN   TestCommitFailureLaunchesNothing
+--- PASS: TestCommitFailureLaunchesNothing (0.00s)
+=== RUN   TestMultiLeafLaunchCommitsOnceBeforeEveryLeaf
+--- PASS: TestMultiLeafLaunchCommitsOnceBeforeEveryLeaf (0.00s)
+=== RUN   TestAtomicMultiLeafFailureLaunchesNothing
+--- PASS: TestAtomicMultiLeafFailureLaunchesNothing (0.00s)
+=== RUN   TestDryRunRecordsNothingAndSpawnsNothing
+--- PASS: TestDryRunRecordsNothingAndSpawnsNothing (0.00s)
+=== RUN   TestLaunchNeedsAWorkspacePath
+--- PASS: TestLaunchNeedsAWorkspacePath (0.00s)
+=== RUN   TestSpawnFailureKeepsTheCommittedRecord
+--- PASS: TestSpawnFailureKeepsTheCommittedRecord (0.00s)
+=== RUN   TestLauncherNeedsARecorder
+--- PASS: TestLauncherNeedsARecorder (0.00s)
+=== RUN   TestOrderedSelectionTakesTheFirstCandidate
+--- PASS: TestOrderedSelectionTakesTheFirstCandidate (0.00s)
+=== RUN   TestDeclaredKindDescribesTheDeclarationNotTheOutcome
+--- PASS: TestDeclaredKindDescribesTheDeclarationNotTheOutcome (0.00s)
+=== RUN   TestRequireNarrowsThePool
+--- PASS: TestRequireNarrowsThePool (0.00s)
+=== RUN   TestRequireNeverRelents
+--- PASS: TestRequireNeverRelents (0.00s)
+=== RUN   TestAvoidWithARemainderDoesNotRelent
+--- PASS: TestAvoidWithARemainderDoesNotRelent (0.00s)
+=== RUN   TestAvoidRelentsWhenItWouldPreventAnyAssignment
+--- PASS: TestAvoidRelentsWhenItWouldPreventAnyAssignment (0.00s)
+=== RUN   TestRelentReportsOnlyTheAvoidsTheChosenCandidateMatched
+--- PASS: TestRelentReportsOnlyTheAvoidsTheChosenCandidateMatched (0.00s)
+=== RUN   TestRelentRestoresOnlyWhatAnAvoidRemoved
+--- PASS: TestRelentRestoresOnlyWhatAnAvoidRemoved (0.00s)
+=== RUN   TestAnAvoidedRequireSurvivorIsRelentedOnto
+--- PASS: TestAnAvoidedRequireSurvivorIsRelentedOnto (0.00s)
+=== RUN   TestDistinctModelLineRejectsTuples
+--- PASS: TestDistinctModelLineRejectsTuples (0.00s)
+=== RUN   TestDistinctModelLineCanExhaust
+--- PASS: TestDistinctModelLineCanExhaust (0.00s)
+=== RUN   TestMultiLeafResolutionIsAtomic
+--- PASS: TestMultiLeafResolutionIsAtomic (0.00s)
+=== RUN   TestRandomSelectionIsDeterministicUnderAnInjectedSource
+--- PASS: TestRandomSelectionIsDeterministicUnderAnInjectedSource (0.00s)
+=== RUN   TestRandomSelectionRespectsConstraints
+--- PASS: TestRandomSelectionRespectsConstraints (0.00s)
+=== RUN   TestRandomPresetNeedsAnInjectedSource
+--- PASS: TestRandomPresetNeedsAnInjectedSource (0.00s)
+=== RUN   TestPresetNotFound
+--- PASS: TestPresetNotFound (0.00s)
+=== RUN   TestContradictoryRequiresAreInvalid
+--- PASS: TestContradictoryRequiresAreInvalid (0.00s)
+=== RUN   TestRepeatedConstraintsNormalizeAndKeepProvenance
+--- PASS: TestRepeatedConstraintsNormalizeAndKeepProvenance (0.00s)
+=== RUN   TestUnknownAxisIsInvalid
+--- PASS: TestUnknownAxisIsInvalid (0.00s)
+=== RUN   TestUnresolvedCompositionReference
+--- PASS: TestUnresolvedCompositionReference (0.00s)
+=== RUN   TestAgentRuntimeKindIsNeverInferred
+--- PASS: TestAgentRuntimeKindIsNeverInferred (0.00s)
+=== RUN   TestDisabledSessionHostLeavesNoEligibleCandidate
+--- PASS: TestDisabledSessionHostLeavesNoEligibleCandidate (0.00s)
+=== RUN   TestMissingConformanceEvidenceEliminatesACandidate
+--- PASS: TestMissingConformanceEvidenceEliminatesACandidate (0.00s)
+=== RUN   TestNoEligibleCandidateOutranksConstraints
+--- PASS: TestNoEligibleCandidateOutranksConstraints (0.00s)
+=== RUN   TestComplexityLimitIsADeclarationError
+--- PASS: TestComplexityLimitIsADeclarationError (0.00s)
+=== RUN   TestResolutionIsRepeatable
+--- PASS: TestResolutionIsRepeatable (0.00s)
+=== RUN   TestRecordCarriesTheWholeExplanation
+--- PASS: TestRecordCarriesTheWholeExplanation (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/launch	0.031s
+=== RUN   TestRecordCommitsBeforePrepareLaunch
+--- PASS: TestRecordCommitsBeforePrepareLaunch (0.11s)
+=== RUN   TestCommittedRecordIsTheResolverRecord
+--- PASS: TestCommittedRecordIsTheResolverRecord (0.10s)
+=== RUN   TestFailedResolutionCommitsNothing
+--- PASS: TestFailedResolutionCommitsNothing (0.07s)
+PASS
+ok  	github.com/procrastivity/duo/internal/launchrecord	0.277s

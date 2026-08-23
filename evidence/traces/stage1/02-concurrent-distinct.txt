@@ -1,0 +1,5 @@
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestTwoSessionsInOneDirectoryStayDistinct
+--- PASS: TestTwoSessionsInOneDirectoryStayDistinct (0.12s)
+PASS
+ok  	github.com/procrastivity/duo/internal/domain	0.124s

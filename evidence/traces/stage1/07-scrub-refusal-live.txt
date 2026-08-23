@@ -1,0 +1,7 @@
+# Stage 1 gate — live scrub refusal: duo session launch against a marker-carrying Herdr server
+# The server was started with the three exact-name markers set, as a wrapping agent harness would leave them.
+# duo a1249de, herdr 0.8.2 — 2026-08-23T11:37:52Z
+
+$ duo session launch daily-claude --output json   (marker-carrying server)
+{"error":{"code":"refusal.spawn_environment","message":"refusing to launch: the environment the new session-host pane inherited from its server (w1:p1) still carries agent-harness marker(s) AI_AGENT, CLAUDECODE, CLAUDE_CODE_CHILD_SESSION. A runtime started there disables its own transcript silently. Restart the session host from a shell that no agent harness is running in, then launch again: a pane inherits the server's environment, and the host's env map can set a pane variable but never unset an inherited one."}}
+exit=3

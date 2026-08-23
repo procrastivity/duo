@@ -1,0 +1,13 @@
+# Stage 1 gate — live launch/enroll, Herdr+Pi (same clean server, SAME workspace as the claude leg)
+# duo a1249de, herdr 0.8.2, pi 0.83.0 — 2026-08-23T11:37:14Z
+
+$ duo session launch daily-pi --output json
+{"schema":"duo.external/v1","request_id":"req_59aef192f4148404","operation":"session.launch","result":{"session_id":"ses_cac34102ff78d88cebd4b80e11885eed","launch_resolution_id":"lrr_b75cd5d1a58e1fb9c764d08694bf795b","selection":"ordered","leaves":[{"name":"main","agent_runtime":"pi","model_line":"pi-default","declared_kind":"determined","outcome":"selected","relented_avoids":[]}]},"warnings":[],"features":[]}
+exit=0
+
+$ duo session list --output json
+{"schema":"duo.external/v1","request_id":"req_3ae02ec9b996fd8e","operation":"session.list","result":{"items":[{"session_id":"ses_b404c8475850796726acadf398afb2f1","workspace_id":"ws_b4645c41af0cbfec4ac7ac134f44cea1","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_fcee228d95e390c4e183ecf73fcfb8b2"},{"session_id":"ses_cac34102ff78d88cebd4b80e11885eed","workspace_id":"ws_b4645c41af0cbfec4ac7ac134f44cea1","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_1d6c9c10f07c3900fe8b5e1bb1f418c4"},{"session_id":"ses_e866183aa0413349ca95d136f70eae4e","workspace_id":"ws_b4645c41af0cbfec4ac7ac134f44cea1","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_02a56e130e51cf3181321ae2dcbf8f06"}]},"warnings":[],"features":[]}
+exit=0
+$ duo session show ses_b404c8475850796726acadf398afb2f1 --output json
+{"schema":"duo.external/v1","request_id":"req_17c8e3e040d137e7","operation":"session.inspect","result":{"session_id":"ses_b404c8475850796726acadf398afb2f1","workspace_id":"ws_b4645c41af0cbfec4ac7ac134f44cea1","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_fcee228d95e390c4e183ecf73fcfb8b2","runtime_instance_state":"starting","owner":"cli","creator":"cli"},"warnings":[],"features":[]}
+exit=0

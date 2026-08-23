@@ -1,0 +1,25 @@
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestExitIsFinal
+--- PASS: TestExitIsFinal (0.15s)
+=== RUN   TestRestartKeepsTheSessionAndReplacesTheInstance
+--- PASS: TestRestartKeepsTheSessionAndReplacesTheInstance (0.10s)
+=== RUN   TestRestartPlacesLiveInstancesInRecovering
+--- PASS: TestRestartPlacesLiveInstancesInRecovering (0.14s)
+=== RUN   TestConflictingClaimQuarantinesBothSessions
+--- PASS: TestConflictingClaimQuarantinesBothSessions (0.14s)
+=== RUN   TestAuthorityKillAndRestart
+=== RUN   TestAuthorityKillAndRestart/a_restart_mints_a_new_authority_incarnation
+=== RUN   TestAuthorityKillAndRestart/restart_preserves_a_proved-live_runtime_instance
+=== RUN   TestAuthorityKillAndRestart/restart_quarantines_conflicting_claims
+=== RUN   TestAuthorityKillAndRestart/a_late_reporter_cannot_revive_an_exited_instance
+=== RUN   TestAuthorityKillAndRestart/degraded_continuity_parks_reports_and_disables_exact-target_writes
+=== RUN   TestAuthorityKillAndRestart/parked_evidence_survives_another_restart
+--- PASS: TestAuthorityKillAndRestart (0.23s)
+    --- PASS: TestAuthorityKillAndRestart/a_restart_mints_a_new_authority_incarnation (0.01s)
+    --- PASS: TestAuthorityKillAndRestart/restart_preserves_a_proved-live_runtime_instance (0.01s)
+    --- PASS: TestAuthorityKillAndRestart/restart_quarantines_conflicting_claims (0.01s)
+    --- PASS: TestAuthorityKillAndRestart/a_late_reporter_cannot_revive_an_exited_instance (0.01s)
+    --- PASS: TestAuthorityKillAndRestart/degraded_continuity_parks_reports_and_disables_exact-target_writes (0.03s)
+    --- PASS: TestAuthorityKillAndRestart/parked_evidence_survives_another_restart (0.03s)
+PASS
+ok  	github.com/procrastivity/duo/internal/domain	0.775s

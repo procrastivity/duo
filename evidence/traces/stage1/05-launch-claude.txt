@@ -1,0 +1,6 @@
+# Stage 1 gate — live launch/enroll, Herdr+Claude (clean disposable server)
+# duo duo version a1249de (commit a1249de, built 2026-08-23T11:36:56Z), herdr 0.8.2, claude 2.1.241 — 2026-08-23T11:37:04Z
+
+$ duo session launch daily-claude --output json
+{"schema":"duo.external/v1","request_id":"req_e035607a65fd3d49","operation":"session.launch","result":{"session_id":"ses_b404c8475850796726acadf398afb2f1","launch_resolution_id":"lrr_e177fe165905ae786f1bfb8c3e523ff6","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","declared_kind":"determined","outcome":"selected","relented_avoids":[]}]},"warnings":[],"features":[]}
+exit=0

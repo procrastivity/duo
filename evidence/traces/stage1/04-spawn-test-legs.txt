@@ -1,0 +1,13 @@
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestLiveScrubPairedTranscriptLoss
+    live_test.go:71: herdr=/home/dev/.local/bin/herdr claude=/home/dev/.local/bin/claude
+=== RUN   TestLiveScrubPairedTranscriptLoss/negative_leg:_marker-carrying_server,_interactive_spawn
+    live_test.go:92: server spawn environment carries marker(s): scrub: environment still carries marker(s): AI_AGENT, CLAUDECODE, CLAUDE_CODE_CHILD_SESSION, CLAUDE_CODE_ENTRYPOINT
+    live_test.go:102: negative leg: session=83c58f8b-eb18-46a9-afa8-4d55e021490f screen_has_warning=true transcripts=0
+=== RUN   TestLiveScrubPairedTranscriptLoss/positive_leg:_Guard-scrubbed_server,_interactive_spawn
+    live_test.go:132: positive leg: session=fcadf7f2-6c48-4e5c-aa3c-e2c6d377110f transcripts=[fcadf7f2-6c48-4e5c-aa3c-e2c6d377110f.jsonl]
+--- PASS: TestLiveScrubPairedTranscriptLoss (22.58s)
+    --- PASS: TestLiveScrubPairedTranscriptLoss/negative_leg:_marker-carrying_server,_interactive_spawn (11.54s)
+    --- PASS: TestLiveScrubPairedTranscriptLoss/positive_leg:_Guard-scrubbed_server,_interactive_spawn (11.04s)
+PASS
+ok  	github.com/procrastivity/duo/internal/scrub	22.591s
