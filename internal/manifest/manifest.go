@@ -115,9 +115,10 @@ type Manifest struct {
 	Assets               []Asset                      `json:"assets"`
 	HarnessTargets       []HarnessTarget              `json:"harness_targets"`
 
-	Tool          Tool   `json:"tool"`
-	SchemaVersion int    `json:"schemaVersion"`
-	Verbs         []Verb `json:"verbs"`
+	Tool          Tool      `json:"tool"`
+	SchemaVersion int       `json:"schemaVersion"`
+	Verbs         []Verb    `json:"verbs"`
+	Contracts     Contracts `json:"contracts"`
 }
 
 // Build walks root's registered command tree (the chassis's single
@@ -139,6 +140,11 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 		assets = []Asset{}
 	}
 
+	contractDigests, err := loadContracts()
+	if err != nil {
+		return Manifest{}, fmt.Errorf("manifest: %w", err)
+	}
+
 	m := Manifest{
 		Schema:               WireSchema,
 		Product:              Product{Name: "duo", Version: build.Version},
@@ -158,6 +164,7 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 		},
 		SchemaVersion: SchemaVersion,
 		Verbs:         verbs,
+		Contracts:     contractDigests,
 	}
 
 	digest, err := manifestDigest(m)
