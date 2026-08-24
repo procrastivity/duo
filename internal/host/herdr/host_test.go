@@ -221,6 +221,7 @@ func TestStartSplitsAnExistingPaneAndMapsCommandToKind(t *testing.T) {
 
 	tuple := testTuple()
 	tuple.Command = "/usr/local/bin/claude"
+	tuple.Target = host.LaunchTargetPane
 	prepared, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: tuple})
 	if err != nil {
 		t.Fatalf("PrepareLaunch: %v", err)
@@ -243,6 +244,56 @@ func TestStartSplitsAnExistingPaneAndMapsCommandToKind(t *testing.T) {
 	}
 	if !birthProven(evidence.Evidence.ProcessBirth) {
 		t.Errorf("launch evidence birth %+v is not proven", evidence.Evidence.ProcessBirth)
+	}
+}
+
+// The built-in default placement is a background tab of the focused
+// pane's workspace, not a split — PROVISIONAL (dogfood, 2026-08-24),
+// pending the config-authored per-kind default (notes/44). An explicit
+// tab target takes the same path.
+func TestStartCreatesABackgroundTabByDefault(t *testing.T) {
+	f := newFakeHerdr(t)
+	existing := f.addPane("w1")
+	h := testHost(t, f)
+	ctx := context.Background()
+
+	prepared, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: testTuple()})
+	if err != nil {
+		t.Fatalf("PrepareLaunch: %v", err)
+	}
+	evidence, err := h.Start(ctx, prepared)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if f.callCount("tab.create") != 1 || f.callCount("pane.split") != 0 {
+		t.Fatalf("calls = %v, want one tab.create and no pane.split", f.mutatingCalls())
+	}
+	if got := f.lastTabParams().WorkspaceID; got != existing.workspaceID {
+		t.Errorf("tab.create workspace = %q, want the focused pane's workspace %q", got, existing.workspaceID)
+	}
+	if evidence.Evidence.PaneID == existing.paneID {
+		t.Errorf("Start returned the pre-existing pane %q", evidence.Evidence.PaneID)
+	}
+	if !birthProven(evidence.Evidence.ProcessBirth) {
+		t.Errorf("launch evidence birth %+v is not proven", evidence.Evidence.ProcessBirth)
+	}
+}
+
+// A target this host does not know is refused at PrepareLaunch, before
+// any server call — the CLI validates first, but the adapter must not
+// silently fall back on a placement the caller did not ask for.
+func TestPrepareLaunchRefusesAnUnknownTarget(t *testing.T) {
+	f := newFakeHerdr(t)
+	f.addPane("w1")
+	h := testHost(t, f)
+
+	tuple := testTuple()
+	tuple.Target = host.LaunchTarget("window")
+	if _, err := h.PrepareLaunch(context.Background(), host.HostLaunchRequest{ResolvedLaunchTuple: tuple}); err == nil {
+		t.Fatal("PrepareLaunch accepted an unknown launch target")
+	}
+	if calls := f.mutatingCalls(); len(calls) != 0 {
+		t.Fatalf("the refusal made mutating calls: %v", calls)
 	}
 }
 

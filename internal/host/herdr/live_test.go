@@ -33,6 +33,8 @@ import (
 //	                       startup files, which can overwrite what is set
 //	                       here (PATH in particular).
 //	DUO_HERDR_LIVE_BINARY  herdr executable for the schema-digest probe.
+//	DUO_HERDR_LIVE_TARGET  placement for the launch leg: "tab", "pane", or
+//	                       unset for the host's built-in default.
 func TestLiveHerdr(t *testing.T) {
 	socket := os.Getenv("DUO_HERDR_LIVE_SOCKET")
 	if socket == "" {
@@ -193,6 +195,9 @@ func liveSubjectPane(ctx context.Context, t *testing.T, h *Host) (host.Evidence,
 		WorkspacePath:         t.TempDir(),
 		Command:               kind,
 		Env:                   env,
+		// DUO_HERDR_LIVE_TARGET picks the placement leg: "tab", "pane",
+		// or unset for the host's built-in default.
+		Target: host.LaunchTarget(os.Getenv("DUO_HERDR_LIVE_TARGET")),
 	}
 	prepared, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: tuple})
 	if err != nil {

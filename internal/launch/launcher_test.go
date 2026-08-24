@@ -88,6 +88,7 @@ func TestPreparedLaunchCarriesTheResolvedTuple(t *testing.T) {
 		Request:       launch.Request{Preset: "review", Require: []launch.Constraint{{Axis: launch.AxisAgentRuntime, Value: "claude"}}},
 		WorkspacePath: "/work/example",
 		Env:           map[string]string{"DUO_SESSION": "ses_test_1"},
+		Target:        host.LaunchTargetTab,
 	})
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
@@ -115,6 +116,9 @@ func TestPreparedLaunchCarriesTheResolvedTuple(t *testing.T) {
 	}
 	if tuple.WorkspacePath != "/work/example" {
 		t.Errorf("workspace path = %q", tuple.WorkspacePath)
+	}
+	if tuple.Target != host.LaunchTargetTab {
+		t.Errorf("target = %q, want the request's placement %q", tuple.Target, host.LaunchTargetTab)
 	}
 }
 

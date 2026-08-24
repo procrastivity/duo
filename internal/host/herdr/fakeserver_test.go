@@ -41,6 +41,9 @@ type fakeHerdr struct {
 	lastRequestID  string
 	lastEnv        map[string]string
 	lastSplit      paneSplitParams
+	lastTab        tabCreateParams
+	tabCloseErr    *wireError
+	nextTab        int
 	lastAgentStart agentStartParams
 	backfill       []string
 	subscribers    []net.Conn
@@ -51,6 +54,7 @@ type fakePaneState struct {
 	paneID      string
 	terminalID  string
 	workspaceID string
+	tabID       string
 	shellPID    int
 	fgPID       int
 }
@@ -238,6 +242,45 @@ func (f *fakeHerdr) dispatch(method string, params json.RawMessage) (any, *wireE
 		f.lastSplit = p
 		pane := f.addPaneLocked("w1")
 		return map[string]any{"type": "pane_info", "pane": paneJSON(pane)}, nil
+	case "tab.create":
+		var p tabCreateParams
+		_ = json.Unmarshal(params, &p)
+		f.lastEnv = p.Env
+		f.lastTab = p
+		ws := p.WorkspaceID
+		if ws == "" {
+			ws = "w1"
+		}
+		f.nextTab++
+		tabID := fmt.Sprintf("%s:t%d", ws, f.nextTab+1)
+		pane := f.addPaneLocked(ws)
+		f.panes[len(f.panes)-1].tabID = tabID
+		pane.tabID = tabID
+		return map[string]any{
+			"type":      "tab_created",
+			"tab":       map[string]any{"tab_id": pane.tabID, "label": p.Label, "focused": false},
+			"root_pane": paneJSON(pane),
+		}, nil
+	case "tab.close":
+		var p tabTargetParams
+		_ = json.Unmarshal(params, &p)
+		if f.tabCloseErr != nil {
+			return nil, f.tabCloseErr
+		}
+		kept := f.panes[:0]
+		closed := false
+		for _, pane := range f.panes {
+			if pane.tabID == p.TabID {
+				closed = true
+				continue
+			}
+			kept = append(kept, pane)
+		}
+		f.panes = kept
+		if !closed {
+			return nil, &wireError{Code: "tab_not_found", Message: "tab " + p.TabID + " not found"}
+		}
+		return map[string]any{"type": "tab_closed", "tab_id": p.TabID}, nil
 	case "pane.close":
 		var p paneTargetParams
 		_ = json.Unmarshal(params, &p)
@@ -305,7 +348,7 @@ func paneJSON(p fakePaneState) map[string]any {
 		"pane_id":      p.paneID,
 		"terminal_id":  p.terminalID,
 		"workspace_id": p.workspaceID,
-		"tab_id":       p.workspaceID + ":t1",
+		"tab_id":       p.tabID,
 		"focused":      false,
 		"agent_status": "unknown",
 		"revision":     0,
@@ -326,6 +369,7 @@ func (f *fakeHerdr) addPaneLocked(workspaceID string) fakePaneState {
 		paneID:      fmt.Sprintf("%s:p%d", workspaceID, f.nextPane),
 		terminalID:  fmt.Sprintf("term_%d", f.nextTerminal),
 		workspaceID: workspaceID,
+		tabID:       workspaceID + ":t1",
 		shellPID:    5000 + f.nextPane,
 		fgPID:       5000 + f.nextPane,
 	}
@@ -449,7 +493,7 @@ func (f *fakeHerdr) mutatingCalls() []string {
 	var out []string
 	for _, c := range f.calls {
 		switch c {
-		case "workspace.create", "pane.split", "agent.start", "pane.send_input", "pane.send_text":
+		case "workspace.create", "tab.create", "tab.close", "pane.split", "agent.start", "pane.send_input", "pane.send_text":
 			out = append(out, c)
 		}
 	}
@@ -460,6 +504,18 @@ func (f *fakeHerdr) envOfLastCreate() map[string]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.lastEnv
+}
+
+func (f *fakeHerdr) lastTabParams() tabCreateParams {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastTab
+}
+
+func (f *fakeHerdr) setTabCloseError(code, message string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tabCloseErr = &wireError{Code: code, Message: message}
 }
 
 func (f *fakeHerdr) lastAgentStartParams() agentStartParams {

@@ -77,6 +77,22 @@ type HostCandidate struct {
 
 // ResolvedLaunchTuple is the launch resolver's finished output: one
 // concrete, already-validated assignment the composer hands to
+// LaunchTarget names where in the session host's containment model a
+// launched execution's container is created. Empty means the host's own
+// built-in default. PROVISIONAL (dogfood, 2026-08-24): this field is a
+// dogfood-day expedient ahead of change control; the ratified design
+// (config-authored per-kind default, recorded target_source) is sketched
+// in terminal-multiplexers notes/44.
+type LaunchTarget string
+
+const (
+	// LaunchTargetTab creates the container as a new tab of the host's
+	// current workspace (Herdr tab.create; tmux new-window would map here).
+	LaunchTargetTab LaunchTarget = "tab"
+	// LaunchTargetPane splits the container from an existing pane.
+	LaunchTargetPane LaunchTarget = "pane"
+)
+
 // HostLauncher.PrepareLaunch. §5.2: "A launch resolver completes launch
 // resolution and records the launch-resolution record before any
 // HostLauncher.PrepareLaunch call. PrepareLaunch receives the
@@ -97,6 +113,9 @@ type ResolvedLaunchTuple struct {
 	Command               string
 	Args                  []string
 	Env                   map[string]string
+	// Target is the requested placement inside the host's containment
+	// model. Empty asks for the host's built-in default. See LaunchTarget.
+	Target LaunchTarget
 }
 
 // HostLaunchRequest is HostLauncher.PrepareLaunch's input.

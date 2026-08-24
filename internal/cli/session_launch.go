@@ -58,6 +58,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	var (
 		workspace    string
 		hostFlag     string
+		targetFlag   string
 		configPath   string
 		requireFlags []string
 		avoidFlags   []string
@@ -91,6 +92,11 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				return err
 			}
 			avoid, err := parseConstraints(avoidFlags)
+			if err != nil {
+				return err
+			}
+
+			target, err := parseLaunchTarget(targetFlag)
 			if err != nil {
 				return err
 			}
@@ -167,6 +173,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				report, err = launchAndBind(cmd.Context(), streams, a, launcher, launch.SpawnRequest{
 					Request:       req,
 					WorkspacePath: mat.WorkspacePath(),
+					Target:        target,
 				}, mat, actor)
 				if err != nil {
 					return launchFailure(streams, mode, err)
@@ -190,6 +197,8 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd.Flags().StringVar(&workspace, "workspace", "", "the launched execution's working directory (defaults to the current directory)")
 	cmd.Flags().StringVar(&hostFlag, "host", "",
 		`the session host to launch into, "<kind>" or "<kind>:<instance>": deduction rung 0, outranking the workspace correlation, the ambient environment, and the policy default`)
+	cmd.Flags().StringVar(&targetFlag, "target", "",
+		`where the launched agent's container is created in the deduced host, "tab" or "pane": a placement override like --host, not a constraint axis (defaults to the host's built-in placement; provisional pending change control, see notes/44)`)
 	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
 	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime, model_line, or model_family); repeatable")
 	cmd.Flags().StringArrayVar(&avoidFlags, "avoid", nil, "a soft launch constraint, axis=value; repeatable")
@@ -220,6 +229,18 @@ func parseConstraints(raw []string) ([]launch.Constraint, error) {
 		out = append(out, launch.Constraint{Axis: a, Value: value, Source: "flag"})
 	}
 	return out, nil
+}
+
+// parseLaunchTarget parses --target: a placement override on the deduced
+// host's containment model, deliberately not a fourth constraint axis
+// (the --host precedent: an override never joins require/avoid).
+func parseLaunchTarget(raw string) (host.LaunchTarget, error) {
+	switch host.LaunchTarget(raw) {
+	case "", host.LaunchTargetTab, host.LaunchTargetPane:
+		return host.LaunchTarget(raw), nil
+	}
+	return "", duoerr.New("invalid.request",
+		fmt.Sprintf("launch target %q is not a placement this build knows (tab, pane).", raw))
 }
 
 // openLaunchAuthority opens the authority store for one launch: as the

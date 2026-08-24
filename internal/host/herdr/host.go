@@ -206,6 +206,7 @@ type preparedLaunch struct {
 	Cwd             string
 	Env             map[string]string
 	CreateWorkspace bool
+	TargetWorkspace string
 	SplitTargetPane string
 	Label           string
 }
@@ -247,11 +248,27 @@ func (h *Host) PrepareLaunch(ctx context.Context, req host.HostLaunchRequest) (h
 		Env:       copyEnv(tuple.Env),
 		Label:     agentName(h.cfg.AgentNamePrefix, tuple.Leaf, tuple.LaunchResolutionID),
 	}
-	target := splitTarget(snap)
-	if target == "" {
-		prepared.CreateWorkspace = true
-	} else {
-		prepared.SplitTargetPane = target
+	// Placement: exactly one of CreateWorkspace, TargetWorkspace, and
+	// SplitTargetPane is set. An empty session always gets workspace.create
+	// (a workspace's first tab exists implicitly). The built-in default is
+	// a background tab — PROVISIONAL (dogfood, 2026-08-24), pending the
+	// config-authored per-kind default sketched in notes/44.
+	switch tuple.Target {
+	case host.LaunchTargetPane:
+		if target := splitTarget(snap); target == "" {
+			prepared.CreateWorkspace = true
+		} else {
+			prepared.SplitTargetPane = target
+		}
+	case host.LaunchTargetTab, "":
+		if ws := tabWorkspace(snap); ws == "" {
+			prepared.CreateWorkspace = true
+		} else {
+			prepared.TargetWorkspace = ws
+		}
+	default:
+		return host.PreparedHostLaunch{}, fmt.Errorf(
+			"herdr: launch target %q is not a placement this host knows (tab, pane)", tuple.Target)
 	}
 
 	return host.PreparedHostLaunch{
@@ -274,13 +291,13 @@ func (h *Host) Start(ctx context.Context, launch host.PreparedHostLaunch) (host.
 			"herdr: prepared launch %s was not prepared by this adapter", launch.LaunchResolutionID)
 	}
 
-	pane, err := h.createPane(ctx, prepared)
+	pane, createdTab, err := h.createPane(ctx, prepared)
 	if err != nil {
 		return host.HostLaunchEvidence{}, err
 	}
 	// The pane's foreground process before the agent starts: its shell.
 	// Everything after this compares against that baseline.
-	baseline, err := h.processBirth(ctx, pane.PaneID)
+	baseline, err := h.shellBaseline(ctx, pane.PaneID)
 	if err != nil {
 		return host.HostLaunchEvidence{}, err
 	}
@@ -291,7 +308,7 @@ func (h *Host) Start(ctx context.Context, launch host.PreparedHostLaunch) (host.
 	// so the verdict is a refused launch and a torn-down pane, never a
 	// warning (conformance §8's hard Stage-1 gate).
 	if err := h.verifyPaneEnvironment(ctx, pane.PaneID, baseline); err != nil {
-		return host.HostLaunchEvidence{}, h.closePaneAfterRefusal(ctx, pane.PaneID, err)
+		return host.HostLaunchEvidence{}, h.closeAfterRefusal(ctx, pane.PaneID, createdTab, err)
 	}
 	if err := h.startAgent(ctx, prepared, pane.PaneID); err != nil {
 		return host.HostLaunchEvidence{}, err
@@ -330,15 +347,31 @@ func (h *Host) Start(ctx context.Context, launch host.PreparedHostLaunch) (host.
 // time, the baseline is returned unchanged: weaker evidence, not an error,
 // because the launch did happen and the caller re-fingerprints at
 // correlation time anyway.
+//
+// A handover counts only when the same non-baseline process holds the
+// terminal across two consecutive polls. Right after agent.start the
+// shell is still processing the injected command, and a prompt that runs
+// its own helper processes puts short-lived children in the foreground
+// list; the first non-baseline reading was one of those often enough to
+// fail the evidence's own first validation (observed live, 2026-08-24,
+// on both placements).
 func (h *Host) settledBirth(ctx context.Context, paneID string, baseline host.ProcessBirthEvidence) host.ProcessBirthEvidence {
 	deadline := h.cfg.Now().Add(h.cfg.LaunchSettleTimeout)
+	var candidate host.ProcessBirthEvidence
 	for {
 		birth, err := h.processBirth(ctx, paneID)
 		if err != nil {
 			return baseline
 		}
-		if birth.PID != baseline.PID {
+		switch {
+		case birth.PID == baseline.PID:
+			// The foreground fell back to the shell; whatever the last
+			// poll saw was transient.
+			candidate = host.ProcessBirthEvidence{}
+		case birth.PID == candidate.PID:
 			return birth
+		default:
+			candidate = birth
 		}
 		if !h.cfg.Now().Before(deadline) {
 			return baseline
@@ -351,26 +384,77 @@ func (h *Host) settledBirth(ctx context.Context, paneID string, baseline host.Pr
 	}
 }
 
-func (h *Host) createPane(ctx context.Context, prepared preparedLaunch) (paneInfo, error) {
-	if prepared.CreateWorkspace {
+// createPane creates the launch's container. The returned tab ID is
+// non-empty only when this call created a tab, so a refusal can tear the
+// whole tab down instead of leaving an empty one behind.
+// shellBaseline waits, bounded, for the pane's foreground to settle on
+// its own shell, then records the pre-agent baseline.
+//
+// A fresh pane's shell runs its startup files first, and Herdr's
+// foreground list carries those transient children. A baseline naming one
+// of them is wrong twice over: the environment gate would read (or fail
+// to read) a process that is not the one forking the agent, and
+// settledBirth would treat the transient's exit as the agent handover and
+// record evidence that fails its own first validation. Observed live on
+// the tab path — tab.create returns while the startup transients are
+// still running; pane.split usually returns before they begin, which is
+// why the split path rarely hit this. On timeout the current reading is
+// returned unchanged: weaker evidence, not an error, like settledBirth.
+func (h *Host) shellBaseline(ctx context.Context, paneID string) (host.ProcessBirthEvidence, error) {
+	deadline := h.cfg.Now().Add(h.cfg.LaunchSettleTimeout)
+	for {
+		var res paneProcessInfoResult
+		if err := h.client.call(ctx, "pane.process_info", paneTargetParams{PaneID: paneID}, &res); err != nil {
+			return host.ProcessBirthEvidence{}, err
+		}
+		info := res.ProcessInfo
+		settled := len(info.ForegroundProcesses) == 0 ||
+			(len(info.ForegroundProcesses) == 1 && info.ForegroundProcesses[0].PID == info.ShellPID)
+		if settled || !h.cfg.Now().Before(deadline) {
+			return h.cfg.ResolveProcessBirth(ctx, info), nil
+		}
+		select {
+		case <-ctx.Done():
+			return host.ProcessBirthEvidence{}, ctx.Err()
+		case <-time.After(h.cfg.LaunchSettlePoll):
+		}
+	}
+}
+
+func (h *Host) createPane(ctx context.Context, prepared preparedLaunch) (paneInfo, string, error) {
+	switch {
+	case prepared.CreateWorkspace:
 		var res workspaceCreatedResult
 		params := workspaceCreateParams{Cwd: prepared.Cwd, Label: prepared.Label, Env: prepared.Env}
 		if err := h.client.call(ctx, "workspace.create", params, &res); err != nil {
-			return paneInfo{}, err
+			return paneInfo{}, "", err
 		}
-		return res.RootPane, nil
+		return res.RootPane, "", nil
+	case prepared.TargetWorkspace != "":
+		var res tabCreatedResult
+		params := tabCreateParams{
+			Cwd:         prepared.Cwd,
+			Label:       prepared.Label,
+			Env:         prepared.Env,
+			WorkspaceID: prepared.TargetWorkspace,
+		}
+		if err := h.client.call(ctx, "tab.create", params, &res); err != nil {
+			return paneInfo{}, "", err
+		}
+		return res.RootPane, res.Tab.TabID, nil
+	default:
+		var res paneInfoResult
+		params := paneSplitParams{
+			Direction:    "right",
+			TargetPaneID: prepared.SplitTargetPane,
+			Cwd:          prepared.Cwd,
+			Env:          prepared.Env,
+		}
+		if err := h.client.call(ctx, "pane.split", params, &res); err != nil {
+			return paneInfo{}, "", err
+		}
+		return res.Pane, "", nil
 	}
-	var res paneInfoResult
-	params := paneSplitParams{
-		Direction:    "right",
-		TargetPaneID: prepared.SplitTargetPane,
-		Cwd:          prepared.Cwd,
-		Env:          prepared.Env,
-	}
-	if err := h.client.call(ctx, "pane.split", params, &res); err != nil {
-		return paneInfo{}, err
-	}
-	return res.Pane, nil
 }
 
 // startAgent registers the agent in a freshly created pane, retrying only
@@ -543,6 +627,23 @@ func splitTarget(snap sessionSnapshot) string {
 		return snap.FocusedPaneID
 	}
 	return snap.Panes[0].PaneID
+}
+
+// tabWorkspace picks the workspace a new tab is created in — the focused
+// pane's workspace, else the first one — or "" when the session holds no
+// workspace and one must be created instead.
+func tabWorkspace(snap sessionSnapshot) string {
+	if len(snap.Workspaces) == 0 {
+		return ""
+	}
+	if snap.FocusedPaneID != "" {
+		for _, p := range snap.Panes {
+			if p.PaneID == snap.FocusedPaneID && p.WorkspaceID != "" {
+				return p.WorkspaceID
+			}
+		}
+	}
+	return snap.Workspaces[0].WorkspaceID
 }
 
 // agentName builds a Herdr agent name from a launch-resolution ID and the

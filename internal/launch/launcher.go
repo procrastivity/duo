@@ -87,6 +87,10 @@ type SpawnRequest struct {
 	WorkspacePath string
 	// Env is the environment the host launcher adds to the execution.
 	Env map[string]string
+	// Target is the requested container placement inside the deduced
+	// host's containment model — a placement input like WorkspacePath,
+	// never a constraint axis. Empty means the host's built-in default.
+	Target host.LaunchTarget
 	// DryRun previews the resolution: same resolver, same static inputs,
 	// no durable record, no session, and no spawn (§6.10). In random mode
 	// its draw is preview-only and is not promised for a later launch.
@@ -207,6 +211,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 				Command:               assignment.Tuple.Executable,
 				Args:                  assignment.Tuple.Arguments,
 				Env:                   req.Env,
+				Target:                req.Target,
 			},
 		})
 		if err != nil {

@@ -60,14 +60,14 @@ func TestStartRefusesAPaneThatInheritedAMarker(t *testing.T) {
 	if n := f.callCount("agent.start"); n != 0 {
 		t.Errorf("agent.start called %d times after a refusal; the gate is not fail-closed", n)
 	}
-	if n := f.callCount("pane.close"); n != 1 {
-		t.Errorf("pane.close called %d times, want 1: a refused launch leaves no pane", n)
+	if n := f.callCount("tab.close"); n != 1 {
+		t.Errorf("tab.close called %d times, want 1: a refused launch closes the tab it created", n)
 	}
 	if got := f.paneCount(); got != before {
 		t.Errorf("pane count = %d, want %d: the refused launch's pane survived", got, before)
 	}
 	if refusal.Cleanup != nil {
-		t.Errorf("Cleanup = %v, want nil: the pane closed successfully", refusal.Cleanup)
+		t.Errorf("Cleanup = %v, want nil: the tab closed successfully", refusal.Cleanup)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestStartRefusesWhenThePaneEnvironmentCannotBeRead(t *testing.T) {
 	if n := f.callCount("agent.start"); n != 0 {
 		t.Errorf("agent.start called %d times after an unreadable environment", n)
 	}
-	if n := f.callCount("pane.close"); n != 1 {
-		t.Errorf("pane.close called %d times, want 1", n)
+	if n := f.callCount("tab.close"); n != 1 {
+		t.Errorf("tab.close called %d times, want 1", n)
 	}
 }
 
@@ -201,11 +201,12 @@ func TestStartReadsThePanesOwnProcessEnvironment(t *testing.T) {
 }
 
 // A teardown that fails does not soften the refusal — but the operator
-// hears about the pane that is still there.
+// hears about the container that is still there. The default placement
+// creates a tab, so the injected failure is on tab.close.
 func TestRefusalRecordsAFailedTeardown(t *testing.T) {
 	f := newFakeHerdr(t)
 	f.addPane("w1")
-	f.setPaneCloseError("internal_error", "the server refused to close the pane")
+	f.setTabCloseError("internal_error", "the server refused to close the tab")
 	h := testHost(t, f, func(c *Config) { c.ResolvePaneEnviron = environResolver(markerEnviron(), nil) })
 	ctx := context.Background()
 
@@ -223,6 +224,35 @@ func TestRefusalRecordsAFailedTeardown(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Cleanup after the refusal also failed") {
 		t.Errorf("refusal message hides the orphaned pane: %v", err)
+	}
+}
+
+// The pane path keeps the same teardown guarantee for a pane-target
+// launch: the split pane is closed on refusal, and a close failure is
+// recorded on the refusal rather than swallowed.
+func TestRefusalOnAPaneTargetRecordsAFailedPaneClose(t *testing.T) {
+	f := newFakeHerdr(t)
+	f.addPane("w1")
+	f.setPaneCloseError("internal_error", "the server refused to close the pane")
+	h := testHost(t, f, func(c *Config) { c.ResolvePaneEnviron = environResolver(markerEnviron(), nil) })
+	ctx := context.Background()
+
+	tuple := testTuple()
+	tuple.Target = host.LaunchTargetPane
+	prepared, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: tuple})
+	if err != nil {
+		t.Fatalf("PrepareLaunch: %v", err)
+	}
+	_, err = h.Start(ctx, prepared)
+	var refusal *scrub.RefusalError
+	if !errors.As(err, &refusal) {
+		t.Fatalf("Start returned %T (%v), want *scrub.RefusalError", err, err)
+	}
+	if refusal.Cleanup == nil {
+		t.Fatal("a failed pane.close left no trace on the refusal")
+	}
+	if n := f.callCount("tab.close"); n != 0 {
+		t.Errorf("tab.close called %d times on a pane-target launch", n)
 	}
 }
 

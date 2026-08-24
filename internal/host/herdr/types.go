@@ -72,6 +72,19 @@ type workspaceCreatedResult struct {
 	RootPane paneInfo `json:"root_pane"`
 }
 
+// tabInfo is the decoded subset of Herdr's tab record: only the ID, which
+// is all the teardown path needs to close a tab this adapter created.
+type tabInfo struct {
+	TabID string `json:"tab_id"`
+}
+
+// tabCreatedResult is tab.create's result ("type": "tab_created" in the
+// pinned schema): the new tab plus the root pane Herdr opens in it.
+type tabCreatedResult struct {
+	Tab      tabInfo  `json:"tab"`
+	RootPane paneInfo `json:"root_pane"`
+}
+
 // workspaceCreateParams and paneSplitParams both carry Env, which is the
 // environment-scrub seam: Herdr panes inherit the *server's* environment,
 // so whatever Duo needs set in the pane has to travel here.
@@ -86,6 +99,20 @@ type paneSplitParams struct {
 	TargetPaneID string            `json:"target_pane_id,omitempty"`
 	Cwd          string            `json:"cwd,omitempty"`
 	Env          map[string]string `json:"env,omitempty"`
+}
+
+// tabCreateParams carries Env for the same environment-scrub reason the
+// other creation params do. focus is deliberately not sent: Herdr defaults
+// it to false, and a Duo launch never steals the user's focus.
+type tabCreateParams struct {
+	Cwd         string            `json:"cwd,omitempty"`
+	Label       string            `json:"label,omitempty"`
+	Env         map[string]string `json:"env,omitempty"`
+	WorkspaceID string            `json:"workspace_id,omitempty"`
+}
+
+type tabTargetParams struct {
+	TabID string `json:"tab_id"`
 }
 
 type agentStartParams struct {

@@ -223,6 +223,23 @@ func TestMalformedHostFlagStaysACallerError(t *testing.T) {
 	}
 }
 
+// A --target grammar error is likewise the caller's to fix: the flag
+// accepts tab, pane, or nothing (the host's built-in placement).
+func TestMalformedTargetFlagStaysACallerError(t *testing.T) {
+	for _, ok := range []string{"", "tab", "pane"} {
+		if _, err := parseLaunchTarget(ok); err != nil {
+			t.Errorf("parseLaunchTarget(%q) = %v, want nil", ok, err)
+		}
+	}
+	_, err := parseLaunchTarget("window")
+	if err == nil {
+		t.Fatal("parseLaunchTarget accepted a placement this build does not know")
+	}
+	if got := launchDuoErr(err).Code; got != "invalid.request" {
+		t.Errorf("code = %q, want %q", got, "invalid.request")
+	}
+}
+
 // encodeDecode round-trips a safe detail payload through its wire encoding,
 // which is how this package's own renderer reads it: the launch and
 // materialization detail shapes are package-private Go types that agree only

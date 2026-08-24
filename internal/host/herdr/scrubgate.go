@@ -120,18 +120,30 @@ func (h *Host) verifyPaneEnvironment(ctx context.Context, paneID string, baselin
 	return scrub.Gate(subject, paneEnvironRemedy, environ)
 }
 
-// closePaneAfterRefusal tears the just-created pane down so a refused
-// launch leaves nothing running. A teardown failure does not turn the
-// refusal into a success; it is recorded on the refusal so the operator
-// learns about the pane that is still there.
-func (h *Host) closePaneAfterRefusal(ctx context.Context, paneID string, refusal error) error {
-	err := h.client.call(ctx, "pane.close", paneTargetParams{PaneID: paneID}, nil)
-	if err == nil || ErrorCode(err) == CodePaneNotFound {
+// closeAfterRefusal tears the just-created container down so a refused
+// launch leaves nothing running: the whole tab when this launch created
+// one (closing only its pane would leave an empty tab behind), else the
+// pane. A teardown failure does not turn the refusal into a success; it
+// is recorded on the refusal so the operator learns about the container
+// that is still there.
+func (h *Host) closeAfterRefusal(ctx context.Context, paneID, tabID string, refusal error) error {
+	var err error
+	subject := "pane " + paneID
+	if tabID != "" {
+		subject = "tab " + tabID
+		err = h.client.call(ctx, "tab.close", tabTargetParams{TabID: tabID}, nil)
+	} else {
+		err = h.client.call(ctx, "pane.close", paneTargetParams{PaneID: paneID}, nil)
+		if ErrorCode(err) == CodePaneNotFound {
+			err = nil
+		}
+	}
+	if err == nil {
 		return refusal
 	}
 	var typed *scrub.RefusalError
 	if errors.As(refusal, &typed) {
-		typed.Cleanup = fmt.Errorf("pane %s could not be closed: %w", paneID, err)
+		typed.Cleanup = fmt.Errorf("%s could not be closed: %w", subject, err)
 	}
 	return refusal
 }
