@@ -1,0 +1,40 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch",
+  "operation": "session.launch",
+  "result": {
+    "session_id": "ses_fixture_1",
+    "launch_resolution_id": "lrr_fixture_1",
+    "selection": "ordered",
+    "leaves": [
+      {
+        "name": "reviewer",
+        "agent_runtime": "codex",
+        "model_line": "gpt-5.6-codex",
+        "model_family": "gpt",
+        "composition": {
+          "name": "codex_gpt56@herdr",
+          "variant": "codex_gpt56",
+          "agent_runtime": "codex",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "host_kind": "herdr",
+          "host_instance_id": "hostinst_herdr_new"
+        },
+        "declared_kind": "open",
+        "outcome": "selected",
+        "relented_avoids": []
+      }
+    ],
+    "host": {
+      "kind": "herdr",
+      "instance_id": "hostinst_herdr_new",
+      "instance_label": "herdr@ws_new",
+      "host_source": "ambient-env",
+      "workspace_id": "ws_new",
+      "outranked_evidence": []
+    }
+  },
+  "warnings": [],
+  "features": []
+}

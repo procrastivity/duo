@@ -60,6 +60,13 @@ type Resolver struct {
 	// once at construction: the resolver reads facts that cannot move
 	// under it, which is what makes I-3's purity structural rather than
 	// promised.
+	// mat is the whole materialization, retained because the record and
+	// the failure payloads cite more of it than the resolution reads: the
+	// outranked evidence and the workspace the deduction was made for
+	// (duo-config-v3 step 13). host and bundle are the two halves the
+	// pipeline itself consults, projected once at construction so the hot
+	// path is not an accessor call.
+	mat                   materialize.Result
 	host                  materialize.DeducedHost
 	bundle                materialize.EvidenceBundle
 	hostVersion           string
@@ -112,6 +119,7 @@ func NewResolver(doc config.DocumentV3, mat materialize.Result, opts Options) (*
 	}
 	return &Resolver{
 		doc:                   doc,
+		mat:                   mat,
 		host:                  host,
 		bundle:                mat.Bundle(),
 		hostVersion:           opts.HostVersions[host.Kind],
@@ -213,7 +221,9 @@ func (r *Resolver) resolve(req Request) (*Resolution, *Error) {
 		assignments, rejections = enumerate(p, func(l *leafPlan) []*candidate { return l.afterRequire })
 	}
 	if len(assignments) == 0 {
-		return nil, r.exhausted(req, p, constraints, rejections)
+		// The causal split decides the row here, not the stage that
+		// happened to empty the pool. See failures.go.
+		return nil, r.exhaustionFailure(req, p, constraints, digests, rejections, relented)
 	}
 
 	selected, draw, err := r.selectAssignment(p, assignments)
@@ -566,6 +576,9 @@ func (r *Resolver) buildRecord(
 		ConsultedRecordDigests: digests,
 		Selection:              p.selection,
 		Constraints:            constraints,
+		Host:                   r.wireHost(),
+		EvidenceBundle:         r.recordEvidence(),
+		Relations:              wireRelations(p),
 		RelationRejections:     rejections,
 		AvoidRelented:          relented,
 		EligibleAssignments:    eligible,
@@ -576,6 +589,9 @@ func (r *Resolver) buildRecord(
 	}
 	if rec.RelationRejections == nil {
 		rec.RelationRejections = []RelationRejection{}
+	}
+	if rec.Relations == nil {
+		rec.Relations = []WireRelation{}
 	}
 	rec.RestoredCandidates = []string{}
 
@@ -615,6 +631,7 @@ func (r *Resolver) buildRecord(
 		rec.Assignment = append(rec.Assignment, Assignment{
 			Leaf:           p.leaves[i].name,
 			Tuple:          c.tuple,
+			Composition:    c.tuple.MintedComposition(),
 			RelentedAvoids: matchedAvoids(c.tuple, constraints.Avoid),
 		})
 	}
@@ -626,6 +643,32 @@ func locators(pool []*candidate) []string {
 	out := make([]string, 0, len(pool))
 	for _, c := range pool {
 		out = append(out, c.locator())
+	}
+	return out
+}
+
+// recordEvidence renders the whole evidence bundle for the record: the
+// correlation fact, every ambient variable read once at materialization,
+// and the standing provider facts M2 snapshotted.
+//
+// It differs from failureEvidence in exactly one way — the ambient captures
+// are here. A failure's safe details cite durable facts a reader can
+// replay; the record is the evidence object itself, and what the deduction
+// actually read is part of it whether or not it has an ID.
+func (r *Resolver) recordEvidence() *materialize.WireBundle {
+	out := &materialize.WireBundle{}
+	if id, ok := r.bundle.CorrelationFactID(); ok {
+		out.CorrelationFactID = string(id)
+	}
+	for _, c := range r.bundle.AmbientCaptures() {
+		out.AmbientCaptures = append(out.AmbientCaptures, materialize.WireCapture(c))
+	}
+	for _, id := range r.bundle.ProviderFactIDs() {
+		out.ProviderFactIDs = append(out.ProviderFactIDs, string(id))
+	}
+	if out.CorrelationFactID == "" && out.AmbientCaptures == nil && out.ProviderFactIDs == nil {
+		// An empty object would claim evidence that does not exist.
+		return nil
 	}
 	return out
 }

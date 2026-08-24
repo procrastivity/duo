@@ -1,0 +1,27 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch_host_unresolved",
+  "operation": "session.launch",
+  "error": {
+    "class": "unavailable",
+    "code": "launch.host_unresolved",
+    "message": "Host deduction produced no candidate host for this launch.",
+    "retry": {"safe": true, "action": "supply_host_or_enable_kind"},
+    "effect": "no_effect",
+    "details": {
+      "workspace_id": "ws_none",
+      "requested_preset": "review",
+      "deduction_trail": [
+        {"source": "explicit-flag", "consulted": false, "yielded_host": false, "detail": "no --host flag supplied"},
+        {"source": "workspace-correlation", "consulted": true, "yielded_host": false, "detail": "no persisted workspace-host correlation for ws_none"},
+        {"source": "ambient-env", "consulted": true, "yielded_host": false, "detail": "HERDR_SOCKET_PATH not set"},
+        {"source": "policy-default", "consulted": true, "yielded_host": false, "detail": "no enabled kind in session_hosts.prefer"}
+      ],
+      "enabled_kinds": [],
+      "pointers": {
+        "override_flag": "--host",
+        "workspace_host_rebind": "duo workspace host rebind"
+      }
+    }
+  }
+}

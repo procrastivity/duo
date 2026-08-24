@@ -52,6 +52,7 @@ var table = []Descriptor{
 			"launch.constraints_exhausted",
 			"launch.no_eligible_candidate",
 			"launch.host_unresolved",
+			"config.variant_unresolved",
 			"config.composition_unresolved",
 		},
 		Fixtures: []string{
@@ -469,6 +470,19 @@ var stableErrorCodes = map[string]ErrorClass{
 	// unavailable, alongside its sibling launch.no_eligible_candidate: it
 	// is an installation-and-state fact, never a malformed request.
 	"launch.host_unresolved": "unavailable",
+	// config.variant_unresolved is duo.config/v3's declaration-ambiguity
+	// code: a missing or ambiguous launch-variant or agent-runtime
+	// reference, a malformed preset, or an exceeded complexity ceiling
+	// (schemas/duo-external-v1.schema.json
+	// $defs/config_variant_unresolved_code, step 02; raised by
+	// internal/launch, step 13). It takes its predecessor's class,
+	// unavailable, unchanged.
+	//
+	// config.composition_unresolved above stays registered and stays
+	// classified: it is deprecated 2026-08-24 (handoff 22), emitted for
+	// duo.config/v2 documents only, and clients must keep accepting it
+	// while v2 documents remain loadable.
+	"config.variant_unresolved": "unavailable",
 
 	"operation.quality_insufficient": "degraded",
 

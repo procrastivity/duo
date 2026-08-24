@@ -331,3 +331,114 @@ rewritten.
   provider read models, instance discovery, the first bind, and the launch
   output rail) is step 14's; `internal/cli/session_launch.go` currently
   carries a marked temporary shim.
+
+## Amendment — the causal split and the grown payloads (2026-08-24)
+
+duo-config-v3 step 13, by reference to step 02's duo-external-v1 amendment
+and to `duo-vnext-access-errors-audit.md` §4.1 ("`duo.config/v3` launch
+codes"). It grows the two exhaustion rows, the launch-resolution record, and
+the ordinary result; the resolution algorithm itself is unchanged.
+
+- **The exhaustion row is decided by cause, not by stage.** `causalSplit`
+  (failures.go) is the whole of it. When no `require`, no `avoid`, and no
+  cross-leaf relation contributed, the row is `launch.no_eligible_candidate`
+  — class `unavailable`, an installed-eligibility loss the same request
+  cannot repair. When any of the three contributed, the row is
+  `launch.constraints_exhausted` — class `invalid`, something the caller can
+  change — and the payload carries **both** tallies, so the static causes are
+  not hidden by reporting the row the caller can act on. A restored
+  candidate counts as an avoid contributing: the relent undid the
+  elimination, but the avoid is why the relent happened.
+
+- **"Static" generalizes the ratified sentence.** The audit names
+  `provider_disabled` because it is the reason step 10 added.
+  `session_host_disabled` and `no_conformance_evidence` are the same kind of
+  fact — installed policy and installed evidence — so all three are static
+  here, and none of them alone moves a failure to the `invalid` row.
+
+- **The split's unavailable branch is unreachable today, and written
+  anyway.** Step 3 emptying a leaf already returns `no_eligible_candidate`
+  before any constraint runs, and a resolution that survived step 3 with no
+  narrowing always enumerates something. The branch exists because the split
+  is a rule about causes; a later stage that can empty a pool without a
+  caller constraint must report the honest row rather than inherit the one
+  it happened to fail under.
+
+- **Tallies are per (leaf, reason), never per candidate.** One row with a
+  count, not N rows of one. Step 03's fixtures do it both ways —
+  `session-launch-explicit-host.json` aggregates, `session-launch-provider-disabled.json`
+  does not — and the per-(leaf, reason) total is what both spellings agree
+  on and what a client can act on. A candidate an avoid took and the relent
+  gave back is not tallied; the relent is on the record instead.
+
+- **The pointer set names only applicable ways out.** `duo provider enable`
+  appears when a provider fact eliminated something; `duo workspace host
+  rebind` when the deduced host came from the workspace correlation, which
+  is the only case rebinding changes; `--host` when the host is plausibly
+  implicated at all (a disabled kind eliminated candidates, the host came
+  from a correlation, or evidence was captured and outranked). The whole
+  object is omitted when none applies. An inapplicable pointer is worse than
+  a missing one — it sends an operator to a verb that cannot help.
+
+- **A failure's evidence bundle carries fact references only; the record
+  carries the whole bundle.** A failure's bundle answers "which durable
+  facts did this rest on, so a later reader can replay it", and an ambient
+  capture has no ID to replay; where a capture explains something it appears
+  on the deduced host's outranked evidence. The record is the evidence
+  object itself, so its bundle keeps the captures too.
+
+- **`survivors` stays on the failure payload.** Step 03's re-authored
+  fixtures omit it, but the audit's handoff-18 clause requiring the four
+  survivor pools was not amended and `launch_failure_details` is
+  `additionalProperties: true`. Keeping it is a compatible carry-forward;
+  dropping it would be a contract removal on a branch that ratified only
+  compatible adds. `consulted_record_digests` is carried on both rows for
+  the same reason.
+
+- **`config.variant_unresolved` replaces `config.composition_unresolved`.**
+  This resolver reads `duo.config/v3` documents only, so every declaration
+  defect it can find is a variant or runtime one and nothing here raises the
+  predecessor any more. `CodeCompositionUnresolved` stays exported,
+  registered, and classified — deprecated, not withdrawn — because clients
+  must keep accepting it while v2 documents remain loadable. The new code's
+  details are `config_declaration_details`: the locator, the reason, and
+  `config_schema: duo.config/v3`, which is what makes the successor readable
+  to a client that knows only the old name.
+
+- **`Report` grew by exactly two things beyond the per-leaf labels: `host`
+  and `relations`.** The workplan asks for a thin report, and step 03's
+  fixtures put both in `result`. The fixtures win, and both earn it: under
+  v3 the host is late-bound state, so a caller reading a result has no other
+  way to learn which host their session went to or that a stale correlation
+  chose it; and a declared relation is a property of the request's preset
+  that no leaf can carry. Everything else stays where §7.3 put it — losing
+  candidates, rejections, digests, and the draw are reachable only through
+  `LaunchResolutionID`.
+
+- **The record carries the deduced host, the full evidence bundle, the
+  declared relations, and a minted composition per assignment.** All four
+  are additions to a JSON body the kernel stores opaquely, so a record
+  committed before this step still decodes: the new fields read as absent,
+  and absent is honest — an empty deduced host means "this record predates
+  late-bound hosts", not "this launch had no host".
+  `TestAPreStep13RecordStillLoads` pins that.
+
+- **Fixture conformance is a shape comparison, not whole-document
+  equality — and that is forced.** Step 03's fixtures carry hand-authored
+  opaque IDs no real materialization can produce (`hostinst_herdr_new`
+  against M1's `herdr:<session>`; `fact_corr_ws_abc_solo` against a kernel
+  fact ID), and they disagree with each other about optional keys
+  (`outranked_evidence: []` in one, absent in another). What is normative in
+  them — code, class, effect, retry action, message, per-candidate reasons,
+  tallies, the deduced host's rung, the pointer set, the evidence
+  references — is compared field for field, plus "every key the fixture
+  declares, this build emits". See `internal/launch/fixture_test.go`.
+
+- **The embedded contract schema is hand-patched again.**
+  `contracts/schemas/duo-external-v1.schema.json` gains `minted_composition`
+  and the two `launch_resolution_leaf` properties, verbatim from step 02,
+  with `contracts/SOURCE`'s digest updated — the same narrow patch step 10
+  made for the three enums, and for the same reason: `launch_resolution_leaf`
+  is `additionalProperties: false`, so the CLI's own envelope validation
+  would otherwise refuse a payload the normative schema requires. Step 16
+  replaces the whole file with `make sync-contracts`.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/procrastivity/duo/internal/config"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 )
 
 // recordPrefix is the launch-resolution record's Duo ID prefix. §6.4 graft
@@ -92,7 +93,34 @@ type Record struct {
 	Selection   string      `json:"selection"`
 	Constraints Constraints `json:"constraints"`
 
-	Leaves             []RecordLeaf        `json:"leaves"`
+	// Host is the single session host M1 deduced for this launch, with the
+	// rung that produced it and every piece of evidence a higher rung beat
+	// (duo-config-v3 step 13). Under v2 the host was a config declaration
+	// name on the composition chain and needed no separate record entry;
+	// under v3 it is *state*, deduced once per launch, so a record that did
+	// not carry it could not explain — or replay — where the session went.
+	//
+	// EvidenceBundle is what that deduction and step 3 rested on, by
+	// reference: the correlation fact, the ambient variables read once at
+	// materialization, and the standing provider facts M2 snapshotted.
+	// Together with ConfigurationDigest and ConsultedRecordDigests it
+	// completes §7.1's consulted-input list for v3: configuration, evidence,
+	// and now state.
+	//
+	// The bundle here is the *full* one, ambient captures included, unlike
+	// the reference set a failure's safe details carry. The record is the
+	// evidence object, and an ambient capture is evidence even though it is
+	// not a durable fact with an ID.
+	Host           RecordHost              `json:"host"`
+	EvidenceBundle *materialize.WireBundle `json:"evidence_bundle,omitempty"`
+
+	Leaves []RecordLeaf `json:"leaves"`
+	// Relations are the cross-leaf relations the preset declared, and
+	// RelationRejections are the complete assignments they rejected. The
+	// declaration is recorded beside the rejections because a rejection
+	// list on its own cannot say whether a relation was enforced and
+	// rejected nothing, or was never declared.
+	Relations          []WireRelation      `json:"relations"`
 	RelationRejections []RelationRejection `json:"relation_rejections"`
 
 	// AvoidRelented records that the strict post-avoid pools yielded no
@@ -151,6 +179,53 @@ type RecordCandidate struct {
 	ProviderFactID string `json:"provider_fact_id,omitempty"`
 }
 
+// RecordHost is the deduced host as the record carries it: the wire shape
+// duo-external-v1's `launch_deduced_host` fixes, with the outranked
+// evidence beside it.
+//
+// It is a type alias in all but name for the failure payload's WireHost,
+// and deliberately the same object: the host a failure blames and the host
+// a record commits are the same deduction, and two spellings of it would be
+// two things to keep in step.
+type RecordHost = WireHost
+
+// MintedComposition is the variant x deduced-host join, named.
+// duo-external-v1's `minted_composition` (2026-08-24 handoff 22).
+//
+// Under `duo.config/v2` a composition was authored and had a declaration
+// locator; under v3 nothing authors one, and this object is the only place
+// a composition is named. That is why it carries the labels rather than a
+// locator: there is no declaration to point at, so the name has to stand on
+// its own parts.
+type MintedComposition struct {
+	// Name is the minted name, `<variant>@<host_kind>`. It is not a
+	// locator and never appears in configuration.
+	Name string `json:"name,omitempty"`
+	// Variant is the bare declared launch-variant name — the one required
+	// field, because the variant is the half of the join that was authored.
+	Variant        string `json:"variant"`
+	AgentRuntime   string `json:"agent_runtime,omitempty"`
+	ModelLine      string `json:"model_line,omitempty"`
+	ModelFamily    string `json:"model_family,omitempty"`
+	HostKind       string `json:"host_kind,omitempty"`
+	HostInstanceID string `json:"host_instance_id,omitempty"`
+}
+
+// MintedComposition projects the composition minted for one tuple. Every
+// field is already on the tuple: this is a projection onto the contract's
+// shape, never a second source of truth.
+func (t Tuple) MintedComposition() MintedComposition {
+	return MintedComposition{
+		Name:           t.Composition,
+		Variant:        t.Variant,
+		AgentRuntime:   t.AgentRuntime,
+		ModelLine:      t.ModelLine,
+		ModelFamily:    t.ModelFamily,
+		HostKind:       t.HostKind,
+		HostInstanceID: t.IntegrationInstanceID,
+	}
+}
+
 // RelationRejection is one complete assignment a cross-leaf relation
 // rejected, named by the assignment's per-leaf declaration locators.
 type RelationRejection struct {
@@ -164,6 +239,11 @@ type RelationRejection struct {
 type Assignment struct {
 	Leaf  string `json:"leaf"`
 	Tuple Tuple  `json:"tuple"`
+	// Composition is the composition this leaf's join minted. It is
+	// derivable from Tuple and stated anyway: the minted composition is the
+	// thing v3 says a launch *is*, and a record that made a reader re-mint
+	// it would be asking them to re-run the join to read the decision.
+	Composition MintedComposition `json:"composition"`
 	// RelentedAvoids are the avoid predicates this leaf's chosen candidate
 	// actually matches. §6.6 reports "the matched avoids on the selected
 	// assignment" and nothing more: a relent that restored candidates this
@@ -201,16 +281,44 @@ type Report struct {
 	// mode does not promise reuse of its draw.
 	Preview bool         `json:"preview,omitempty"`
 	Leaves  []ReportLeaf `json:"leaves"`
+	// Host is the deduced session host this launch resolved against
+	// (duo-config-v3 step 13). It is the one *growth* of the thin
+	// projection beyond the per-leaf list, and it is not decoration: under
+	// v3 the host is late-bound state, so a caller reading a result cannot
+	// otherwise tell which host their session went to, or that a stale
+	// workspace correlation chose it. Step 03's re-authored
+	// contracts/fixtures/duo-external-v1/session-launch.json carries it in
+	// `result`, and `launch_resolution_report` has the property.
+	//
+	// It is a pointer so a hand-built Report without one omits the key
+	// rather than asserting an empty deduction.
+	Host *WireHost `json:"host,omitempty"`
+	// Relations are the preset's declared cross-leaf relations, present
+	// only when it declares any. They are a property of the declaration
+	// the caller asked for, not of any leaf, and
+	// contracts/fixtures/duo-external-v1/session-launch-distinct-model-family.json
+	// carries them in `result`.
+	Relations []WireRelation `json:"relations,omitempty"`
 }
 
 // ReportLeaf is one leaf of the ordinary result.
+//
+// Its field set is exactly `launch_resolution_leaf`, which is
+// `additionalProperties: false`: name, the three public axis labels, the
+// minted composition, the declared kind, the outcome, and the relented
+// avoids. ModelFamily and Composition are step 02's adds — the family
+// because v3 makes it a required label and a constraint axis, and the
+// composition because v3 mints one and a caller has no other way to learn
+// its name.
 type ReportLeaf struct {
-	Name           string      `json:"name"`
-	AgentRuntime   string      `json:"agent_runtime"`
-	ModelLine      string      `json:"model_line"`
-	DeclaredKind   string      `json:"declared_kind"`
-	Outcome        string      `json:"outcome"`
-	RelentedAvoids []Predicate `json:"relented_avoids"`
+	Name           string            `json:"name"`
+	AgentRuntime   string            `json:"agent_runtime"`
+	ModelLine      string            `json:"model_line"`
+	ModelFamily    string            `json:"model_family"`
+	Composition    MintedComposition `json:"composition"`
+	DeclaredKind   string            `json:"declared_kind"`
+	Outcome        string            `json:"outcome"`
+	RelentedAvoids []Predicate       `json:"relented_avoids"`
 }
 
 // Report projects the ordinary result out of the record.
@@ -219,11 +327,17 @@ func (r *Resolution) Report() Report {
 	for _, leaf := range r.Record.Leaves {
 		kinds[leaf.Name] = leaf.DeclaredKind
 	}
+	host := r.Record.Host
 	out := Report{
 		SessionID:          r.Record.SessionID,
 		LaunchResolutionID: r.Record.ID,
 		Selection:          r.Record.Selection,
 		Leaves:             make([]ReportLeaf, 0, len(r.Record.Assignment)),
+		Host:               &host,
+		Relations:          r.Record.Relations,
+	}
+	if host.Kind == "" {
+		out.Host = nil
 	}
 	for _, a := range r.Record.Assignment {
 		relented := a.RelentedAvoids
@@ -234,6 +348,8 @@ func (r *Resolution) Report() Report {
 			Name:           a.Leaf,
 			AgentRuntime:   a.Tuple.AgentRuntime,
 			ModelLine:      a.Tuple.ModelLine,
+			ModelFamily:    a.Tuple.ModelFamily,
+			Composition:    a.Composition,
 			DeclaredKind:   kinds[a.Leaf],
 			Outcome:        OutcomeSelected,
 			RelentedAvoids: relented,

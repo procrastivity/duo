@@ -1,0 +1,77 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch_explicit_host",
+  "operation": "session.launch",
+  "error": {
+    "class": "unavailable",
+    "code": "launch.no_eligible_candidate",
+    "message": "--host tmux names a disabled session-host kind; every join was eliminated.",
+    "retry": {"safe": true, "action": "change_host_or_enable_kind"},
+    "effect": "no_effect",
+    "details": {
+      "requested_preset": "review",
+      "constraints": {"require": [], "avoid": []},
+      "candidates": [
+        {
+          "leaf": "main",
+          "declaration_locator": "launch_variants.claude_sonnet",
+          "variant": "claude_sonnet",
+          "composition": {
+            "variant": "claude_sonnet",
+            "agent_runtime": "claude",
+            "model_line": "sonnet-5",
+            "model_family": "claude",
+            "host_kind": "tmux",
+            "host_instance_id": "hostinst_tmux_explicit"
+          },
+          "agent_runtime": "claude",
+          "model_line": "sonnet-5",
+          "model_family": "claude",
+          "elimination_reason": "session_host_disabled"
+        },
+        {
+          "leaf": "main",
+          "declaration_locator": "launch_variants.pi_gpt56",
+          "variant": "pi_gpt56",
+          "composition": {
+            "variant": "pi_gpt56",
+            "agent_runtime": "pi",
+            "model_line": "gpt-5.6",
+            "model_family": "gpt",
+            "host_kind": "tmux",
+            "host_instance_id": "hostinst_tmux_explicit"
+          },
+          "agent_runtime": "pi",
+          "model_line": "gpt-5.6",
+          "model_family": "gpt",
+          "elimination_reason": "session_host_disabled"
+        }
+      ],
+      "elimination_tallies": [
+        {"leaf": "main", "reason": "session_host_disabled", "count": 2, "detail": "tmux disabled"}
+      ],
+      "host": {
+        "kind": "tmux",
+        "instance_id": "hostinst_tmux_explicit",
+        "instance_label": "tmux@explicit",
+        "host_source": "explicit-flag",
+        "workspace_id": "ws_new",
+        "outranked_evidence": [
+          {
+            "source": "ambient-env",
+            "kind": "herdr",
+            "instance_label": "HERDR_SOCKET_PATH",
+            "captures": [
+              {"name": "HERDR_SOCKET_PATH", "value": "/run/user/1000/herdr/ambient.sock", "captured_at": "2026-08-24T16:00:00Z"}
+            ],
+            "detail": "ambient Herdr socket captured and outranked by the explicit --host flag"
+          }
+        ]
+      },
+      "pointers": {
+        "override_flag": "--host"
+      },
+      "complete_assignments_survived": 0
+    }
+  }
+}

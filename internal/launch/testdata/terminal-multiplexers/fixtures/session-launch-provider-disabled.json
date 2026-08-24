@@ -1,0 +1,102 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch_provider_disabled",
+  "operation": "session.launch",
+  "error": {
+    "class": "unavailable",
+    "code": "launch.no_eligible_candidate",
+    "message": "All candidates for leaf main carry the disabled codex provider.",
+    "retry": {"safe": true, "action": "enable_provider_or_change_host"},
+    "effect": "no_effect",
+    "details": {
+      "requested_preset": "codex_any",
+      "constraints": {"require": [], "avoid": []},
+      "candidates": [
+        {
+          "leaf": "main",
+          "declaration_locator": "launch_variants.codex_gpt56",
+          "variant": "codex_gpt56",
+          "composition": {
+            "variant": "codex_gpt56",
+            "agent_runtime": "codex",
+            "model_line": "gpt-5.6-codex",
+            "model_family": "gpt",
+            "host_kind": "solo",
+            "host_instance_id": "hostinst_solo_ws_abc"
+          },
+          "agent_runtime": "codex",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "elimination_reason": "provider_disabled"
+        },
+        {
+          "leaf": "main",
+          "declaration_locator": "launch_variants.pi_gpt56_codex",
+          "variant": "pi_gpt56_codex",
+          "composition": {
+            "variant": "pi_gpt56_codex",
+            "agent_runtime": "pi",
+            "model_line": "gpt-5.6-codex",
+            "model_family": "gpt",
+            "host_kind": "solo",
+            "host_instance_id": "hostinst_solo_ws_abc"
+          },
+          "agent_runtime": "pi",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "elimination_reason": "provider_disabled"
+        },
+        {
+          "leaf": "main",
+          "declaration_locator": "launch_variants.opencode_gpt56",
+          "variant": "opencode_gpt56",
+          "composition": {
+            "variant": "opencode_gpt56",
+            "agent_runtime": "opencode",
+            "model_line": "gpt-5.6-codex",
+            "model_family": "gpt",
+            "host_kind": "solo",
+            "host_instance_id": "hostinst_solo_ws_abc"
+          },
+          "agent_runtime": "opencode",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "elimination_reason": "provider_disabled"
+        }
+      ],
+      "elimination_tallies": [
+        {"leaf": "main", "reason": "provider_disabled", "count": 1, "detail": "codex_gpt56"},
+        {"leaf": "main", "reason": "provider_disabled", "count": 1, "detail": "pi_gpt56_codex"},
+        {"leaf": "main", "reason": "provider_disabled", "count": 1, "detail": "opencode_gpt56"}
+      ],
+      "host": {
+        "kind": "solo",
+        "instance_id": "hostinst_solo_ws_abc",
+        "instance_label": "solo@/run/user/1000/solo/ws_abc.sock",
+        "host_source": "workspace-correlation",
+        "workspace_id": "ws_abc",
+        "outranked_evidence": [
+          {
+            "source": "ambient-env",
+            "kind": "herdr",
+            "instance_label": "HERDR_SOCKET_PATH",
+            "captures": [
+              {"name": "HERDR_SOCKET_PATH", "value": "/run/user/1000/herdr/ambient.sock", "captured_at": "2026-08-24T16:00:00Z"}
+            ],
+            "detail": "ambient Herdr socket captured and outranked by the persisted workspace correlation"
+          }
+        ]
+      },
+      "evidence_bundle": {
+        "correlation_fact_id": "fact_corr_ws_abc_solo",
+        "provider_fact_ids": ["fact_provider_codex_disabled"]
+      },
+      "pointers": {
+        "override_flag": "--host",
+        "provider_enable": "duo provider enable codex",
+        "workspace_host_rebind": "duo workspace host rebind"
+      },
+      "complete_assignments_survived": 0
+    }
+  }
+}

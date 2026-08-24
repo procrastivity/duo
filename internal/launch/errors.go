@@ -18,10 +18,30 @@ const (
 	// CodeInvalidRequest reports malformed constraint grammar or
 	// contradictory same-axis requirements.
 	CodeInvalidRequest = "invalid.request"
-	// CodeCompositionUnresolved reports a missing or ambiguous
-	// composition/launch-variant link, a malformed preset declaration, or
-	// an exceeded complexity limit. It stays what it has always been:
-	// declaration ambiguity, never narrowing.
+	// CodeVariantUnresolved reports a missing or ambiguous launch-variant
+	// or agent-runtime reference, a malformed preset declaration, or an
+	// exceeded complexity limit, under `duo.config/v3`. It is declaration
+	// ambiguity, never narrowing, and its class is unavailable
+	// (duo-vnext-access-errors-audit.md §4.1, "duo.config/v3 launch
+	// codes", 2026-08-24 handoff 22).
+	//
+	// It is the successor to CodeCompositionUnresolved, not an addition
+	// beside it: this resolver reads `duo.config/v3` documents only, so
+	// every declaration defect it can find is a variant or runtime one.
+	CodeVariantUnresolved = "config.variant_unresolved"
+	// CodeCompositionUnresolved is CodeVariantUnresolved's deprecated
+	// predecessor, deprecated 2026-08-24 (handoff 22).
+	//
+	// It stays a registered stable code and stays exported, because
+	// clients must keep accepting it while `duo.config/v2` documents
+	// remain loadable — but nothing in this package emits it any more.
+	// This resolver is v3-only (NewResolver takes a config.DocumentV3), so
+	// there is no v2 path left here to raise it from; the constant is a
+	// name a v2-era projection can still compare against, and the registry
+	// keeps its class.
+	//
+	// Deprecated: use CodeVariantUnresolved. Emitted for duo.config/v2
+	// documents only; no duo.config/v3 resolution raises it.
 	CodeCompositionUnresolved = "config.composition_unresolved"
 	// CodeConstraintsExhausted reports that a require or a cross-leaf
 	// relation left no complete assignment even after every avoid relented.
@@ -120,15 +140,36 @@ func presetNotFound(name string) *Error {
 		map[string]any{"requested_preset": name})
 }
 
+// configSchemaV3 is the configuration schema marker every declaration
+// failure this resolver raises names. It is a constant rather than a value
+// read off the document because the resolver is v3-only: a document that
+// reached it was parsed by config.ParseV3 or it did not reach it at all.
+const configSchemaV3 = "duo.config/v3"
+
 // unresolved reports a declaration defect: a missing or ambiguous
-// reference, a malformed preset, or an exceeded complexity limit. locator
-// is the declaration locator at fault, and reason continues the sentence it
-// starts.
+// launch-variant or agent-runtime reference, a malformed preset, or an
+// exceeded complexity limit. locator is the declaration locator at fault,
+// and reason continues the sentence it starts.
+//
+// Its safe detail is duo-external-v1's `config_declaration_details`: the
+// offending locator, the configuration schema that produced it, and the
+// reason. Naming the schema is what makes the successor code readable — a
+// caller that sees config.variant_unresolved with `duo.config/v3` knows the
+// document it must fix is a v3 one, and a v2-era client that still knows
+// only config.composition_unresolved knows why it is seeing a code it does
+// not recognize.
 func unresolved(locator, reason string) *Error {
-	return newError(CodeCompositionUnresolved,
+	return newError(CodeVariantUnresolved,
 		fmt.Sprintf("%s %s.", locator, reason),
 		Retry{Safe: true, Action: "fix_the_declaration"},
-		map[string]any{"declaration_locator": locator, "reason": reason})
+		declarationDetails{Locator: locator, ConfigSchema: configSchemaV3, Reason: reason})
+}
+
+// declarationDetails is duo-external-v1's `config_declaration_details`.
+type declarationDetails struct {
+	Locator      string `json:"locator"`
+	ConfigSchema string `json:"config_schema"`
+	Reason       string `json:"reason"`
 }
 
 // internalFailure reports an internal break — today only a failure to draw
@@ -140,49 +181,4 @@ func internalFailure(reference string) *Error {
 		"Launch resolution failed internally.",
 		Retry{Safe: true, Action: "retry_or_report"},
 		map[string]any{"diagnostics_reference": reference})
-}
-
-// exhaustionDetails is the safe detail §6.8 requires on
-// launch.constraints_exhausted and launch.no_eligible_candidate, in the
-// shape contracts/fixtures/duo-external-v1/session-launch-exhausted.json
-// fixes.
-//
-// Provenance is deliberately absent. §6.8's prose asks for "constraints
-// with provenance", but the normative fixture's constraints object carries
-// axis/value pairs only (launch_constraint_predicate has
-// additionalProperties: false). The fixture wins, and the provenance lives
-// where §6.9 puts everything else that explains a resolution: the
-// launch-resolution record.
-type exhaustionDetails struct {
-	RequestedPreset             string          `json:"requested_preset"`
-	Constraints                 wireConstraints `json:"constraints"`
-	Candidates                  []wireCandidate `json:"candidates"`
-	Survivors                   Survivors       `json:"survivors"`
-	CompleteAssignmentsSurvived int             `json:"complete_assignments_survived"`
-}
-
-// wireCandidate is one candidate's safe row: which leaf declared it, its
-// declaration locator, its two public axis values, and — when it did not
-// survive — the stable reason it was eliminated.
-type wireCandidate struct {
-	Leaf               string `json:"leaf"`
-	DeclarationLocator string `json:"declaration_locator"`
-	AgentRuntime       string `json:"agent_runtime"`
-	ModelLine          string `json:"model_line"`
-	EliminationReason  string `json:"elimination_reason,omitempty"`
-}
-
-// Survivors is §6.4 graft 3's explicit pool report: the declaration
-// locators that survived each stage of the pipeline.
-//
-// In an error's safe details the lists are flat across leaves — leaf order,
-// then candidate order, with a locator two leaves share listed once —
-// because the fixture fixes them as arrays of locators; which leaf declared
-// a locator is recoverable from the candidate rows, which name the leaf. On
-// a record leaf they are that one leaf's pools.
-type Survivors struct {
-	BeforeConstraints     []string `json:"before_constraints"`
-	AfterRequire          []string `json:"after_require"`
-	AfterAvoid            []string `json:"after_avoid"`
-	AfterAvoidRestoration []string `json:"after_avoid_restoration"`
 }

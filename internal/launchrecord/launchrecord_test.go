@@ -381,3 +381,161 @@ func TestFailedResolutionCommitsNothing(t *testing.T) {
 		t.Errorf("a failed resolution recorded %d durable facts, want none", n)
 	}
 }
+
+// TestAPreStep13RecordStillLoads is the persisted shape's compatibility
+// gate.
+//
+// duo-config-v3 step 13 grows the launch-resolution record: the deduced
+// host, the evidence bundle, the declared relations, and a minted
+// composition on every assignment. The kernel stores the record as an
+// opaque body, so growth is only safe if the *old* body — one committed
+// before those fields existed — still decodes into the current type and
+// still says what it said.
+//
+// The literal below is a record this repository committed before step 13.
+// It must keep loading unchanged, with the new fields reading as absent
+// rather than as claims: an empty deduced host is "this record predates
+// late-bound hosts", not "this launch had no host".
+func TestAPreStep13RecordStillLoads(t *testing.T) {
+	const body = `{
+	  "id": "lrr_legacy_1",
+	  "request_id": "req_legacy",
+	  "caller": "operator",
+	  "resolved_at": "2026-08-23T12:00:00.000Z",
+	  "requested_preset": "review",
+	  "preset_locator": "presets.review",
+	  "configuration_digest": "sha256:legacy",
+	  "consulted_record_digests": ["sha256:conformance-fixture"],
+	  "selection": "ordered",
+	  "constraints": {"require": [], "avoid": []},
+	  "leaves": [
+	    {
+	      "name": "reviewer",
+	      "locator": "presets.review.leaves.reviewer",
+	      "declared_kind": "open",
+	      "candidates": [
+	        {
+	          "tuple": {
+	            "composition": "review_codex_gpt56@tmux",
+	            "agent_runtime": "codex",
+	            "model_line": "gpt-5.6",
+	            "model_family": "gpt",
+	            "launch_variant": "launch_variants.review_codex_gpt56",
+	            "agent_runtime_declaration": "agent_runtimes.codex_default",
+	            "host_kind": "tmux",
+	            "host_instance": "/run/tmux-1000/default",
+	            "host_version": "3.5a",
+	            "integration_instance_id": "local_tmux",
+	            "executable": "codex"
+	          },
+	          "order": 0,
+	          "outcome": "selected"
+	        }
+	      ],
+	      "survivors": {
+	        "before_constraints": ["launch_variants.review_codex_gpt56"],
+	        "after_require": ["launch_variants.review_codex_gpt56"],
+	        "after_avoid": ["launch_variants.review_codex_gpt56"],
+	        "after_avoid_restoration": []
+	      }
+	    }
+	  ],
+	  "relation_rejections": [],
+	  "avoid_relented": false,
+	  "restored_candidates": [],
+	  "eligible_assignments": 1,
+	  "assignment": [
+	    {
+	      "leaf": "reviewer",
+	      "tuple": {
+	        "composition": "review_codex_gpt56@tmux",
+	        "agent_runtime": "codex",
+	        "model_line": "gpt-5.6",
+	        "model_family": "gpt",
+	        "launch_variant": "launch_variants.review_codex_gpt56",
+	        "agent_runtime_declaration": "agent_runtimes.codex_default",
+	        "host_kind": "tmux",
+	        "host_instance": "/run/tmux-1000/default",
+	        "host_version": "3.5a",
+	        "integration_instance_id": "local_tmux",
+	        "executable": "codex"
+	      },
+	      "relented_avoids": []
+	    }
+	  ],
+	  "session_id": "ses_legacy_1",
+	  "instance_ids": ["inst_legacy_1"]
+	}`
+
+	var rec launch.Record
+	if err := json.Unmarshal([]byte(body), &rec); err != nil {
+		t.Fatalf("decoding a pre-step-13 record body: %v", err)
+	}
+
+	if rec.ID != "lrr_legacy_1" || rec.RequestedPreset != "review" {
+		t.Errorf("record identity = %s/%s, want lrr_legacy_1/review", rec.ID, rec.RequestedPreset)
+	}
+	if len(rec.Assignment) != 1 || rec.Assignment[0].Tuple.Composition != "review_codex_gpt56@tmux" {
+		t.Fatalf("assignment did not survive the decode: %+v", rec.Assignment)
+	}
+	// The new fields read as absent, and absent is honest: this record was
+	// written before the host was recorded, and nothing here invents one.
+	if rec.Host.Kind != "" || rec.Host.HostSource != "" {
+		t.Errorf("a pre-step-13 record decoded a deduced host %+v, want the zero value", rec.Host)
+	}
+	if rec.EvidenceBundle != nil {
+		t.Errorf("a pre-step-13 record decoded an evidence bundle %+v, want nil", rec.EvidenceBundle)
+	}
+	if rec.Assignment[0].Composition.Variant != "" {
+		t.Errorf("a pre-step-13 record decoded a minted composition %+v, want the zero value",
+			rec.Assignment[0].Composition)
+	}
+	// Re-serializing is what the recorder does; the round trip must not
+	// lose the old body's own content.
+	again, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatalf("re-serializing the decoded record: %v", err)
+	}
+	var back launch.Record
+	if err := json.Unmarshal(again, &back); err != nil {
+		t.Fatalf("decoding the re-serialized record: %v", err)
+	}
+	if !reflect.DeepEqual(rec, back) {
+		t.Error("a pre-step-13 record does not survive a decode/encode round trip unchanged")
+	}
+}
+
+// TestCommittedRecordCarriesTheDeducedHost is the growth's positive side: a
+// record this build commits *durably* carries the host M1 deduced, the rung that
+// produced it, and the composition each leaf's join minted — the three
+// things a v3 launch cannot be replayed without.
+func TestCommittedRecordCarriesTheDeducedHost(t *testing.T) {
+	h := newHarness(t)
+
+	if _, err := h.launcher.Launch(context.Background(), launch.SpawnRequest{
+		Request:       launch.Request{Preset: "review"},
+		WorkspacePath: workspacePath,
+	}); err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	stored, ok := h.authority.LaunchResolution("lrr_test_1")
+	if !ok {
+		t.Fatal("the kernel holds no launch-resolution record")
+	}
+	var rec launch.Record
+	if err := json.Unmarshal(stored.Body, &rec); err != nil {
+		t.Fatalf("decoding the durable record: %v", err)
+	}
+
+	if rec.Host.Kind == "" || rec.Host.HostSource == "" {
+		t.Errorf("committed record carries no deduced host: %+v", rec.Host)
+	}
+	if rec.Host.OutrankedEvidence == nil {
+		t.Error("committed record carries no outranked-evidence list; an empty list is the claim that nothing was outranked")
+	}
+	for _, a := range rec.Assignment {
+		if a.Composition.Variant == "" || a.Composition.Name == "" {
+			t.Errorf("assignment for leaf %q carries no minted composition: %+v", a.Leaf, a.Composition)
+		}
+	}
+}

@@ -434,7 +434,7 @@ presets:
 
 	r := newResolverOver(t, doc, materialized(t, doc))
 	err := resolveErr(t, r, launch.Request{Preset: "review"})
-	wantCode(t, err, launch.CodeCompositionUnresolved)
+	wantCode(t, err, launch.CodeVariantUnresolved)
 	if !strings.Contains(err.Message, "launch_variants.missing") {
 		t.Errorf("message = %q, want the declaration locator", err.Message)
 	}
@@ -461,7 +461,7 @@ presets:
           - variant: review
 `
 	err := resolveErr(t, newResolver(t, yaml), launch.Request{Preset: "review"})
-	wantCode(t, err, launch.CodeCompositionUnresolved)
+	wantCode(t, err, launch.CodeVariantUnresolved)
 	if !strings.Contains(err.Message, "agent_runtimes.codex_default") {
 		t.Errorf("message = %q, want the runtime declaration locator", err.Message)
 	}
@@ -564,13 +564,13 @@ func TestComplexityLimitIsADeclarationError(t *testing.T) {
 		o.Limits = launch.Limits{MaxLeaves: 16, MaxCandidatesPerLeaf: 2, MaxAssignments: 4096}
 	})
 	err := resolveErr(t, r, launch.Request{Preset: "review"})
-	wantCode(t, err, launch.CodeCompositionUnresolved)
+	wantCode(t, err, launch.CodeVariantUnresolved)
 
 	r = newResolver(t, scenarioYAML, func(o *launch.Options) {
 		o.Limits = launch.Limits{MaxLeaves: 16, MaxCandidatesPerLeaf: 64, MaxAssignments: 4}
 	})
 	err = resolveErr(t, r, launch.Request{Preset: "adversarial_pair"})
-	wantCode(t, err, launch.CodeCompositionUnresolved)
+	wantCode(t, err, launch.CodeVariantUnresolved)
 }
 
 // TestResolutionIsRepeatable is §7.2's baseline determinism contract in

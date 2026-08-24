@@ -1,0 +1,76 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_launch_mixed_exhausted",
+  "operation": "session.launch",
+  "error": {
+    "class": "invalid",
+    "code": "launch.constraints_exhausted",
+    "message": "Require model_family=gpt on leaf verifier left no complete assignment; the codex provider is also disabled.",
+    "retry": {"safe": true, "action": "change_constraints_or_preset"},
+    "effect": "no_effect",
+    "details": {
+      "requested_preset": "build_and_verify",
+      "constraints": {
+        "require": [{"axis": "model_family", "value": "gpt"}],
+        "avoid": []
+      },
+      "candidates": [
+        {
+          "leaf": "verifier",
+          "declaration_locator": "launch_variants.claude_sonnet",
+          "variant": "claude_sonnet",
+          "composition": {
+            "variant": "claude_sonnet",
+            "agent_runtime": "claude",
+            "model_line": "sonnet-5",
+            "model_family": "claude",
+            "host_kind": "solo",
+            "host_instance_id": "hostinst_solo_ws_abc"
+          },
+          "agent_runtime": "claude",
+          "model_line": "sonnet-5",
+          "model_family": "claude",
+          "elimination_reason": "require_unmatched"
+        },
+        {
+          "leaf": "verifier",
+          "declaration_locator": "launch_variants.pi_gpt56_codex",
+          "variant": "pi_gpt56_codex",
+          "composition": {
+            "variant": "pi_gpt56_codex",
+            "agent_runtime": "pi",
+            "model_line": "gpt-5.6-codex",
+            "model_family": "gpt",
+            "host_kind": "solo",
+            "host_instance_id": "hostinst_solo_ws_abc"
+          },
+          "agent_runtime": "pi",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "elimination_reason": "provider_disabled"
+        }
+      ],
+      "elimination_tallies": [
+        {"leaf": "verifier", "reason": "require_unmatched", "count": 1, "detail": "claude_sonnet"},
+        {"leaf": "verifier", "reason": "provider_disabled", "count": 1, "detail": "pi_gpt56_codex"}
+      ],
+      "host": {
+        "kind": "solo",
+        "instance_id": "hostinst_solo_ws_abc",
+        "instance_label": "solo@/run/user/1000/solo/ws_abc.sock",
+        "host_source": "workspace-correlation",
+        "workspace_id": "ws_abc"
+      },
+      "evidence_bundle": {
+        "correlation_fact_id": "fact_corr_ws_abc_solo",
+        "provider_fact_ids": ["fact_provider_codex_disabled"]
+      },
+      "pointers": {
+        "override_flag": "--host",
+        "provider_enable": "duo provider enable codex",
+        "workspace_host_rebind": "duo workspace host rebind"
+      },
+      "complete_assignments_survived": 0
+    }
+  }
+}

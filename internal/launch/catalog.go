@@ -50,6 +50,13 @@ type Tuple struct {
 	// provider names nothing a `duo provider disable` could have turned
 	// off. It is deliberately not a constraint axis (constraints.go).
 	Provider string `json:"provider,omitempty"`
+	// Variant is the bare declared launch-variant name, without the
+	// `launch_variants.` prefix. It is what the minted composition and the
+	// failure rows carry as `variant`
+	// (contracts/fixtures/duo-external-v1/session-launch-exhausted.json),
+	// beside the locator: a locator addresses a declaration, a variant
+	// names one, and duo-external-v1 asks for both.
+	Variant string `json:"variant"`
 	// LaunchVariant and AgentRuntimeDecl are the declaration locators the
 	// tuple was joined from. LaunchVariant is *the* candidate locator:
 	// candidate.locator, the survivor pools, and the failure details all
@@ -420,6 +427,7 @@ func (r *Resolver) mintTuple(name string) (Tuple, *Error) {
 		ModelLine:             variant.ModelLine,
 		ModelFamily:           variant.ModelFamily,
 		Provider:              variant.Provider,
+		Variant:               name,
 		LaunchVariant:         variantLocator,
 		AgentRuntimeDecl:      runtimeLocator,
 		HostKind:              r.host.Kind,

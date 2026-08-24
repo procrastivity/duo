@@ -140,33 +140,6 @@ presets:
           - variant: review_claude_opus4
 `
 
-// exhaustionYAML is the declaration
-// contracts/fixtures/duo-external-v1/session-launch-exhausted.json reports
-// on, carried onto v3: a `review` preset whose one leaf `reviewer` declares
-// exactly one candidate. The fixture's survivor pools list that one
-// locator, which is only true of a one-candidate declaration.
-const exhaustionYAML = `
-schema: duo.config/v3
-session_hosts:
-  prefer: [tmux]
-agent_runtimes:
-  codex_default:
-    kind: codex
-    executable: codex
-launch_variants:
-  review_codex_gpt56:
-    agent_runtime: codex_default
-    model_line: gpt-5.6
-    model_family: gpt
-presets:
-  review:
-    selection: ordered
-    leaves:
-      reviewer:
-        candidates:
-          - variant: review_codex_gpt56
-`
-
 // parseDoc resolves one duo.config/v3 document through the real strict
 // resolver. Every test starts from a document internal/config accepted, so
 // nothing here can pass on a shape the configuration boundary would reject.
@@ -402,4 +375,64 @@ func newLauncher(t *testing.T, r *launch.Resolver, recorder *recordingRecorder, 
 		t.Fatalf("launch.NewLauncher: %v", err)
 	}
 	return l
+}
+
+// --- fixture-scenario materialization -------------------------------------
+
+// fixedCorrelations is a workspace↔host read model with at most one
+// enrolled root and at most one binding. It is what lets a test drive M1's
+// correlation rung — the rung that outranks the ambient environment — with
+// no store behind it.
+type fixedCorrelations struct {
+	root      string
+	workspace domain.WorkspaceID
+	// binding is the persisted correlation, absent when the workspace is
+	// enrolled but nothing has bound it. An enrolled-but-unbound workspace
+	// is the ordinary case before a first bind, so it needs to be
+	// expressible.
+	binding *domain.HostBinding
+	factID  domain.FactID
+}
+
+func (c fixedCorrelations) WorkspaceForRoot(root string) (domain.Workspace, bool) {
+	if c.workspace == "" || root != c.root {
+		return domain.Workspace{}, false
+	}
+	return domain.Workspace{ID: c.workspace, RootPath: root}, true
+}
+
+func (c fixedCorrelations) HostCorrelation(id domain.WorkspaceID) (domain.HostCorrelation, bool) {
+	if c.binding == nil || id != c.workspace {
+		return domain.HostCorrelation{}, false
+	}
+	return domain.HostCorrelation{Binding: *c.binding, FactID: c.factID}, true
+}
+
+// ambient builds a LookupEnv over a fixed map, so a test can put a host's
+// published variables into a materialization without touching the process
+// environment. An empty map is a pane with no host variables in it.
+func ambient(vars map[string]string) func(string) (string, bool) {
+	return func(name string) (string, bool) {
+		v, ok := vars[name]
+		return v, ok
+	}
+}
+
+// fixtureMaterialization runs the real M1/M2 over one fixture scenario's
+// inputs. Everything outside the process is injected, so what comes back is
+// a deduction a test can reason about: one host, one rung that produced it,
+// and whatever evidence that rung outranked.
+func fixtureMaterialization(t *testing.T, opts materialize.Options) materialize.Result {
+	t.Helper()
+	if opts.LookupEnv == nil {
+		opts.LookupEnv = ambient(nil)
+	}
+	if opts.Now == nil {
+		opts.Now = fixedClock()
+	}
+	res, err := materialize.Materialize(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("materialize.Materialize: %v", err)
+	}
+	return res
 }
