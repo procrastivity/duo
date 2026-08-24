@@ -16,6 +16,8 @@ import (
 // XDG_DATA_HOME so the test never touches a real installation.
 func TestDoctorCommand_JSON(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // Step 15: no duo.config.yaml written under it
+	clearAmbientHerdrEnv(t)                  // Step 15: this repo dogfoods a live Herdr session
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	streams := &iostreams.Streams{Out: out, Err: errOut}
@@ -67,6 +69,8 @@ func TestDoctorCommand_JSON(t *testing.T) {
 // human-mode report lands on stdout with no error.
 func TestDoctorCommand_Human(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // Step 15: no duo.config.yaml written under it
+	clearAmbientHerdrEnv(t)                  // Step 15: this repo dogfoods a live Herdr session
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	streams := &iostreams.Streams{Out: out, Err: errOut}
