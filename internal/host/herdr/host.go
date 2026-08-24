@@ -138,14 +138,6 @@ func (c Config) validate() error {
 	return nil
 }
 
-// InstanceIDForSession is the conventional integration-instance ID for a
-// Herdr session name. Herdr has no server identity of its own, so the
-// session name — which is what selects a socket — is the identity Duo
-// records.
-func InstanceIDForSession(session string) string {
-	return "herdr:" + session
-}
-
 // New builds a Host from a validated config.
 func New(cfg Config) (*Host, error) {
 	if err := cfg.validate(); err != nil {

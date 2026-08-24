@@ -199,12 +199,14 @@ func humanReport(report doctorReport) string {
 //     binding two different ways;
 //   - the M1/M2 materializer (internal/launch/materialize, Step 11),
 //     called with the real correlation and provider read models
-//     (*domain.Authority satisfies both narrow interfaces) and no
-//     discovery adapter (this composition root wires none yet — see the
-//     wip finding); Materialize itself never checks reachability (I-3)
-//     and never writes, so calling it here is exactly as read-only as
-//     calling it from the launch path would be, just without a spawn
-//     following it;
+//     (*domain.Authority satisfies both narrow interfaces) and the same
+//     stage1Discovery the launch path wires (Step 14), so doctor and
+//     `duo session launch` deduce from identical inputs and can never
+//     disagree about what the next launch would do; Materialize itself
+//     never checks reachability (I-3) and never writes, and enumerating
+//     instances is a directory read, not a dial — so calling it here is
+//     exactly as read-only as calling it from the launch path would be,
+//     just without a spawn following it;
 //   - the standing provider facts (domain.Authority.StandingProviderFacts,
 //     Step 08).
 //
@@ -406,12 +408,11 @@ func doctorHostBinding(a *domain.Authority, root string) workspaceHostShowResult
 // deduced (or why nothing resolved).
 //
 // This is the whole of Step 15's "read-only reuse": no bind/rebind API is
-// ever called here, and Discovery is left nil because this composition
-// root does not wire a host-instance discovery adapter yet (the launcher
-// wiring, Step 14, is a separate concurrent step) — Materialize's own
-// policy-default rung already says "no host-instance discovery is
-// available in this build" out loud when that matters, which is exactly
-// the honest answer for a build with none wired.
+// ever called here. Discovery is stage1Discovery, the same discoverer the
+// launch path wires (Step 14) — doctor's job is to report what the next
+// launch would deduce, and a doctor that deduced from a smaller set of
+// inputs than the launcher would report a different answer than the one
+// the operator is about to get.
 func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, policy config.SessionHostPolicy) doctorHostDeductionSection {
 	section := doctorHostDeductionSection{OutrankedEvidence: []doctorOutrankedEvidence{}}
 
@@ -420,6 +421,7 @@ func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, 
 		Policy:        policy,
 		Correlations:  a,
 		Providers:     a,
+		Discovery:     stage1Discovery{},
 	})
 
 	var partial *materialize.Error

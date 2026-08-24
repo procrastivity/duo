@@ -18,11 +18,33 @@ import (
 type Error struct {
 	Code    string
 	Message string
+	// Details is the failure's *safe* detail payload, in the shape the
+	// duo.external/v1 error object fixes for that code, or nil when the
+	// code carries none. It is rendered only under --json, where the
+	// envelope has somewhere to put it; human mode stays one line.
+	//
+	// It exists because two launch failures owe the caller more than a
+	// sentence: `launch.constraints_exhausted` and
+	// `launch.no_eligible_candidate` carry the per-reason tallies, the
+	// deduced host, the evidence bundle, and the pointer set — the ways
+	// out — and a projection that dropped them would make the operator
+	// re-run the command in another mode to learn what to do
+	// (duo-vnext-projection-contracts.md §2.1, 2026-08-24 handoff 22).
+	// Nothing here needs a permission beyond the operation's own; local
+	// paths and raw adapter text stay behind diagnostics.read.
+	Details any
 }
 
 // New constructs a verb-raised structured error.
 func New(code, message string) *Error {
 	return &Error{Code: code, Message: message}
+}
+
+// WithDetails attaches a safe detail payload to err and returns it, so a
+// projection can build the error and its details in one expression.
+func (e *Error) WithDetails(details any) *Error {
+	e.Details = details
+	return e
 }
 
 func (e *Error) Error() string {
@@ -50,12 +72,20 @@ func renderJSON(w io.Writer, err *Error) {
 		Error struct {
 			Code    string `json:"code"`
 			Message string `json:"message"`
+			Details any    `json:"details,omitempty"`
 		} `json:"error"`
 	}{}
 	envelope.Error.Code = err.Code
 	envelope.Error.Message = err.Message
+	envelope.Error.Details = err.Details
 
-	// Two plain strings cannot fail to encode; no fallback path needed.
-	b, _ := json.Marshal(envelope)
+	b, marshalErr := json.Marshal(envelope)
+	if marshalErr != nil {
+		// A caller handed us details that will not encode. The code and
+		// the message always will, so the envelope still goes out — a
+		// failure must never be swallowed by its own detail payload.
+		envelope.Error.Details = nil
+		b, _ = json.Marshal(envelope)
+	}
 	_, _ = fmt.Fprintln(w, string(b))
 }

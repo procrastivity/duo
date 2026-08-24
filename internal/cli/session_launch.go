@@ -1,10 +1,11 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -55,6 +56,7 @@ func defaultLaunchConfigPath() (string, error) {
 func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	var (
 		workspace    string
+		hostFlag     string
 		configPath   string
 		requireFlags []string
 		avoidFlags   []string
@@ -71,15 +73,6 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 			mode, err := outputMode(cmd)
 			if err != nil {
 				return err
-			}
-
-			ws := workspace
-			if ws == "" {
-				wd, err := os.Getwd()
-				if err != nil {
-					return duoerr.New("internal.cwd_unresolved", fmt.Sprintf("resolving the working directory: %v", err))
-				}
-				ws = wd
 			}
 
 			path := configPath
@@ -104,27 +97,33 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				return err
 			}
 
-			// --- STEP-12 TEMPORARY SHIM -------------------------------
-			// duo-config-v3 step 12 replaced the resolver's v2 entry
-			// point, which left this command uncompilable. This block is
-			// the smallest thing that keeps the binary and its tests
-			// honest until step 14 owns the launch wiring properly.
-			//
-			// What it does NOT do, and what step 14 adds: the --host
-			// flag, the workspace<->host correlation and standing
-			// provider read models (M1 rungs 2 and 4's state inputs),
-			// instance discovery, the first-bind write after a successful
-			// spawn, and the launch-output rail that names the deduced
-			// instance, its host_source, and the outranked evidence. With
-			// no correlation source and no discoverer, deduction here
-			// reaches only the ambient-environment rung.
+			// The authority opens before materialization, not after: M1's
+			// correlation rung and M2's provider snapshot both read it, and
+			// a dry run must read exactly what a real launch would. A dry
+			// run opens read-only, so previewing a launch never takes the
+			// authority-writer lease and never creates a store.
+			a, closer, err := openLaunchAuthority(cmd.Context(), !dryRun)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = closer.Close() }()
+
+			// M1/M2 (internal/launch/materialize, step 11) with the real
+			// read models: *domain.Authority satisfies both narrow
+			// interfaces, and stage1Discovery enumerates the session-host
+			// instances this build has an adapter for. Nothing here checks
+			// that the deduced instance is reachable (I-3).
 			mat, err := materialize.Materialize(cmd.Context(), materialize.Options{
-				WorkspaceFlag:   ws,
+				WorkspaceFlag:   workspace,
+				HostFlag:        hostFlag,
 				RequestedPreset: args[0],
 				Policy:          doc.SessionHosts,
+				Correlations:    a,
+				Providers:       a,
+				Discovery:       stage1Discovery{},
 			})
 			if err != nil {
-				return err // already a *duoerr.Error
+				return launchFailure(streams, mode, err)
 			}
 
 			resolver, err := launch.NewResolver(doc, mat, launch.Options{
@@ -135,7 +134,6 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 			if err != nil {
 				return duoerr.New("internal.launch_resolver_build_failed", err.Error())
 			}
-			// --- end STEP-12 TEMPORARY SHIM ---------------------------
 
 			req := launch.Request{
 				Preset:    args[0],
@@ -149,20 +147,14 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 			if dryRun {
 				resolution, err := resolver.Resolve(req)
 				if err != nil {
-					return launchDuoErr(err)
+					return launchFailure(streams, mode, err)
 				}
 				report = resolution.Report()
 				report.LaunchResolutionID = "" // §6.10: a dry run commits no record.
 				report.Preview = true
 			} else {
-				a, s, err := openWriteAuthority(cmd.Context())
-				if err != nil {
-					return err
-				}
-				defer func() { _ = s.Close() }()
-
 				recorder, err := launchrecord.New(a, launchrecord.Options{
-					WorkspacePath: ws,
+					WorkspacePath: mat.WorkspacePath(),
 					Actor:         actor,
 					Owner:         owner,
 					BindActor:     domain.ActorID(bindActor),
@@ -174,15 +166,16 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				if err != nil {
 					return duoerr.New("internal.launcher_build_failed", err.Error())
 				}
-				result, err := launcher.Launch(cmd.Context(), launch.SpawnRequest{
+				report, err = launchAndBind(cmd.Context(), streams, a, launcher, launch.SpawnRequest{
 					Request:       req,
-					WorkspacePath: ws,
-				})
+					WorkspacePath: mat.WorkspacePath(),
+				}, mat, actor)
 				if err != nil {
-					return launchDuoErr(err)
+					return launchFailure(streams, mode, err)
 				}
-				report = result.Report
 			}
+
+			writeCorrelationNote(streams, report.Host)
 
 			if mode == "json" {
 				b, err := json.Marshal(newEnvelope("session.launch", report))
@@ -197,6 +190,8 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&workspace, "workspace", "", "the launched execution's working directory (defaults to the current directory)")
+	cmd.Flags().StringVar(&hostFlag, "host", "",
+		`the session host to launch into, "<kind>" or "<kind>:<instance>": deduction rung 0, outranking the workspace correlation, the ambient environment, and the policy default`)
 	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
 	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime, model_line, or model_family); repeatable")
 	cmd.Flags().StringArrayVar(&avoidFlags, "avoid", nil, "a soft launch constraint, axis=value; repeatable")
@@ -229,17 +224,97 @@ func parseConstraints(raw []string) ([]launch.Constraint, error) {
 	return out, nil
 }
 
+// openLaunchAuthority opens the authority store for one launch: as the
+// durable writer for a real launch, read-only for a dry run.
+//
+// A dry run reads the same two models a real launch does — the workspace↔
+// host correlation M1 consults and the standing provider facts M2
+// snapshots — so its preview is the decision the real launch would make.
+// What it must not do is take the authority-writer lease or create a store
+// that was not there: §6.10 makes a dry run create no durable anything, and
+// a preview that locked out a concurrent duo would be a write in all but
+// name.
+func openLaunchAuthority(ctx context.Context, write bool) (*domain.Authority, io.Closer, error) {
+	if !write {
+		return openReadAuthority(ctx)
+	}
+	a, s, err := openWriteAuthority(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	// A typed nil *store.Store would make the returned io.Closer non-nil,
+	// so the success path is the only one that wraps it.
+	var closer io.Closer = s
+	return a, closer, nil
+}
+
+// launchAndBind is the whole of the post-resolution path: spawn, and then —
+// only if the spawn succeeded — the cold-start first bind.
+//
+// The two live in one function so the ordering is a property of the code
+// rather than of the order two statements happen to appear in a command
+// handler. Launcher.Launch already makes "record before spawn" unforgeable
+// (its unexported `committed` token, invariant I-1); this makes "spawn
+// before bind" just as plain: the bind is unreachable from a Launch that
+// returned an error, so a failing Start writes no correlation fact.
+func launchAndBind(
+	ctx context.Context,
+	streams *iostreams.Streams,
+	a *domain.Authority,
+	launcher *launch.Launcher,
+	req launch.SpawnRequest,
+	mat materialize.Result,
+	actor string,
+) (launch.Report, error) {
+	result, err := launcher.Launch(ctx, req)
+	if err != nil {
+		// A resolution failure recorded nothing; a spawn failure after the
+		// commit left the record standing (§7.4). Neither is a session
+		// running on the deduced host, and only a running session is
+		// evidence a correlation may rest on.
+		return launch.Report{}, err
+	}
+	bindFirstHost(ctx, streams, a, mat, result, actor)
+	return result.Report, nil
+}
+
+// launchFailure renders whatever a failure owes the operator beyond its
+// message, then projects it onto the chassis's structured error.
+//
+// In text mode the pointer set goes to stderr as typed commands, because
+// duoerr.Render's human line carries the message and nothing else. In JSON
+// mode nothing is written here: the whole safe detail payload — tallies,
+// deduced host, evidence bundle, pointers — rides the error envelope
+// duoerr.Render emits, which is where a machine reader expects it.
+func launchFailure(streams *iostreams.Streams, mode string, err error) *duoerr.Error {
+	de := launchDuoErr(err)
+	if mode != "json" {
+		writeFailureRail(streams, de.Details)
+	}
+	return de
+}
+
 // launchDuoErr projects a launch-resolution failure onto the chassis's
-// structured error. A *launch.Error carries its own registered stable code
-// (internal/launch/errors.go); a *scrub.RefusalError is the spawn-environment
-// gate tripping, which is a guard refusal and not an internal failure;
-// anything else reached here from Launcher.Launch's host-side spawn step,
-// which this package's host set and Stage-1 support oracle raise as plain
-// errors.
+// structured error.
+//
+// A *launch.Error and a *materialize.Error each carry their own registered
+// stable code and their own duo.external/v1 safe details, which travel with
+// the projection so --output json emits the whole object. A
+// *scrub.RefusalError is the spawn-environment gate tripping, which is a
+// guard refusal and not an internal failure. An already-structured
+// *duoerr.Error passes through unchanged — ParseHostFlag raises one for a
+// malformed --host, and re-wrapping it would bury a caller-correctable
+// grammar error under an internal code. Anything else reached here from
+// Launcher.Launch's host-side spawn step, which this package's host set and
+// Stage-1 support oracle raise as plain errors.
 func launchDuoErr(err error) *duoerr.Error {
 	var lerr *launch.Error
 	if errors.As(err, &lerr) {
-		return lerr.Duo()
+		return lerr.Duo().WithDetails(lerr.Details)
+	}
+	var merr *materialize.Error
+	if errors.As(err, &merr) {
+		return merr.Duo().WithDetails(merr.Details)
 	}
 	var refusal *scrub.RefusalError
 	if errors.As(err, &refusal) {
@@ -251,29 +326,141 @@ func launchDuoErr(err error) *duoerr.Error {
 		// registers a v1 wire code for this gate.
 		return duoerr.New("refusal.spawn_environment", refusal.Error())
 	}
+	var derr *duoerr.Error
+	if errors.As(err, &derr) {
+		return derr
+	}
 	return duoerr.New("internal.launch_failed", err.Error())
 }
 
+// failureRail is the part of a launch failure's safe details this package
+// re-renders for a human: the deduced host and the pointer set.
+//
+// It is decoded out of the details payload rather than type-asserted onto
+// it, and that is deliberate. internal/launch's failureDetails and
+// internal/launch/materialize's HostUnresolvedDetails are two unexported
+// (or package-local) shapes that agree on exactly these duo.external/v1
+// members; going through the wire encoding reads what the contract fixes,
+// and cannot bind this renderer to either package's Go type.
+type failureRail struct {
+	Host struct {
+		Kind          string `json:"kind"`
+		InstanceLabel string `json:"instance_label"`
+		HostSource    string `json:"host_source"`
+	} `json:"host"`
+	Pointers *materialize.PointerSet `json:"pointers"`
+}
+
+// writeFailureRail prints the deduced host and the pointer set — the ways
+// out — on stderr.
+//
+// The pointer set is `details.pointers` verbatim: the same three members
+// the JSON envelope carries, in the same words, so an operator reading the
+// human output and one reading the envelope are told to type the same
+// things (duo-vnext-projection-contracts.md §2.1's launch-verb block).
+func writeFailureRail(streams *iostreams.Streams, details any) {
+	if details == nil {
+		return
+	}
+	raw, err := json.Marshal(details)
+	if err != nil {
+		return
+	}
+	var rail failureRail
+	if err := json.Unmarshal(raw, &rail); err != nil {
+		return
+	}
+
+	if rail.Host.Kind != "" {
+		_, _ = fmt.Fprintf(streams.Err, "duo: host:      %s:%s (host_source=%s)\n",
+			rail.Host.Kind, rail.Host.InstanceLabel, rail.Host.HostSource)
+	}
+	if rail.Pointers == nil || *rail.Pointers == (materialize.PointerSet{}) {
+		return
+	}
+	_, _ = fmt.Fprintln(streams.Err, "duo: ways out:")
+	for _, pointer := range []struct{ label, value string }{
+		{"override flag", rail.Pointers.OverrideFlag},
+		{"provider enable", rail.Pointers.ProviderEnable},
+		{"workspace host rebind", rail.Pointers.WorkspaceHostRebind},
+	} {
+		if pointer.value == "" {
+			continue
+		}
+		_, _ = fmt.Fprintf(streams.Err, "duo:   %-22s %s\n", pointer.label+":", pointer.value)
+	}
+}
+
+// writeCorrelationNote is thread 3 (nested launch), which this step owns.
+//
+// A persisted correlation outranks the ambient environment by design: it is
+// intent, the pane is accident, and notes/19 §0's inherited-socket footgun
+// is why Duo inverts Herdr's own precedence. The cost of that choice is
+// that a Duo run from inside pane B, in a workspace bound to server A,
+// launches into A — correctly, and invisibly, unless the output says so.
+//
+// So whenever the correlation won over a captured ambient environment, the
+// note names both instances and the audited verb that changes the binding.
+// It goes to stderr in both output modes: --output json's stdout carries
+// exactly one envelope, and the machine reader already has the same facts
+// in `result.host.outranked_evidence`.
+func writeCorrelationNote(streams *iostreams.Streams, host *launch.WireHost) {
+	if host == nil || host.HostSource != string(domain.HostSourceWorkspaceCorrelation) {
+		return
+	}
+	for _, outranked := range host.OutrankedEvidence {
+		if outranked.Source != string(domain.HostSourceAmbientEnv) || len(outranked.Captures) == 0 {
+			continue
+		}
+		_, _ = fmt.Fprintf(streams.Err,
+			"duo: this workspace's recorded correlation chose %s:%s and outranked the ambient environment of the pane you are in.\n",
+			host.Kind, host.InstanceLabel)
+		for _, capture := range outranked.Captures {
+			_, _ = fmt.Fprintf(streams.Err, "duo:   outranked: %s=%s\n", capture.Name, capture.Value)
+		}
+		_, _ = fmt.Fprintf(streams.Err, "duo: %s\n", rebindPointer(host.Kind+":"+host.InstanceLabel))
+		return
+	}
+}
+
 func renderLaunchReportText(streams *iostreams.Streams, r launch.Report) error {
+	var b strings.Builder
 	if r.Preview {
-		if _, err := fmt.Fprintln(streams.Out, "preview only: no session, no durable record, no spawn"); err != nil {
-			return err
-		}
+		b.WriteString("preview only: no session, no durable record, no spawn\n")
 	} else {
-		if _, err := fmt.Fprintf(streams.Out, "session:  %s\nrecord:   %s\n", r.SessionID, r.LaunchResolutionID); err != nil {
-			return err
-		}
+		fmt.Fprintf(&b, "session:  %s\nrecord:   %s\n", r.SessionID, r.LaunchResolutionID)
 	}
-	if _, err := fmt.Fprintf(streams.Out, "selection: %s\n", r.Selection); err != nil {
-		return err
-	}
+	writeDeducedHostLines(&b, r.Host)
+	fmt.Fprintf(&b, "selection: %s\n", r.Selection)
 	for _, leaf := range r.Leaves {
-		if _, err := fmt.Fprintf(streams.Out, "  %s: %s / %s (%s) -> %s\n",
-			leaf.Name, leaf.AgentRuntime, leaf.ModelLine, leaf.DeclaredKind, leaf.Outcome); err != nil {
-			return err
-		}
+		fmt.Fprintf(&b, "  %s: %s / %s (%s) -> %s\n",
+			leaf.Name, leaf.AgentRuntime, leaf.ModelLine, leaf.DeclaredKind, leaf.Outcome)
 	}
-	return nil
+	_, err := fmt.Fprint(streams.Out, b.String())
+	return err
+}
+
+// writeDeducedHostLines prints the late-bound host every v3 launch resolved
+// against: the instance, the rung that produced it, and every piece of
+// evidence a higher rung beat.
+//
+// It is not decoration. Under v3 the host is state, deduced per launch, so
+// an operator reading a result has no other way to tell which server their
+// session went to — or that a stale workspace correlation chose it
+// (duo-vnext-installation-contract.md §1.1, "the deduced instance and its
+// host_source are explicit in launch output and in duo doctor").
+func writeDeducedHostLines(b *strings.Builder, host *launch.WireHost) {
+	if host == nil || host.Kind == "" {
+		return
+	}
+	fmt.Fprintf(b, "host:      %s:%s (host_source=%s)\n", host.Kind, host.InstanceLabel, host.HostSource)
+	for _, outranked := range host.OutrankedEvidence {
+		detail := outranked.Detail
+		if outranked.InstanceLabel != "" {
+			detail = outranked.Kind + ":" + outranked.InstanceLabel + " (" + detail + ")"
+		}
+		fmt.Fprintf(b, "  outranked %-22s %s\n", outranked.Source+":", detail)
+	}
 }
 
 // --- Stage-1 host set and support oracle --------------------------------
@@ -336,11 +523,11 @@ func (stage1Support) Supported(t launch.Tuple) launch.Verdict {
 // anything else refuses with a clear, unambiguous message rather than
 // guessing at a launcher for it.
 //
-// STEP-12 TEMPORARY SHIM: the kind and the instance now come off the tuple
-// (the host M1 deduced) rather than off a config session-host declaration,
-// which is the shape step 14 keeps. Everything around it is still step
-// 14's: the --host flag that feeds the deduction, the correlation read
-// model, and the first bind after a successful spawn.
+// The kind and the instance come off the tuple — the one host M1 deduced
+// for this launch — and never off a config session-host declaration:
+// `duo.config/v3`'s session_hosts block is host-kind policy and carries no
+// instance at all. Two workspaces bound to two Herdr sockets build two
+// adapters from one configuration.
 type stage1HostSet struct{}
 
 func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
