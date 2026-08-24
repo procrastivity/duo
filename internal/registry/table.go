@@ -160,6 +160,32 @@ var table = []Descriptor{
 		Route:          nil,
 		Milestone:      true,
 	},
+	{
+		// "config.migrate" is an authored operation name for the
+		// duo-vnext-installation-contract.md §1.3 `duo config migrate`
+		// verb (workplan Step 07). It is not a dogfood-milestone
+		// operation, so Milestone stays the zero value (false).
+		//
+		// Permissions: no name in the registered permission vocabulary
+		// (duo-vnext-access-errors-audit.md §1.1) covers "author or
+		// transform a local configuration document" — config.migrate
+		// never opens the authority store or reaches a live daemon, the
+		// same reasoning manifest.show's row states ("installed-product
+		// read; no grant required"), extended here to a local,
+		// operator-invoked read/write of a document the operator names on
+		// the command line. Flagged per docs/registry/decisions.md
+		// ("Permission gaps in the planning set, flagged").
+		Name:           "config.migrate",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    nil,
+		Idempotency:    IdempotencyNotApplicable,
+		Audit:          AuditNone,
+		CLI:            []string{"config", "migrate"},
+		MCPTool:        "",
+		Route:          nil,
+	},
 
 	// --- Contract-attested v1 surface beyond the milestone (data rows) ---
 	{

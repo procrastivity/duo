@@ -1,0 +1,51 @@
+{
+  "schema": "duo.config/v2",
+  "authority": {
+    "socket": "/run/user/1000/duo/duo.sock"
+  },
+  "workspaces": {
+    "main": {
+      "root": "/work/example",
+      "discovery": "explicit"
+    }
+  },
+  "session_hosts": {
+    "local_tmux": {
+      "kind": "tmux",
+      "server": "default"
+    }
+  },
+  "agent_runtimes": {
+    "codex_default": {
+      "kind": "codex"
+    }
+  },
+  "launch_variants": {
+    "codex_in_tmux": {
+      "agent_runtime": "codex_default",
+      "session_host": "local_tmux",
+      "executable": "codex",
+      "arguments": []
+    }
+  },
+  "compositions": {
+    "review": {
+      "launch_variant": "codex_in_tmux",
+      "model_line": "gpt-5.6"
+    }
+  },
+  "presets": {
+    "review": {
+      "selection": "ordered",
+      "leaves": {
+        "main": {
+          "candidates": [
+            {
+              "composition": "review"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
