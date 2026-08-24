@@ -88,3 +88,24 @@ outlives the launched agent in the pane; `duo doctor` does not warn
 when a deduced host's panes would fail the scrub gate. The first e2e
 attempt was itself refused by that gate (probe server carried inherited
 agent markers) — the gate failed closed, correctly.
+
+### Addendum: the pi leg was dead in real use (found by dogfood, fixed same day)
+
+User report: claude closes, pi does not. Root cause: the pi close logic
+lived only in the shipped reporter extension, and nothing installs that
+extension in production — RenderExtension/ExtensionFileName had zero
+non-test call sites (the package doc calls installation someone else's
+concern; that someone was never built). The e2e pass had been carried
+by the verification harness's own project-local install.
+
+Fix: a minimal close-only extension
+(internal/runtime/pi/closeonexit/duo-close-on-exit.ts), materialized
+per launch into the harness dir and loaded with pi's `-e <path>` flag —
+the exact mirror of the claude `--settings` leg. The activation env var
+stays as the in-extension guard. Verified CLI-level on a fresh
+marker-free server with the masking install deleted first: pi Ctrl-D →
+container gone 2/2, no trust prompt on explicit `-e` (the project-local
+route had demanded one), flag-off negative checks clean, claude leg
+undisturbed. The harness-dir leak now reproduces on both legs (one
+orphan dir per flag-on launch) — still a recorded notes/46 §10 debt.
+Updated transcripts: close-on-exit/e2e-results.md.

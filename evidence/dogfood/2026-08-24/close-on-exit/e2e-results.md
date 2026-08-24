@@ -535,3 +535,203 @@ leg (`lrr_9603ec...`) correctly created nothing — the leak is claude-leg-only.
 - No server was started or stopped.
 - `/home/dev/Code/duo-vnext` working tree still unmodified beyond the original
   6 modified + 4 untracked files.
+
+---
+
+# pi -e fix rerun (duo46-fix)
+
+The earlier pi PASS was invalid: it was carried by a **project-local install of
+the reporter extension** at `SP/proj/.pi/extensions/duo-pi-reporter.ts` that I
+had created by hand. Nothing installs that extension in production, so the env
+var alone was inert — my harness masked the defect.
+
+**First action of this round was to delete that install** (`rm -rf SP/proj/.pi`),
+so nothing project-local could mask the new mechanism. Verified absent before
+every launch below.
+
+Binary: `make build` -> `/home/dev/Code/duo-vnext/bin/duo`,
+`duo version c2cab35-dirty (commit c2cab35, built 2026-08-24T22:55:27Z)`.
+`~/.local/bin/duo-go` was not overwritten.
+Server: `/home/dev/.config/herdr/sessions/duo46-fix/herdr.sock`, empty at start.
+Deduction re-confirmed via `duo doctor` -> `host_source=ambient-env` on that socket.
+
+## Fix under test
+
+`stage1LeafAugmenter.Augment`'s `case "pi"` now materializes
+`internal/runtime/pi/closeonexit/duo-close-on-exit.ts` into the same per-launch
+harness dir and returns `Args: ["-e", extensionPath]` **plus** the existing
+`Env: {DUO_CLOSE_PANE_ON_EXIT: "1"}`.
+
+## Leg 1 — pi, `--close-on-exit`, Ctrl-D
+
+```
+$ bin/duo session launch probe_pi --close-on-exit
+exit=0
+record:   lrr_3f116c8024124841ea71bf269da5660f
+  main: pi / gpt-5.6-luna (determined) -> selected
+snapshot: workspaces ['w1'] tabs ['w1:t1'] panes ['w1:p1']
+```
+
+Materialized file:
+
+```
+SP/xdg/data/duo/harness/lrr_3f116c8024124841ea71bf269da5660f/main/
+drwx------  (dir 0700)
+-rw-------  duo-close-on-exit.ts   5420 bytes   (0600, matching closeonexit.go)
+```
+
+`DUO_CLOSE_PANE_ON_EXIT=1` confirmed on the pi process's own
+`/proc/<pid>/environ`.
+
+**Live argv.** `pi` rewrites its process title, so `/proc/<pid>/cmdline` and
+herdr's `pane.process_info` both report bare `pi`. Captured from the pane screen
+on a second flag-on launch instead, read before it scrolled
+(`lrr_9d67f3fa4798759f39d369eb341f5420`):
+
+```
+λ …/proj › pi --provider openai-codex --model gpt-5.6-luna \
+  -e /tmp/.../xdg/data/duo/harness/lrr_9d67f3fa4798759f39d369eb341f5420/main/duo-close-on-exit.ts
+```
+
+`-e` is appended after the variant's own `append_arguments`, and the path names
+that launch's own resolution id.
+
+**Independent proof the `-e` load is what activated it** — pi's startup banner
+lists the extension, and it exists in no discovery path:
+
+```
+[Extensions]
+  duo-close-on-exit.ts, herdr-agent-state.ts, moshi-hooks.ts, pi-effort
+
+$ ls ~/.pi/agent/extensions/     -> herdr-agent-state.ts, moshi-hooks.ts   (no duo file)
+$ ls -d SP/proj/.pi              -> No such file or directory
+```
+
+`duo-pi-reporter.ts` is correctly **absent** from the loaded list — the fix does
+not depend on the reporter.
+
+Ctrl-D, both runs:
+
+```
+run 1: t+1s panes ['w1:p1']  ->  t+2s workspaces [] tabs [] panes []
+run 2: t+1s panes ['w2:p1']  ->  t+2s workspaces [] tabs [] panes []
+```
+
+**Verdict: PASS (2/2).**
+
+## Trust prompt: NONE
+
+The specific question — whether the explicit `-e` load triggers pi's project
+trust gate — answers **no**. The pane screen goes straight from the typed launch
+line to pi's banner:
+
+```
+λ …/proj › pi --provider openai-codex --model gpt-5.6-luna -e /tmp/.../duo-close-on-exit.ts
+
+ pi v0.83.0
+ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+```
+
+No "Trust project folder?" dialog appeared on either flag-on launch, and none was
+answered. This is a real improvement over the old project-local approach, which
+required a trust answer ("Trust (this session only)") before the extension would
+load — an interactive gate no headless duo launch could have cleared. Consistent
+with the asset's own note that an explicit `-e` path bypasses discovery entirely.
+
+## Leg 2 — pi control, flag off
+
+```
+$ bin/duo session launch probe_pi
+exit=0
+record:   lrr_c91791a504402e15beafd37c1e980bd4
+snapshot: workspaces ['w3'] tabs ['w3:t1'] panes ['w3:p1']
+```
+
+Four negative checks, all correct:
+
+```
+typed line:   pi --provider openai-codex --model gpt-5.6-luna     (no -e)
+harness dir:  lrr_c91791a504402e15beafd37c1e980bd4 -> does not exist
+pane env:     no DUO_* variables at all
+[Extensions]: herdr-agent-state.ts, moshi-hooks.ts, pi-effort     (no duo file)
+```
+
+After `ctrl+d`, 12 s of polling:
+
+```
+t+1s .. t+12s: workspaces ['w3'] tabs ['w3:t1'] panes ['w3:p1']
+pane.process_info -> shell_pid 3352922, fg 3352922 bash /bin/bash
+```
+
+**Verdict: PASS.** pi exits, the pane stays at the shell.
+
+## Leg 3 — claude regression, flag on
+
+```
+$ bin/duo session launch probe_claude --close-on-exit
+exit=0
+record:   lrr_bcfe54f8c3d1f951f8fe95c3f5aa41a4
+snapshot: workspaces ['w3'] tabs ['w3:t1','w3:t2'] panes ['w3:p1','w3:p2']
+```
+
+Claude branch untouched by the pi change:
+
+```
+live argv: claude --model haiku --settings \
+  SP/xdg/data/duo/harness/lrr_bcfe54f8c3d1f951f8fe95c3f5aa41a4/main/close-on-exit-settings.json
+harness dir contents (claude files only, no pi extension):
+  -rw-------  close-on-exit-settings.json   356   (0600)
+  -rwx------  session-end-hook.sh          4184   (0700)
+```
+
+After `/exit`:
+
+```
+t+1s .. t+7s: tabs ['w3:t1','w3:t2'] panes ['w3:p1','w3:p2']
+t+8s:         tabs ['w3:t1']         panes ['w3:p1']
+```
+
+**Verdict: PASS.** Claude's container (pane + its lone tab) closes; the workspace
+survives because the leg-2 control pane still holds a tab — correct scoping.
+
+## Unit tests
+
+`go test ./internal/runtime/pi/... ./internal/cli/... ./internal/runtime/claude/...
+./internal/launch/...` — all `ok`.
+
+## Rerun summary
+
+| leg | verdict |
+|---|---|
+| 1 — pi, flag on, `-e <path>` + Ctrl-D -> container gone | **PASS** (2/2) |
+| 2 — pi control, flag off -> pane survives | **PASS** |
+| 3 — claude regression, flag on -> container gone | **PASS** |
+| pi trust prompt on explicit `-e` | **none — no gate, nothing answered** |
+
+## Harness leak: still open, now on both legs
+
+The claude-leg leak reported earlier now reproduces on the pi leg too — each
+flag-on launch leaves its generated file behind after the session ends. Six
+orphan directories accumulated across this session's launches:
+
+```
+lrr_3f116c8024124841ea71bf269da5660f   pi   (duo46-fix leg 1 run 1)
+lrr_9d67f3fa4798759f39d369eb341f5420   pi   (duo46-fix leg 1 run 2)
+lrr_bcfe54f8c3d1f951f8fe95c3f5aa41a4   claude (duo46-fix leg 3)
+lrr_816026501e8c5e35c4ab801abc57d718   claude (duo46-clean leg 1)
+lrr_9018ae2cbc078ee65a43afb8a0a43188   claude (duo46-clean leg 2)
+lrr_9210b89b3b4d0a31403cd6aab980a03b   claude (the original REFUSED launch)
+```
+
+Flag-off launches correctly create nothing.
+
+## Cleanup (pi -e fix rerun)
+
+- `w3:p1`, the control pane that survived by design in leg 2, closed with
+  `pane.close` on the `duo46-fix` socket.
+- Final `session.snapshot` on `duo46-fix`:
+  `{"workspaces": [], "tabs": [], "panes": [], "layouts": [], "agents": []}`
+- Server left running; no server started or stopped.
+- `SP/proj/.pi/` remains deleted — the masking install is gone for good.
+- `~/.pi/agent/` and `~/.claude/settings.json` untouched; no pi trust entry was
+  created this round (no prompt appeared).

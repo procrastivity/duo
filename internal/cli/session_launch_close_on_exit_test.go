@@ -217,15 +217,20 @@ func newPiBindHarness(t *testing.T) *bindHarness {
 	return h
 }
 
-// TestCloseOnExitSetsEnvVarForAPiLeaf is the env-setting leg's whole point
-// end to end: --close-on-exit threads from launch.SpawnRequest.CloseOnExit
-// through stage1LeafAugmenter, and a pi leaf's pane-creation env — the
-// ResolvedLaunchTuple.Env a HostLauncher.PrepareLaunch receives, which the
-// herdr adapter copies verbatim into workspace.create/tab.create/pane.split
-// (internal/host/herdr/doc.go's "environment scrub duty" section) — gains
-// DUO_CLOSE_PANE_ON_EXIT=1, the exact key and value
-// internal/runtime/pi/extension/duo-pi-reporter.ts reads.
-func TestCloseOnExitSetsEnvVarForAPiLeaf(t *testing.T) {
+// TestCloseOnExitSetsEnvVarAndExtensionFlagForAPiLeaf is the pi leg's whole
+// point end to end: --close-on-exit threads from
+// launch.SpawnRequest.CloseOnExit through stage1LeafAugmenter, and a pi
+// leaf now gains BOTH its pane-creation env — the ResolvedLaunchTuple.Env a
+// HostLauncher.PrepareLaunch receives, which the herdr adapter copies
+// verbatim into workspace.create/tab.create/pane.split
+// (internal/host/herdr/doc.go's "environment scrub duty" section) —
+// DUO_CLOSE_PANE_ON_EXIT=1 (the exact key and value both
+// internal/runtime/pi/extension/duo-pi-reporter.ts and
+// internal/runtime/pi/closeonexit/duo-close-on-exit.ts read), AND a
+// `-e <absolute path>` launch argument pointing at a real, materialized
+// close-on-exit extension file — pi's own per-launch extension-loading
+// flag (pi 0.83.0 `pi --help`: `--extension, -e <path>`).
+func TestCloseOnExitSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
 
 	result, hosts := launchWithAugmenter(t, h, true)
@@ -243,13 +248,25 @@ func TestCloseOnExitSetsEnvVarForAPiLeaf(t *testing.T) {
 	if got := req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"]; got != "1" {
 		t.Errorf("pane-creation env DUO_CLOSE_PANE_ON_EXIT = %q, want \"1\"", got)
 	}
+
+	extensionPath, present := findFlag(req.ResolvedLaunchTuple.Args, "-e")
+	if !present {
+		t.Fatalf("leaf args = %v, want a -e flag", req.ResolvedLaunchTuple.Args)
+	}
+	if !filepath.IsAbs(extensionPath) {
+		t.Errorf("-e path %q is not absolute", extensionPath)
+	}
+	if _, err := os.Stat(extensionPath); err != nil {
+		t.Errorf("the materialized close-on-exit extension is missing: %v", err)
+	}
 }
 
-// TestCloseOnExitLeavesEnvUnchangedForAPiLeafWithoutTheFlag pins the other
-// half: a pi leaf's pane-creation env carries no
-// DUO_CLOSE_PANE_ON_EXIT at all when --close-on-exit was never passed, so
-// an ordinary pi launch is unaffected by this feature existing.
-func TestCloseOnExitLeavesEnvUnchangedForAPiLeafWithoutTheFlag(t *testing.T) {
+// TestCloseOnExitLeavesArgsAndEnvUnchangedForAPiLeafWithoutTheFlag pins the
+// other half: a pi leaf's pane-creation env carries no
+// DUO_CLOSE_PANE_ON_EXIT, and its launch arguments carry no -e flag, when
+// --close-on-exit was never passed, so an ordinary pi launch is unaffected
+// by this feature existing.
+func TestCloseOnExitLeavesArgsAndEnvUnchangedForAPiLeafWithoutTheFlag(t *testing.T) {
 	h := newPiBindHarness(t)
 
 	_, hosts := launchWithAugmenter(t, h, false)
@@ -264,5 +281,8 @@ func TestCloseOnExitLeavesEnvUnchangedForAPiLeafWithoutTheFlag(t *testing.T) {
 	if _, present := req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"]; present {
 		t.Errorf("pane-creation env unexpectedly carries DUO_CLOSE_PANE_ON_EXIT = %q",
 			req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"])
+	}
+	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "-e"); present {
+		t.Errorf("leaf args = %v, want no -e flag", req.ResolvedLaunchTuple.Args)
 	}
 }

@@ -596,8 +596,11 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // adapter-aware seam --close-on-exit's two runtime legs use to contribute
 // what each needs for a leaf's launch — claude materializes a generated
 // SessionEnd hook and settings file and appends `--settings <path>` to
-// that leaf's launch arguments; pi sets a pane-creation env marker its
-// extension reads.
+// that leaf's launch arguments; pi materializes a generated close-only
+// extension (internal/runtime/pi/closeonexit.go, deliberately separate
+// from the shipped reporter extension) and appends `-e <path>` to that
+// leaf's launch arguments, alongside the same activation env var claude's
+// leg does not need but pi's extension reads to decide whether to act.
 //
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
@@ -608,8 +611,18 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // kind. The claude leg's hook itself is what guards on being inside a
 // Herdr pane (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some
 // future non-Herdr host simply gets a settings file whose hook exits 0
-// immediately. The pi leg's env marker is inert unless the pi extension
-// that reads it is also running inside a Herdr pane (duo-pi-reporter.ts).
+// immediately. The pi leg's materialized extension carries the identical
+// guard (closeonexit/duo-close-on-exit.ts) — a leaf on some future
+// non-Herdr host gets an extension loaded that quietly does nothing.
+//
+// The pi leg's env var is not vestigial even though the materialized
+// extension is loaded explicitly with `-e <path>` rather than discovered:
+// DUO_CLOSE_PANE_ON_EXIT is the activation guard the extension itself
+// checks before it acts (internal/runtime/pi/closeonexit/duo-close-on-exit.ts),
+// and it also serves the shipped reporter extension's own close block
+// (duo-pi-reporter.ts, guarded the same way) for whenever reporter
+// installation gets built — nothing here assumes the reporter is absent,
+// it just does not depend on the reporter being present either.
 //
 // PROVISIONAL (dogfood, 2026-08-24): see host.ResolvedLaunchTuple.CloseOnExit
 // and terminal-multiplexers notes/46. Every agent runtime other than
@@ -617,12 +630,13 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // set and t.AgentRuntime is one of those two.
 type stage1LeafAugmenter struct{}
 
-// closePaneOnExitEnvVar is the exact key duo-pi-reporter.ts reads
-// (internal/runtime/pi/extension/duo-pi-reporter.ts:
-// `process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1"`) to decide, on a
-// session_shutdown with reason "quit", whether to close its own pane.
-// Both the key and the value "1" are exact-match contracts with that
-// script, not a convention this package chose.
+// closePaneOnExitEnvVar is the exact key both
+// internal/runtime/pi/extension/duo-pi-reporter.ts and
+// internal/runtime/pi/closeonexit/duo-close-on-exit.ts read
+// (`process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1"`) to decide, on a
+// session_shutdown with reason "quit", whether to close their pane. Both
+// the key and the value "1" are exact-match contracts with those scripts,
+// not a convention this package chose.
 const closePaneOnExitEnvVar = "DUO_CLOSE_PANE_ON_EXIT"
 
 func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf string, t launch.Tuple, closeOnExit bool) (launch.LeafAugmentation, error) {
@@ -641,7 +655,18 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf s
 		}
 		return launch.LeafAugmentation{Args: []string{"--settings", settingsPath}}, nil
 	case "pi":
-		return launch.LeafAugmentation{Env: map[string]string{closePaneOnExitEnvVar: "1"}}, nil
+		dir, err := pi.DefaultHarnessDir(launchResolutionID, leaf)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the close-on-exit harness directory for leaf %s: %w", leaf, err)
+		}
+		extensionPath, err := pi.MaterializeCloseOnExit(dir)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the close-on-exit harness for leaf %s: %w", leaf, err)
+		}
+		return launch.LeafAugmentation{
+			Args: []string{"-e", extensionPath},
+			Env:  map[string]string{closePaneOnExitEnvVar: "1"},
+		}, nil
 	default:
 		return launch.LeafAugmentation{}, nil
 	}
