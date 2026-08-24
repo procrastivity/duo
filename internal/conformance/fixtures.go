@@ -30,7 +30,7 @@ func (c FixtureCase) Skipped() bool { return c.Reason != "" }
 // those fixtures are a public operation's request/result envelope, so none
 // has a CLI/MCP/presentation projection to compare.
 var fixtureFamilyReasons = map[string]string{
-	"duo.config": "duo.config/v2 fixture is local configuration input, not a wire operation envelope",
+	"duo.config": "duo.config/v3 fixture is local configuration input, not a wire operation envelope",
 	"duo.manifest": "duo.manifest/v1 fixture is manifest.show's CLI-only result body " +
 		"(manifest.show is registered local_admin-shaped: no MCP tool or presentation route)",
 	"duo.projection-stamp": "duo.projection-stamp/v1 fixture is a harness installation stamp, not an operation envelope",

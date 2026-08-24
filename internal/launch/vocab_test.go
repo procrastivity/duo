@@ -22,8 +22,9 @@ import (
 // exist to compare.
 //
 // This test compares against contracts/schemas/duo-external-v1.schema.json
-// as embedded in this binary, which step 10 patched by hand (only these
-// three enum lists) rather than through `make sync-contracts` (step 16).
+// as embedded in this binary — step 10 patched only these three enum lists
+// by hand; `make sync-contracts` (step 16) has since replaced the whole
+// file with the normative one.
 func TestVocabulariesMatchExternalV1Schema(t *testing.T) {
 	schema := loadExternalV1Schema(t)
 

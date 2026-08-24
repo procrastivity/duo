@@ -17,17 +17,31 @@
       "candidates": [
         {
           "leaf": "reviewer",
-          "declaration_locator": "compositions.review_codex_gpt56",
+          "declaration_locator": "launch_variants.codex_gpt56",
+          "variant": "codex_gpt56",
+          "composition": {
+            "variant": "codex_gpt56",
+            "agent_runtime": "codex",
+            "model_line": "gpt-5.6-codex",
+            "model_family": "gpt",
+            "host_kind": "herdr",
+            "host_instance_id": "hostinst_herdr_new"
+          },
           "agent_runtime": "codex",
-          "model_line": "gpt-5.6",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
           "elimination_reason": "require_unmatched"
         }
       ],
-      "survivors": {
-        "before_constraints": ["compositions.review_codex_gpt56"],
-        "after_require": [],
-        "after_avoid": [],
-        "after_avoid_restoration": []
+      "elimination_tallies": [
+        {"leaf": "reviewer", "reason": "require_unmatched", "count": 1}
+      ],
+      "host": {
+        "kind": "herdr",
+        "instance_id": "hostinst_herdr_new",
+        "instance_label": "herdr@ws_new",
+        "host_source": "ambient-env",
+        "workspace_id": "ws_new"
       },
       "complete_assignments_survived": 0
     }

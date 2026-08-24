@@ -2,7 +2,7 @@
 
 These files are normative examples for the Session 5 projection gate. Each
 file uses `duo.external/v1` except four files that test other schema
-families: `config.json` (`duo.config/v2`), `manifest.json`
+families: `config.json` (`duo.config/v3`), `manifest.json`
 (`duo.manifest/v1`), `projection-stamp.json` (`duo.projection-stamp/v1`),
 and `projection-cases.json` (`duo.projection-conformance/v1`).
 
@@ -31,7 +31,7 @@ because the configuration and installation contracts sanction them there.
 | `cursor-expired.json` | Reconnect requires a new snapshot and barrier. |
 | `manifest.json` | Static operation projectability without live support. |
 | `projection-stamp.json` | Generated ownership and drift inputs. |
-| `config.json` | Strict successor configuration root: determined `review` composition with authored `model_line`, plus additive `presets.review`. |
+| `config.json` | `duo.config/v3` root: policy-only `session_hosts` (no instance, no socket path), `agent_runtimes`, `model_family`-carrying `launch_variants`, and variant-targeting `presets.review` / `presets.build_and_verify` (no authored compositions; the host late-binds at launch). |
 | `session-launch.json` | Ordinary `session.launch` success: chosen leaf, resolved model line, and launch-resolution reference. |
 | `session-launch-exhausted.json` | `launch.constraints_exhausted`: rejected candidate, elimination reason, and zero surviving assignments. |
 | `session-launch-model-line-relent.json` | Model-line soft avoid relent: avoid eliminated all candidates, relent restores pre-avoid pool, and chosen candidate reported with relented constraint. |
@@ -39,6 +39,12 @@ because the configuration and installation contracts sanction them there.
 | `session-launch-random-mode.json` | Random selection: explicit `"random"` selection mode, picked assignment, and no relented constraints on ordered chosen candidate. |
 | `session-launch-mixed-leaf.json` | Multi-leaf atomic resolution: two leaves, distinct compositions, both selected and reported with atomic whole-plan semantics. |
 | `session-launch-distinct-model-line.json` | Cross-leaf distinct-model-line relation: two leaves with different model lines satisfy the relation, rejected tuples match same-line pairs. |
+| `session-launch-distinct-model-family.json` | Cross-leaf distinct-model-family relation: two leaves with different model families (`builder` claude, `verifier` gpt) satisfy the relation. |
+| `session-launch-model-family-avoid.json` | `model_family` avoid closes the model-line silent miss: `--avoid model_family=gpt` removes every gpt-family candidate and `claude_sonnet` is selected. |
+| `session-launch-provider-disabled.json` | `launch.no_eligible_candidate`: three candidates eliminated by a disabled provider fact, with the deduced host, the consulted provider fact ID, and the pointer set. |
+| `session-launch-mixed-exhausted.json` | `launch.constraints_exhausted` with a mixed cause: one candidate falls to `require_unmatched`, the other to `provider_disabled`, both tallied because a caller constraint contributed. |
+| `session-launch-host-unresolved.json` | `launch.host_unresolved`: host deduction consults every rung of the fixed ranking and yields no host; the deduction trail is the diagnostic. |
+| `session-launch-explicit-host.json` | `--host` names a disabled kind: deduction rung `explicit-flag` wins, but every join is eliminated by `session_host_disabled`. |
 | `session-enroll.json` | Ordinary `session.enroll` success: opaque session and runtime-instance IDs assigned. |
 | `session-enroll-conflict.json` | `session.target_exited`: enrollment conflict with safe retry guidance and no_effect result. |
 | `projection-cases.json` | Equivalent canonical requests through CLI, MCP, and presentation forms. |

@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/procrastivity/duo/contracts"
 	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/launch"
@@ -18,12 +17,13 @@ import (
 )
 
 // This file validates the payloads internal/launch emits against the
-// amended duo-external-v1 schema, from the testdata copy taken at
+// amended duo-external-v1 schema, read from the embedded contracts.FS.
+// Before Step 16 synced the contract set (workplan Risk 6), the embedded
+// schema was still the pre-v3 one (only step 10's three hand-patched enum
+// lists), so this file read a testdata copy taken at
 // ~/Code/terminal-multiplexers commit 767f413 (step 02's compatible adds,
-// branch A). The embedded contract schema is still the pre-v3 one and
-// carries only step 10's three enum patches, so it cannot answer these
-// questions yet; step 16 syncs the contract set and this loader then points
-// at contracts.FS.
+// branch A) instead; that copy is gone now that contracts.FS carries the
+// synced schema.
 //
 // The validator below is a deliberate subset. It covers exactly the JSON
 // Schema keywords the launch $defs use, and refuses any keyword it does not
@@ -33,17 +33,16 @@ import (
 // oneOf/allOf/if-then machinery, is done out of band with check-jsonschema
 // and recorded in the step's finding.
 
-// externalV1Schema loads the amended schema from testdata.
+// externalV1Schema loads the amended schema from the embedded contract set.
 func externalV1Schema(t *testing.T) map[string]any {
 	t.Helper()
-	path := filepath.Join("testdata", "terminal-multiplexers", "schemas", "duo-external-v1.schema.json")
-	data, err := os.ReadFile(path)
+	data, err := contracts.FS.ReadFile("schemas/duo-external-v1.schema.json")
 	if err != nil {
-		t.Fatalf("reading %s: %v", path, err)
+		t.Fatalf("reading embedded schema: %v", err)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatalf("decoding %s: %v", path, err)
+		t.Fatalf("decoding embedded schema: %v", err)
 	}
 	return doc
 }

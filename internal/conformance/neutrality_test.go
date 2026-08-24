@@ -19,7 +19,7 @@ import (
 // owning the string keeps this package's boundary (internal/conformance/**)
 // intact.
 var integrationNamePairs = []struct{ host, runtime string }{
-	{host: "local_tmux", runtime: "codex_default"},   // contracts/fixtures/duo-external-v1/config.json
+	{host: "local_tmux", runtime: "codex_default"},   // a v2-shaped session_host/agent_runtime pair
 	{host: "local_herdr", runtime: "claude_default"}, // a second real-shaped pair, distinct from the first
 	{host: "fake_host", runtime: "fake_runtime"},     // the fake host + fake runtime pair
 }

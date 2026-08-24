@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/procrastivity/duo/contracts"
 	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/launch"
@@ -20,14 +19,13 @@ import (
 // This file holds the fixture-driven conformance tests for duo.config/v3's
 // launch payloads.
 //
-// The fixtures are step 03's re-authored launch documents, copied from
-// ~/Code/terminal-multiplexers (`fixtures/duo-external-v1/`, commit
-// 32e01fe) into testdata/terminal-multiplexers/fixtures/, beside the
-// amended schema (`schemas/duo-external-v1.schema.json`, commit 767f413).
-// The copies exist because this build's embedded contract set is still the
-// pre-v3 one: workplan Risk 6 parks that mismatch and step 16 syncs it
-// once, at which point these copies are deleted and the loader points at
-// contracts.FS.
+// The fixtures are step 03's re-authored launch documents
+// (`fixtures/duo-external-v1/`, commit 32e01fe), read from the embedded
+// contracts.FS. Before Step 16 synced the contract set (workplan Risk 6),
+// this package read testdata/terminal-multiplexers/fixtures/ instead — a
+// hand-copied snapshot taken because the embedded set was still the
+// pre-v3 one; that copy is gone now that contracts.FS carries the real
+// thing.
 //
 // The comparison is a *shape* comparison, not whole-document equality, and
 // that is forced rather than chosen. The fixtures carry hand-authored
@@ -69,11 +67,11 @@ type errorEnvelope struct {
 	Error     any    `json:"error"`
 }
 
-// fixture decodes one step-03 fixture out of testdata.
+// fixture decodes one step-03 fixture out of the embedded contract set.
 func fixture(t *testing.T, name string) map[string]any {
 	t.Helper()
-	path := filepath.Join("testdata", "terminal-multiplexers", "fixtures", name)
-	data, err := os.ReadFile(path)
+	path := "fixtures/duo-external-v1/" + name
+	data, err := contracts.FS.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading fixture %s: %v", path, err)
 	}

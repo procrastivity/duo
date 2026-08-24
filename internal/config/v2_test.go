@@ -2,19 +2,25 @@ package config
 
 import (
 	"errors"
+	"os"
 	"testing"
 
-	"github.com/procrastivity/duo/contracts"
 	"github.com/procrastivity/duo/internal/duoerr"
 )
 
-// TestParseV2_Fixture proves the synced contracts/fixtures/duo-external-v1/
-// config.json — a real duo.config/v2 document — resolves cleanly and its
-// composition's required fields come through untouched.
+// TestParseV2_Fixture proves a real duo.config/v2 document resolves cleanly
+// and its composition's required fields come through untouched.
+//
+// The fixture is testdata/duo-config-v2.legacy-fixture.json, not the synced
+// contracts/fixtures/duo-external-v1/config.json: duo-config-v3 step 01
+// replaced the normative fixture with a v3 document, so this package's own
+// v2 golden fixture (migrate_test.go's copy of the last v2 config.json,
+// commit ce0a12c) is the only v2 document Step 16's sync leaves behind for
+// this test to read.
 func TestParseV2_Fixture(t *testing.T) {
-	data, err := contracts.FS.ReadFile("fixtures/duo-external-v1/config.json")
+	data, err := os.ReadFile("testdata/duo-config-v2.legacy-fixture.json")
 	if err != nil {
-		t.Fatalf("reading embedded fixture: %v", err)
+		t.Fatalf("reading testdata fixture: %v", err)
 	}
 
 	doc, err := ParseV2(data)

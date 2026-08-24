@@ -2,22 +2,22 @@ package config
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
+	"github.com/procrastivity/duo/contracts"
 	"github.com/procrastivity/duo/internal/duoerr"
 )
 
-// TestParseV3_Fixture proves the notes/42-shaped duo.config/v3 fixture — a
-// copy of terminal-multiplexers' fixtures/duo-external-v1/config.json,
-// checked into testdata/duo-config-v3.fixture.json until Step 16 syncs
-// contracts (workplan Risk 6) — resolves cleanly and its host-free variant
-// and preset shapes come through untouched.
+// TestParseV3_Fixture proves the notes/42-shaped duo.config/v3 fixture —
+// contracts/fixtures/duo-external-v1/config.json, synced from
+// terminal-multiplexers by Step 16 (workplan Risk 6; the testdata copy this
+// test read before the sync is gone) — resolves cleanly and its host-free
+// variant and preset shapes come through untouched.
 func TestParseV3_Fixture(t *testing.T) {
-	data, err := os.ReadFile("testdata/duo-config-v3.fixture.json")
+	data, err := contracts.FS.ReadFile("fixtures/duo-external-v1/config.json")
 	if err != nil {
-		t.Fatalf("reading testdata fixture: %v", err)
+		t.Fatalf("reading embedded fixture: %v", err)
 	}
 
 	doc, err := ParseV3(data)

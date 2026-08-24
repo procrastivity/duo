@@ -10,7 +10,17 @@
       {
         "name": "first",
         "agent_runtime": "codex",
-        "model_line": "gpt-5.6",
+        "model_line": "gpt-5.6-codex",
+        "model_family": "gpt",
+        "composition": {
+          "name": "codex_gpt56@herdr",
+          "variant": "codex_gpt56",
+          "agent_runtime": "codex",
+          "model_line": "gpt-5.6-codex",
+          "model_family": "gpt",
+          "host_kind": "herdr",
+          "host_instance_id": "hostinst_herdr_new"
+        },
         "declared_kind": "open",
         "outcome": "selected",
         "relented_avoids": []
@@ -18,11 +28,31 @@
       {
         "name": "second",
         "agent_runtime": "claude",
-        "model_line": "claude-opus-4",
+        "model_line": "opus-5",
+        "model_family": "claude",
+        "composition": {
+          "name": "claude_opus@herdr",
+          "variant": "claude_opus",
+          "agent_runtime": "claude",
+          "model_line": "opus-5",
+          "model_family": "claude",
+          "host_kind": "herdr",
+          "host_instance_id": "hostinst_herdr_new"
+        },
         "declared_kind": "open",
         "outcome": "selected",
         "relented_avoids": []
       }
+    ],
+    "host": {
+      "kind": "herdr",
+      "instance_id": "hostinst_herdr_new",
+      "instance_label": "herdr@ws_new",
+      "host_source": "ambient-env",
+      "workspace_id": "ws_new"
+    },
+    "relations": [
+      {"kind": "distinct_model_line", "leaves": ["first", "second"]}
     ]
   },
   "warnings": [],

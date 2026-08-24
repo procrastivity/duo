@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:config:v3",
+  "title": "Duo configuration v3 root",
+  "type": "object",
+  "required": ["schema"],
+  "properties": {
+    "schema": {"const": "duo.config/v3"},
+    "authority": {"type": "object"},
+    "workspaces": {"$ref": "#/$defs/named_objects"},
+    "session_hosts": {"$ref": "#/$defs/session_hosts"},
+    "agent_runtimes": {"$ref": "#/$defs/agent_runtimes"},
+    "launch_variants": {"$ref": "#/$defs/launch_variants"},
+    "presets": {"$ref": "#/$defs/presets"},
+    "control": {"type": "object"},
+    "collaboration": {"type": "object"},
+    "presentation_clients": {"$ref": "#/$defs/named_objects"},
+    "assets": {"type": "object"},
+    "projections": {"$ref": "#/$defs/named_objects"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "named_objects": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"type": "object"}
+    },
+    "session_hosts": {
+      "description": "Session-host policy only. Host instances and socket paths are state (workspace<->host correlation records in duo.db), never authored here. The deduction ranking is fixed in the resolver: explicit flag > workspace correlation > ambient environment > policy default. This block configures which kinds may be used and which deduction sources are consulted; it never configures their ranking.",
+      "type": "object",
+      "properties": {
+        "prefer": {
+          "description": "Ordered host-kind preference. This is the only ordered field in the block, and it is consumed only at the policy-default rung of the fixed ranking.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"}
+        },
+        "kinds": {
+          "description": "Per-kind stanzas. An absent kind, and an absent enabled flag, both mean enabled.",
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "additionalProperties": {"$ref": "#/$defs/session_host_kind"}
+        },
+        "deduce": {
+          "description": "Per-source stanzas over the closed source set. Unordered by construction: enabling or disabling a source never changes the fixed ranking. An absent source, and an absent enabled flag, both mean enabled. workspace = the persisted workspace<->host correlation; env = ambient environment evidence captured at materialization; default = the first enabled kind in prefer.",
+          "type": "object",
+          "propertyNames": {"enum": ["workspace", "env", "default"]},
+          "additionalProperties": {"$ref": "#/$defs/session_host_deduce_source"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "session_host_kind": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "session_host_deduce_source": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "agent_runtimes": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/agent_runtime"}
+    },
+    "agent_runtime": {
+      "type": "object",
+      "required": ["kind", "executable"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "executable": {"type": "string", "minLength": 1},
+        "arguments": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "launch_variants": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/launch_variant"}
+    },
+    "launch_variant": {
+      "description": "Runtime x command shape x model line. Host-free: the session host is deduced at launch materialization, and the executable lives on the agent runtime.",
+      "type": "object",
+      "required": ["agent_runtime", "model_line", "model_family"],
+      "properties": {
+        "agent_runtime": {"type": "string", "minLength": 1},
+        "model_line": {"type": "string", "minLength": 1},
+        "model_family": {"type": "string", "minLength": 1},
+        "provider": {"type": "string", "minLength": 1},
+        "append_arguments": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "presets": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/preset"}
+    },
+    "preset": {
+      "type": "object",
+      "required": ["leaves"],
+      "properties": {
+        "selection": {"enum": ["ordered", "random"]},
+        "leaves": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "additionalProperties": {"$ref": "#/$defs/preset_leaf"}
+        },
+        "relations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/preset_relation"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "preset_leaf": {
+      "type": "object",
+      "required": ["candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["variant"],
+            "properties": {
+              "variant": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "preset_relation": {
+      "type": "object",
+      "required": ["kind", "leaves"],
+      "properties": {
+        "kind": {"enum": ["distinct_model_line", "distinct_model_family"]},
+        "leaves": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "schema": "duo.config/v2",
+  "schema": "duo.config/v3",
   "authority": {
     "socket": "/run/user/1000/duo/duo.sock"
   },
@@ -10,28 +10,59 @@
     }
   },
   "session_hosts": {
-    "local_tmux": {
-      "kind": "tmux",
-      "server": "default"
+    "prefer": ["herdr"],
+    "kinds": {
+      "herdr": {
+        "enabled": true
+      },
+      "tmux": {
+        "enabled": false
+      }
+    },
+    "deduce": {
+      "workspace": {
+        "enabled": true
+      },
+      "env": {
+        "enabled": true
+      },
+      "default": {
+        "enabled": true
+      }
     }
   },
   "agent_runtimes": {
-    "codex_default": {
-      "kind": "codex"
+    "claude": {
+      "kind": "claude",
+      "executable": "claude",
+      "arguments": []
+    },
+    "pi": {
+      "kind": "pi",
+      "executable": "pi"
     }
   },
   "launch_variants": {
-    "codex_in_tmux": {
-      "agent_runtime": "codex_default",
-      "session_host": "local_tmux",
-      "executable": "codex",
-      "arguments": []
-    }
-  },
-  "compositions": {
-    "review": {
-      "launch_variant": "codex_in_tmux",
-      "model_line": "gpt-5.6"
+    "claude_opus": {
+      "agent_runtime": "claude",
+      "provider": "anthropic",
+      "model_family": "claude",
+      "model_line": "opus-5",
+      "append_arguments": ["--model", "opus"]
+    },
+    "claude_sonnet": {
+      "agent_runtime": "claude",
+      "provider": "anthropic",
+      "model_family": "claude",
+      "model_line": "sonnet-5",
+      "append_arguments": ["--model", "sonnet"]
+    },
+    "pi_gpt56": {
+      "agent_runtime": "pi",
+      "provider": "openai_api",
+      "model_family": "gpt",
+      "model_line": "gpt-5.6",
+      "append_arguments": ["--model", "openai/gpt-5.6"]
     }
   },
   "presets": {
@@ -41,11 +72,45 @@
         "main": {
           "candidates": [
             {
-              "composition": "review"
+              "variant": "claude_sonnet"
+            },
+            {
+              "variant": "pi_gpt56"
             }
           ]
         }
       }
+    },
+    "build_and_verify": {
+      "selection": "ordered",
+      "leaves": {
+        "builder": {
+          "candidates": [
+            {
+              "variant": "claude_sonnet"
+            },
+            {
+              "variant": "pi_gpt56"
+            }
+          ]
+        },
+        "verifier": {
+          "candidates": [
+            {
+              "variant": "pi_gpt56"
+            },
+            {
+              "variant": "claude_sonnet"
+            }
+          ]
+        }
+      },
+      "relations": [
+        {
+          "kind": "distinct_model_family",
+          "leaves": ["builder", "verifier"]
+        }
+      ]
     }
   }
 }
