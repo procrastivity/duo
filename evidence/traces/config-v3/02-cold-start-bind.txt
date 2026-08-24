@@ -1,0 +1,71 @@
+# config-v3 gate — bullet 2: cold start in a fresh workspace from a Herdr pane (disposable server gate17a)
+# duo a1e1cf9, herdr 0.8.2, claude 2.1.241 — 2026-08-24T11:54:14Z
+# env: isolated XDG_{CONFIG,DATA,STATE}_HOME; HERDR_SOCKET_PATH/HERDR_SESSION point at gate17a; cwd=/tmp/duo-g17.RePb/ws1
+
+$ printf "y\n" | script -qec "duo session launch daily-claude" /dev/null   # interactive TTY, ambient-env rung, confirm bind
+y
+duo: herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock was deduced from the ambient environment of the pane this command is running in.
+duo: bind workspace ws_6d0c64e99f35093ce8ff73d64f178863 to it, so later launches go to the same host? [y/N] duo: host bound: workspace ws_6d0c64e99f35093ce8ff73d64f178863 -> herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock (host_source=ambient-env, fact fact_e03afad98fc9ce5dfd8049bc5951dd52)
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock --evidence "<what you checked>"
+session:  ses_9385a322c1259b2e016da90ad666bbce
+record:   lrr_5e0707ec0a8e7b94b4379306a4d50b97
+host:      herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock (host_source=ambient-env)
+selection: ordered
+  main: claude / sonnet-5 (determined) -> selected
+exit=0
+
+$ duo workspace host show
+workspace root:  /tmp/duo-g17.RePb/ws1
+workspace:       ws_6d0c64e99f35093ce8ff73d64f178863
+host:            herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock
+host instance:   herdr:gate17a
+host source:     ambient-env
+session name:    gate17a
+pane id:         w1:p1
+terminal id:     term_659c9a52ebb211
+process birth:   pid=2281993 started=2026-08-24T11:54:14.040Z
+bound by:        workspace.host_bound (fact_e03afad98fc9ce5dfd8049bc5951dd52)
+bound at:        2026-08-24T11:54:14.873Z
+actor:           cli
+reason:          cold-start host correlation from launch deduction
+evidence:        host deduced by ambient-env and proven by a successful spawn (launch-resolution record lrr_5e0707ec0a8e7b94b4379306a4d50b97)
+exit=0
+
+$ duo doctor --json | jq {host_binding,host_deduction:...,config:.config.schema}
+{
+  "host_binding": {
+    "workspace_root": "/tmp/duo-g17.RePb/ws1",
+    "workspace_id": "ws_6d0c64e99f35093ce8ff73d64f178863",
+    "bound": true,
+    "host": {
+      "kind": "herdr",
+      "instance_label": "/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock",
+      "instance_id": "herdr:gate17a",
+      "host_source": "ambient-env",
+      "fingerprint": {
+        "session_name": "gate17a",
+        "pane_id": "w1:p1",
+        "terminal_id": "term_659c9a52ebb211",
+        "process_pid": 2281993,
+        "process_started_at": "2026-08-24T11:54:14.040Z"
+      }
+    },
+    "provenance": {
+      "fact_id": "fact_e03afad98fc9ce5dfd8049bc5951dd52",
+      "fact_kind": "workspace.host_bound",
+      "at": "2026-08-24T11:54:14.873Z",
+      "actor": "cli",
+      "reason": "cold-start host correlation from launch deduction",
+      "evidence": "host deduced by ambient-env and proven by a successful spawn (launch-resolution record lrr_5e0707ec0a8e7b94b4379306a4d50b97)"
+    }
+  },
+  "deduced": {
+    "kind": "herdr",
+    "instance_label": "/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock",
+    "instance_id": "herdr:gate17a",
+    "host_source": "workspace-correlation"
+  },
+  "host_source": "workspace-correlation",
+  "config_schema": "duo.config/v3"
+}
+exit=0

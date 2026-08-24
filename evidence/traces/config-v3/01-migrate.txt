@@ -1,0 +1,73 @@
+# config-v3 gate — bullet 1: duo config migrate --to duo.config/v3
+# duo a1e1cf9, source: git show ce0a12c:fixtures/duo-external-v1/config.json — 2026-08-24T11:51:32Z
+
+$ duo config migrate --to duo.config/v3 v2-config.json   # stdout preview, families manual
+{
+  "schema": "duo.config/v3",
+  "authority": {
+    "socket": "/run/user/1000/duo/duo.sock"
+  },
+  "workspaces": {
+    "main": {
+      "discovery": "explicit",
+      "root": "/work/example"
+    }
+  },
+  "session_hosts": {
+    "prefer": [
+      "tmux"
+    ]
+  },
+  "agent_runtimes": {
+    "codex_default": {
+      "kind": "codex",
+      "executable": "codex"
+    }
+  },
+  "launch_variants": {
+    "review": {
+      "agent_runtime": "codex_default",
+      "model_line": "gpt-5.6",
+      "model_family": "manual"
+    }
+  },
+  "presets": {
+    "review": {
+      "selection": "ordered",
+      "leaves": {
+        "main": {
+          "candidates": [
+            {
+              "variant": "review"
+            }
+          ]
+        }
+exit=0
+
+$ duo config migrate --to duo.config/v3 v2-config.json --write migrated.json   # must refuse: model_family still manual
+duo: config migrate: config migrate --write refuses: model_family is still "manual" for launch_variant(s) review; author every model_family first (e.g. --set-model-family <variant>=<label>)
+exit=3
+
+$ duo config migrate --to duo.config/v3 v2-config.json --set-model-family review=gpt --write migrated.json
+config migrate: wrote /tmp/claude-1000/-home-dev-Code-terminal-multiplexers/ed920e22-a718-46ce-93c0-a805dd451bd8/scratchpad/gate17/migrated.json (schema: duo.config/v3)
+
+migration report:
+  renamed:
+    compositions.review.model_line -> launch_variants.review.model_line
+    launch_variants.codex_in_tmux.arguments -> agent_runtimes.codex_default.arguments
+    launch_variants.codex_in_tmux.executable -> agent_runtimes.codex_default.executable
+    launch_variants.codex_in_tmux.session_host (local_tmux) -> state to bind, reported only
+    presets.*.leaves.*.candidates[].composition -> presets.*.leaves.*.candidates[].variant
+    session_hosts -> session_hosts (host-kind policy only; prefer in order of first appearance among the migrated declarations)
+  defaulted: (none)
+  rejected:
+    compositions (root retired; content redistributed into launch_variants)
+  manual: (none)
+  state to bind:
+    variant review: session_host local_tmux (kind tmux), socket (no socket_path recorded in the source document) — rebind with `duo workspace host rebind`
+exit=0
+
+$ duo session launch review --config migrated.json --dry-run   # load proof: ParseV3 accepts the migrated document
+duo: host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+duo: session launch: No candidate declared for leaf "main" is supported by installed evidence.
+exit=0

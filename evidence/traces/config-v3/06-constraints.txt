@@ -1,0 +1,18 @@
+# config-v3 gate — bullet 6: --avoid model_family=gpt and --host <disabled kind> behave per the fixtures
+# duo a1e1cf9 — 2026-08-24T11:55:04Z
+
+$ duo session launch review --avoid model_family=gpt --dry-run   # removes the gpt candidates; claude_sonnet wins (fixture session-launch-model-family-avoid)
+duo: this workspace's recorded correlation chose herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock and outranked the ambient environment of the pane you are in.
+duo:   outranked: HERDR_SOCKET_PATH=/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock
+duo:   outranked: HERDR_SESSION=gate17b
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock --evidence "<what you checked>"
+preview only: no session, no durable record, no spawn
+host:      herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock (host_source=workspace-correlation)
+  outranked ambient-env:           herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock (outranked by workspace-correlation)
+selection: ordered
+  main: claude / sonnet-5 (open) -> selected
+exit=0
+
+$ duo session launch review --host tmux:gate-dummy --dry-run --output json   # explicit-flag on a disabled kind: every join eliminated (fixture session-launch-explicit-host)
+{"error":{"code":"launch.no_eligible_candidate","message":"--host tmux names a disabled session-host kind; every join was eliminated.","details":{"requested_preset":"review","leaf":"main","constraints":{"require":[],"avoid":[]},"candidates":[{"leaf":"main","declaration_locator":"launch_variants.claude_sonnet","variant":"claude_sonnet","composition":{"name":"claude_sonnet@tmux","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"tmux","host_instance_id":"tmux:gate-dummy"},"agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","elimination_reason":"session_host_disabled"},{"leaf":"main","declaration_locator":"launch_variants.pi_gpt56","variant":"pi_gpt56","composition":{"name":"pi_gpt56@tmux","variant":"pi_gpt56","agent_runtime":"pi","model_line":"gpt-5.6","model_family":"gpt","host_kind":"tmux","host_instance_id":"tmux:gate-dummy"},"agent_runtime":"pi","model_line":"gpt-5.6","model_family":"gpt","elimination_reason":"session_host_disabled"}],"elimination_tallies":[{"leaf":"main","reason":"session_host_disabled","count":2,"detail":"tmux disabled"}],"host":{"kind":"tmux","instance_label":"gate-dummy","host_source":"explicit-flag","workspace_id":"ws_6d0c64e99f35093ce8ff73d64f178863","outranked_evidence":[{"source":"workspace-correlation","kind":"herdr","instance_label":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock","fact_id":"fact_e03afad98fc9ce5dfd8049bc5951dd52","detail":"outranked by explicit-flag"},{"source":"ambient-env","kind":"herdr","instance_label":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock","captures":[{"name":"HERDR_SOCKET_PATH","value":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock","captured_at":"2026-08-24T11:55:04.378Z"},{"name":"HERDR_SESSION","value":"gate17b","captured_at":"2026-08-24T11:55:04.378Z"}],"detail":"outranked by explicit-flag"}]},"evidence_bundle":{"correlation_fact_id":"fact_e03afad98fc9ce5dfd8049bc5951dd52","provider_fact_ids":["fact_09a61e40eaa601ad9c3b9bc5d65966ba"]},"pointers":{"override_flag":"--host"},"survivors":{"before_constraints":[],"after_require":[],"after_avoid":[],"after_avoid_restoration":[]},"consulted_record_digests":[],"complete_assignments_survived":0}}}
+exit=1

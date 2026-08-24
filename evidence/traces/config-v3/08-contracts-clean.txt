@@ -1,0 +1,8 @@
+# config-v3 gate — bullet 8b: contracts tree clean against the normative repo @ a1e1cf9 — 2026-08-24T11:56:11Z
+
+$ git diff --exit-code contracts/
+(clean)
+exit=0
+
+$ grep source-sha contracts/SOURCE
+source-sha: 210bfd3ddea27524702238d847d4b9eb6aca13a9

@@ -1,0 +1,16 @@
+# config-v3 gate — bullet 7b: Stage-1 launch-touching legs re-run + record-before-spawn ordering @ a1e1cf9 — 2026-08-24T11:55:08Z
+
+$ go test ./internal/launch/... ./internal/launchrecord ./internal/cli -count=1
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/launch	0.082s
+ok  	github.com/procrastivity/duo/internal/launch/materialize	0.005s
+ok  	github.com/procrastivity/duo/internal/launchrecord	0.415s
+ok  	github.com/procrastivity/duo/internal/cli	2.497s
+exit=0
+
+$ go test ./internal/launch -run "TestRecordCommitsBeforePrepareLaunch|TestCommittedRecordIsTheResolverRecord" -v -count=1
+=== RUN   TestRecordCommitsBeforePrepareLaunch
+--- PASS: TestRecordCommitsBeforePrepareLaunch (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/launch	0.006s
+exit=0

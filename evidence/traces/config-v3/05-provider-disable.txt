@@ -1,0 +1,24 @@
+# config-v3 gate — bullet 5: duo provider disable codex; codex-only preset exhausts with provider_disabled tallies + pointers; enable restores
+# duo a1e1cf9 — 2026-08-24T11:55:04Z
+
+$ duo provider disable codex
+provider codex: disabled (fact fact_eba616cf901a28b13ce755cdb2540a16)
+exit=0
+
+$ duo session launch codex-any --dry-run --output json
+{"error":{"code":"launch.no_eligible_candidate","message":"All candidates for leaf main carry the disabled codex provider.","details":{"requested_preset":"codex-any","leaf":"main","constraints":{"require":[],"avoid":[]},"candidates":[{"leaf":"main","declaration_locator":"launch_variants.pi_gpt56_codex","variant":"pi_gpt56_codex","composition":{"name":"pi_gpt56_codex@herdr","variant":"pi_gpt56_codex","agent_runtime":"pi","model_line":"gpt-5.6-codex","model_family":"gpt","host_kind":"herdr","host_instance_id":"herdr:gate17a"},"agent_runtime":"pi","model_line":"gpt-5.6-codex","model_family":"gpt","elimination_reason":"provider_disabled"},{"leaf":"main","declaration_locator":"launch_variants.codex_gpt56","variant":"codex_gpt56","composition":{"name":"codex_gpt56@herdr","variant":"codex_gpt56","agent_runtime":"codex","model_line":"gpt-5.6-codex","model_family":"gpt","host_kind":"herdr","host_instance_id":"herdr:gate17a"},"agent_runtime":"codex","model_line":"gpt-5.6-codex","model_family":"gpt","elimination_reason":"provider_disabled"}],"elimination_tallies":[{"leaf":"main","reason":"provider_disabled","count":2,"detail":"codex provider disabled"}],"host":{"kind":"herdr","instance_id":"herdr:gate17a","instance_label":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock","host_source":"workspace-correlation","workspace_id":"ws_6d0c64e99f35093ce8ff73d64f178863","outranked_evidence":[{"source":"ambient-env","kind":"herdr","instance_label":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock","captures":[{"name":"HERDR_SOCKET_PATH","value":"/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock","captured_at":"2026-08-24T11:55:04.289Z"},{"name":"HERDR_SESSION","value":"gate17b","captured_at":"2026-08-24T11:55:04.289Z"}],"detail":"outranked by workspace-correlation"}]},"evidence_bundle":{"correlation_fact_id":"fact_e03afad98fc9ce5dfd8049bc5951dd52","provider_fact_ids":["fact_eba616cf901a28b13ce755cdb2540a16"]},"pointers":{"override_flag":"--host","provider_enable":"duo provider enable codex","workspace_host_rebind":"duo workspace host rebind"},"survivors":{"before_constraints":[],"after_require":[],"after_avoid":[],"after_avoid_restoration":[]},"consulted_record_digests":[],"complete_assignments_survived":0}}}
+exit=1
+
+$ duo provider enable codex && duo session launch codex-any --dry-run
+provider codex: enabled (fact fact_09a61e40eaa601ad9c3b9bc5d65966ba)
+exit=0
+duo: this workspace's recorded correlation chose herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock and outranked the ambient environment of the pane you are in.
+duo:   outranked: HERDR_SOCKET_PATH=/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock
+duo:   outranked: HERDR_SESSION=gate17b
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock --evidence "<what you checked>"
+preview only: no session, no durable record, no spawn
+host:      herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock (host_source=workspace-correlation)
+  outranked ambient-env:           herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock (outranked by workspace-correlation)
+selection: ordered
+  main: pi / gpt-5.6-codex (open) -> selected
+exit=0

@@ -27,3 +27,20 @@ Notes recorded at gate time:
   layered config precedence (docs/config), the five Stage-2+ runtime
   interfaces and two host provider interfaces (docs/adapters), and rows
   for unattested operation families (docs/registry).
+
+## 2026-08-24 — Stage 1v3 (duo.config/v3) exit gate: PASS
+
+Evidence: `evidence/traces/config-v3/` (gate.md maps every roadmap §3a
+gate bullet to a command transcript or test name). Binary `a1e1cf9`.
+Live set: herdr 0.8.2, claude 2.1.241, pi 0.83.0, two disposable
+servers, isolated XDG homes, no live user session touched.
+
+v3 is the shipped schema from this gate on: the loader refuses
+`duo.config/v2` with the `duo config migrate --to duo.config/v3`
+pointer (`config.schema_v2_unsupported`), and `contracts/SOURCE` pins
+the normative repo at `210bfd3` (contains the fixture seal `32e01fe`).
+The dogfood checkpoint (duo-dogfood step 24) re-targets to v3 and
+authors `model_family` by hand — migration reports `manual` and infers
+nothing. Carried forward from the gate run: the no-ambient-variables
+visibility caveat on wrong bindings (step 14 finding), and the
+fingerprint-flag requirement on `duo workspace host rebind`.

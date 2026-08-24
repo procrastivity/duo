@@ -1,0 +1,15 @@
+# config-v3 gate — bullet 3: second launch in ws1 from an UNRELATED pane (gate17b env): correlation beats env
+# duo a1e1cf9, herdr 0.8.2, pi 0.83.0 — 2026-08-24T11:55:04Z
+
+$ duo session launch daily-pi   # env points at gate17b; the ws1 correlation (gate17a) must win and name the outranked capture
+duo: this workspace's recorded correlation chose herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock and outranked the ambient environment of the pane you are in.
+duo:   outranked: HERDR_SOCKET_PATH=/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock
+duo:   outranked: HERDR_SESSION=gate17b
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock --evidence "<what you checked>"
+session:  ses_54074b39abdb028a89d77b3b69970e89
+record:   lrr_6a7503906493f4599ab740503c3820d6
+host:      herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock (host_source=workspace-correlation)
+  outranked ambient-env:           herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock (outranked by workspace-correlation)
+selection: ordered
+  main: pi / gpt-5.6 (determined) -> selected
+exit=0

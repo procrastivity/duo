@@ -1,0 +1,66 @@
+# config-v3 gate — bullet 4: duo workspace host rebind to the gate17b socket; the fact carries both instances with fingerprints
+# duo a1e1cf9 — 2026-08-24T11:55:52Z
+# First attempt (kept for the record): rebind without any fingerprint flag refuses —
+#   'domain: a host correlation requires fingerprint evidence (session name, pane id, terminal id, or process birth)' (exit 1).
+# The verb takes the new instance's fingerprints via flags; at least one is required.
+
+$ duo workspace host rebind --host herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock --session-name gate17b --reason "gate leg 4" --evidence "gate17 leg 4: herdr.sock of disposable server gate17b, listed by discovery" --output json
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_0dfa1d8848297956",
+  "operation": "workspace.host.rebind",
+  "result": {
+    "workspace_root": "/tmp/duo-g17.RePb/ws1",
+    "workspace_id": "ws_6d0c64e99f35093ce8ff73d64f178863",
+    "previous_host": {
+      "kind": "herdr",
+      "instance_label": "/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock",
+      "instance_id": "herdr:gate17a",
+      "host_source": "ambient-env",
+      "fingerprint": {
+        "session_name": "gate17a",
+        "pane_id": "w1:p1",
+        "terminal_id": "term_659c9a52ebb211",
+        "process_pid": 2281993,
+        "process_started_at": "2026-08-24T11:54:14.040Z"
+      }
+    },
+    "host": {
+      "kind": "herdr",
+      "instance_label": "/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock",
+      "host_source": "explicit-flag",
+      "fingerprint": {
+        "session_name": "gate17b"
+      }
+    },
+    "provenance": {
+      "fact_id": "fact_93313625616b6b48587bdc5f6d93b590",
+      "fact_kind": "workspace.host_rebound",
+      "at": "2026-08-24T11:55:52.481Z",
+      "actor": "cli",
+      "reason": "gate leg 4",
+      "evidence": "gate17 leg 4: herdr.sock of disposable server gate17b, listed by discovery"
+    }
+  },
+  "warnings": [],
+  "features": []
+}
+exit=0
+
+$ duo workspace host show
+workspace root:  /tmp/duo-g17.RePb/ws1
+workspace:       ws_6d0c64e99f35093ce8ff73d64f178863
+host:            herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17b/herdr.sock
+host instance:   -
+host source:     explicit-flag
+session name:    gate17b
+pane id:         -
+terminal id:     -
+process birth:   -
+bound by:        workspace.host_rebound (fact_93313625616b6b48587bdc5f6d93b590)
+bound at:        2026-08-24T11:55:52.481Z
+actor:           cli
+reason:          gate leg 4
+evidence:        gate17 leg 4: herdr.sock of disposable server gate17b, listed by discovery
+replaced:        herdr:/tmp/duo-g17.RePb/xdg/herdr/sessions/gate17a/herdr.sock
+exit=0
