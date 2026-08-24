@@ -1,0 +1,18 @@
+$ duo doctor
+duo doctor
+  store: /home/dev/.local/share/duo/duo.db
+    status: not yet initialized
+  adapters: 2 registered
+    fake-host (session_host): supported
+    fake-runtime (agent_runtime): supported
+  workspace:       /home/dev/Code/duo-vnext
+    workspace id:  -
+    host binding:  none
+                   (duo has no workspace for this root path yet)
+  host deduction (what M1 would deduce now):
+    herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+  providers:
+    (no standing provider facts; every provider a variant names is enabled by default)
+  config:          /home/dev/.config/duo/duo.config.yaml
+    schema:        duo.config/v3
+exit=0

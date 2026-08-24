@@ -1,0 +1,98 @@
+schema: duo.config/v3
+
+session_hosts:
+  prefer: [herdr]
+  kinds:
+    herdr: {enabled: true}
+    tmux: {enabled: false}      # deferred until before the slice completion gate
+  deduce:
+    workspace: {enabled: true}
+    env: {enabled: true}
+    default: {enabled: true}
+
+agent_runtimes:
+  claude:
+    kind: claude
+    executable: claude
+    arguments: []
+  pi:
+    kind: pi
+    executable: pi
+
+launch_variants:
+  claude_fable:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: fable-5
+    append_arguments: ["--model", "fable"]
+  claude_opus:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: opus-5
+    append_arguments: ["--model", "opus"]
+  claude_sonnet:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: sonnet-5
+    append_arguments: ["--model", "sonnet"]
+  claude_haiku:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: haiku-4.5
+    append_arguments: ["--model", "haiku"]
+  pi_openai_gpt56sol:
+    agent_runtime: pi
+    provider: openai-codex
+    model_family: gpt
+    model_line: gpt-5.6-sol
+    append_arguments: ["--provider", "openai-codex", "--model", "gpt-5.6-sol"]
+  pi_openai_gpt56terra:
+    agent_runtime: pi
+    provider: openai-codex
+    model_family: gpt
+    model_line: gpt-5.6-terra
+    append_arguments: ["--provider", "openai-codex", "--model", "gpt-5.6-terra"]
+  pi_openai_gpt56luna:
+    agent_runtime: pi
+    provider: openai-codex
+    model_family: gpt
+    model_line: gpt-5.6-luna
+    append_arguments: ["--provider", "openai-codex", "--model", "gpt-5.6-luna"]
+
+presets:
+  orchestrator:
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_fable}
+  builder:
+    selection: ordered
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_sonnet}
+          - {variant: pi_openai_gpt56luna}
+  reviewer:
+    selection: ordered
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_opus}
+          - {variant: pi_openai_gpt56sol}
+  build_and_verify:
+    selection: ordered
+    leaves:
+      builder:
+        candidates:
+          - {variant: claude_sonnet}
+          - {variant: pi_openai_gpt56luna}
+      verifier:
+        candidates:
+          - {variant: pi_openai_gpt56terra}
+          - {variant: claude_sonnet}
+    relations:
+      - {kind: distinct_model_family, leaves: [builder, verifier]}

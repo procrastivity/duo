@@ -1,0 +1,29 @@
+$ duo session launch orchestrator --dry-run
+preview only: no session, no durable record, no spawn
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+selection: ordered
+  main: claude / fable-5 (determined) -> selected
+exit=0
+
+$ duo session launch builder --dry-run
+preview only: no session, no durable record, no spawn
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+selection: ordered
+  main: claude / sonnet-5 (open) -> selected
+exit=0
+
+$ duo session launch reviewer --dry-run
+preview only: no session, no durable record, no spawn
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+selection: ordered
+  main: claude / opus-5 (open) -> selected
+exit=0
+
+$ duo session launch build_and_verify --dry-run
+preview only: no session, no durable record, no spawn
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+selection: ordered
+  builder: claude / sonnet-5 (open) -> selected
+  verifier: pi / gpt-5.6-terra (open) -> selected
+exit=0
+

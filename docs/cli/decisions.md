@@ -240,3 +240,12 @@ daily presets") is where the shipped dogfood document actually lands; it
 should confirm this path or amend it in the same change that authors the
 document, rather than this step guessing a name Step 24 then has to live
 with silently.
+
+**Resolved 2026-08-24 (dogfood Step 24).** The user confirmed the path
+as-is while authoring the daily-driver document: the launch config lives
+at `$XDG_CONFIG_HOME/duo/duo.config.yaml` (falling back to
+`~/.config/duo/duo.config.yaml`), and `--config` still overrides it
+outright. The authored document is `duo.config/v3`; a dated copy sits in
+`evidence/dogfood/2026-08-24/`. No rename was taken to separate it from
+the merged `config.yaml` tool config — the two names stay adjacent in
+one directory, as this entry already described.
