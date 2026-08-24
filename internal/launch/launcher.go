@@ -41,6 +41,58 @@ type HostSet interface {
 	LauncherFor(t Tuple) (host.HostLauncher, error)
 }
 
+// LeafAugmentation is what an installed LeafAugmenter contributes to one
+// leaf's launch: extra command-line arguments and/or extra environment
+// entries. Either field may be empty; a caller with nothing to add for a
+// given leaf returns the zero value.
+type LeafAugmentation struct {
+	// Args is appended after the tuple's own declared Arguments, in the
+	// order returned.
+	Args []string
+	// Env is merged over SpawnRequest.Env for this leaf only — never the
+	// tuple's own data, and never another leaf's env. A key present here
+	// wins over the same key in SpawnRequest.Env.
+	Env map[string]string
+}
+
+// LeafAugmenter optionally contributes extra command-line arguments and/or
+// extra environment entries to one leaf's launch, once its launch-resolution
+// record is durable and before that leaf's HostLauncher.PrepareLaunch.
+// Launcher.spawn calls it, if one is installed, in the per-leaf loop — after
+// the tuple's own declared Executable/Arguments are known (catalog.go: "the
+// agent runtime's declared executable and base arguments, with the variant's
+// append_arguments appended"), before the host adapter ever sees them.
+//
+// This is the seam for a caller that needs to materialize something the
+// extra arguments depend on existing on disk first (a generated hook
+// script, a settings file), or that needs a leaf's pane-creation
+// environment to carry an extra marker a host adapter copies verbatim
+// (host.ResolvedLaunchTuple.Env; see internal/host/herdr/doc.go's
+// "environment scrub duty" section for how a Herdr adapter carries it):
+// Augment runs synchronously in the spawn path, so its side effects are
+// visible before the host adapter starts the process. A returned error is
+// an ordinary spawn failure, handled exactly like a PrepareLaunch or Start
+// failure — the leaves before it already started, and the caller owns what
+// to do about them (§7.4).
+//
+// This package stays agnostic of any concrete agent runtime or session
+// host by design (doc.go: resolution "probes no host or runtime");
+// Augment receives only the tuple's public fields (AgentRuntime, and so
+// on), never a runtime adapter. A caller that needs to act only for one
+// agent-runtime kind switches on Tuple.AgentRuntime itself.
+//
+// PROVISIONAL (dogfood, 2026-08-24): the first and only installed
+// implementation is CLI's stage1LeafAugmenter, which contributes two
+// independent legs of --close-on-exit on the same closeOnExit request: the
+// claude-runtime leg materializes a per-session SessionEnd hook and
+// settings file and returns Args `["--settings", <path>]`; the pi-runtime
+// leg returns Env `{"DUO_CLOSE_PANE_ON_EXIT": "1"}`, which the pi
+// extension's session_shutdown handler reads from its own pane env. See
+// host.ResolvedLaunchTuple.CloseOnExit and terminal-multiplexers notes/46.
+type LeafAugmenter interface {
+	Augment(ctx context.Context, launchResolutionID, leaf string, t Tuple, closeOnExit bool) (LeafAugmentation, error)
+}
+
 // Launcher is the ordering guarantee: it resolves, commits the
 // launch-resolution record, and only then lets a session host prepare a
 // spawn.
@@ -57,14 +109,27 @@ type HostSet interface {
 // test TestRecordCommitsBeforePrepareLaunch pins the observable half of the
 // same property.
 type Launcher struct {
-	resolver *Resolver
-	recorder Recorder
-	hosts    HostSet
+	resolver  *Resolver
+	recorder  Recorder
+	hosts     HostSet
+	augmenter LeafAugmenter
+}
+
+// LauncherOption configures optional Launcher behavior beyond the three
+// required collaborators NewLauncher takes positionally. The zero-value
+// Launcher — no options passed — behaves exactly as it did before this
+// seam existed: no leaf's arguments or env are ever augmented.
+type LauncherOption func(*Launcher)
+
+// WithLeafAugmenter installs a LeafAugmenter. See that type's doc comment
+// for what it is for and when Launcher.spawn calls it.
+func WithLeafAugmenter(a LeafAugmenter) LauncherOption {
+	return func(l *Launcher) { l.augmenter = a }
 }
 
 // NewLauncher builds a launcher over a resolver, a recorder, and a host
-// set.
-func NewLauncher(resolver *Resolver, recorder Recorder, hosts HostSet) (*Launcher, error) {
+// set, plus any LauncherOption.
+func NewLauncher(resolver *Resolver, recorder Recorder, hosts HostSet, opts ...LauncherOption) (*Launcher, error) {
 	switch {
 	case resolver == nil:
 		return nil, fmt.Errorf("launch: NewLauncher needs a resolver")
@@ -73,7 +138,11 @@ func NewLauncher(resolver *Resolver, recorder Recorder, hosts HostSet) (*Launche
 	case hosts == nil:
 		return nil, fmt.Errorf("launch: NewLauncher needs a host set")
 	}
-	return &Launcher{resolver: resolver, recorder: recorder, hosts: hosts}, nil
+	l := &Launcher{resolver: resolver, recorder: recorder, hosts: hosts}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l, nil
 }
 
 // SpawnRequest is one session.launch request: the resolution request plus
@@ -91,6 +160,13 @@ type SpawnRequest struct {
 	// host's containment model — a placement input like WorkspacePath,
 	// never a constraint axis. Empty means the host's built-in default.
 	Target host.LaunchTarget
+	// CloseOnExit is threaded straight through to every leaf's
+	// host.ResolvedLaunchTuple.CloseOnExit and handed to the installed
+	// LeafAugmenter, if any, exactly as Target is. See
+	// host.ResolvedLaunchTuple.CloseOnExit for what it means and does not
+	// mean. PROVISIONAL (dogfood, 2026-08-24); see terminal-multiplexers
+	// notes/46.
+	CloseOnExit bool
 	// DryRun previews the resolution: same resolver, same static inputs,
 	// no durable record, no session, and no spawn (§6.10). In random mode
 	// its draw is preview-only and is not promised for a later launch.
@@ -202,6 +278,35 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 		if err != nil {
 			return out, fmt.Errorf("launch: leaf %s: %w", assignment.Leaf, err)
 		}
+
+		args := assignment.Tuple.Arguments
+		env := req.Env
+		if l.augmenter != nil {
+			aug, err := l.augmenter.Augment(ctx, c.record.ID, assignment.Leaf, assignment.Tuple, req.CloseOnExit)
+			if err != nil {
+				return out, fmt.Errorf("launch: leaf %s: augmenting launch: %w", assignment.Leaf, err)
+			}
+			if len(aug.Args) > 0 {
+				// A fresh slice: assignment.Tuple.Arguments is the
+				// record's own declared data and must not be mutated by
+				// an append that happens to have spare capacity.
+				args = append(append([]string{}, args...), aug.Args...)
+			}
+			if len(aug.Env) > 0 {
+				// A fresh map: req.Env is the caller's own data (and may
+				// be shared across leaves) and must never be mutated in
+				// place.
+				merged := make(map[string]string, len(req.Env)+len(aug.Env))
+				for k, v := range req.Env {
+					merged[k] = v
+				}
+				for k, v := range aug.Env {
+					merged[k] = v
+				}
+				env = merged
+			}
+		}
+
 		prepared, err := launcher.PrepareLaunch(ctx, host.HostLaunchRequest{
 			ResolvedLaunchTuple: host.ResolvedLaunchTuple{
 				LaunchResolutionID:    c.record.ID,
@@ -209,9 +314,10 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 				IntegrationInstanceID: assignment.Tuple.IntegrationInstanceID,
 				WorkspacePath:         req.WorkspacePath,
 				Command:               assignment.Tuple.Executable,
-				Args:                  assignment.Tuple.Arguments,
-				Env:                   req.Env,
+				Args:                  args,
+				Env:                   env,
 				Target:                req.Target,
+				CloseOnExit:           req.CloseOnExit,
 			},
 		})
 		if err != nil {

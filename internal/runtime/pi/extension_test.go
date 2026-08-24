@@ -100,6 +100,63 @@ func TestExtensionTerminalityAndLifecycleMarkers(t *testing.T) {
 	}
 }
 
+// Provisional close-on-exit: on a quit shutdown, if Duo launched the pane
+// with DUO_CLOSE_PANE_ON_EXIT=1 and the pane is Herdr's (HERDR_ENV=1, a pane
+// id, and Herdr's own bin path all present), the extension asks Herdr to
+// close its own pane. The activation flag and Herdr's pane identifiers name
+// no secret, so — unlike SOCKET_PATH/TOKEN — they are read at module load
+// but never scrubbed; closePaneOnExit runs after stop(), because closing the
+// pane can tear the process down before anything queued after it would run.
+func TestExtensionClosesPaneOnExitWhenActivated(t *testing.T) {
+	src := runtimepi.ExtensionSource()
+
+	for _, want := range []string{
+		`const CLOSE_PANE_ON_EXIT = process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1";`,
+		`const HERDR_ENV = process.env["HERDR_ENV"] === "1";`,
+		`const HERDR_PANE_ID = process.env["HERDR_PANE_ID"] ?? "";`,
+		`const HERDR_BIN_PATH = process.env["HERDR_BIN_PATH"] ?? "";`,
+		"function closePaneOnExit()",
+		`execFileSync(HERDR_BIN_PATH, ["pane", "close", HERDR_PANE_ID], { stdio: "ignore" });`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("asset lost close-on-exit line: %s", want)
+		}
+	}
+
+	// None of the four gates were scrubbed with `delete process.env[...]`:
+	// this is the deliberate stay-readable decision, not an oversight.
+	for _, scrubbed := range []string{
+		`delete process.env["DUO_CLOSE_PANE_ON_EXIT"]`,
+		`delete process.env["HERDR_ENV"]`,
+		`delete process.env["HERDR_PANE_ID"]`,
+		`delete process.env["HERDR_BIN_PATH"]`,
+	} {
+		if strings.Contains(src, scrubbed) {
+			t.Errorf("asset scrubs %s: close-on-exit's flag and Herdr's pane "+
+				"identifiers name no secret and are meant to stay readable", scrubbed)
+		}
+	}
+
+	// Ordering: stop() releases the reporter's own socket server before
+	// closePaneOnExit() can tear the process down.
+	shutdown := strings.Index(src, `pi.on("session_shutdown"`)
+	stopCall := strings.Index(src[shutdown:], "stop();")
+	closeCall := strings.Index(src[shutdown:], "closePaneOnExit();")
+	if shutdown < 0 || stopCall < 0 || closeCall < 0 {
+		t.Fatalf("could not locate session_shutdown's stop()/closePaneOnExit() calls")
+	}
+	if stopCall > closeCall {
+		t.Errorf("asset calls closePaneOnExit() before stop(): closing the pane can end " +
+			"the process, so the reporter's own cleanup must run first")
+	}
+
+	// Synchronous and error-swallowing: the process is exiting, so async work
+	// would race the exit, and a failed close must never break pi shutdown.
+	if strings.Contains(src, "execFileSync") && strings.Contains(src, "await execFileSync") {
+		t.Errorf("execFileSync must not be awaited: the pane close must stay synchronous")
+	}
+}
+
 // Native prompt delivery is proven and documented, and deliberately absent
 // from the Stage 1 asset: it is Duo's Stage 2+ prompt surface.
 func TestExtensionHasNoPromptDeliveryCall(t *testing.T) {

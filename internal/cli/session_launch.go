@@ -65,6 +65,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 		dryRun       bool
 		owner, actor string
 		bindActor    string
+		closeOnExit  bool
 	)
 
 	cmd := &cobra.Command{
@@ -167,7 +168,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				if err != nil {
 					return duoerr.New("internal.launch_recorder_build_failed", err.Error())
 				}
-				launcher, err := launch.NewLauncher(resolver, recorder, stage1HostSet{})
+				launcher, err := launch.NewLauncher(resolver, recorder, stage1HostSet{}, launch.WithLeafAugmenter(stage1LeafAugmenter{}))
 				if err != nil {
 					return duoerr.New("internal.launcher_build_failed", err.Error())
 				}
@@ -175,6 +176,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 					Request:       req,
 					WorkspacePath: mat.WorkspacePath(),
 					Target:        target,
+					CloseOnExit:   closeOnExit,
 				}, mat, actor)
 				if err != nil {
 					return launchFailure(streams, mode, err)
@@ -200,6 +202,8 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 		`the session host to launch into, "<kind>" or "<kind>:<instance>": deduction rung 0, outranking the workspace correlation, the ambient environment, and the policy default`)
 	cmd.Flags().StringVar(&targetFlag, "target", "",
 		`where the launched agent's container is created in the deduced host, "tab" or "pane": a placement override like --host, not a constraint axis (defaults to the host's built-in placement; provisional pending change control, see notes/44)`)
+	cmd.Flags().BoolVar(&closeOnExit, "close-on-exit", false,
+		`close the launched agent's host-side container when the agent exits cleanly, from an agent-side SessionEnd hook -- never a watcher, send-keys, or shell injection (crashes and kills leave the container open by design; provisional pending change control, see notes/46)`)
 	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
 	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime, model_line, or model_family); repeatable")
 	cmd.Flags().StringArrayVar(&avoidFlags, "avoid", nil, "a soft launch constraint, axis=value; repeatable")
@@ -585,5 +589,60 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 		return nil, fmt.Errorf(
 			"cli: the deduced session host %q is of kind %q, which this Stage-1 build does not support (only %q)",
 			t.IntegrationInstanceID, t.HostKind, herdr.AdapterID)
+	}
+}
+
+// stage1LeafAugmenter is the CLI's launch.LeafAugmenter: the concrete,
+// adapter-aware seam --close-on-exit's two runtime legs use to contribute
+// what each needs for a leaf's launch — claude materializes a generated
+// SessionEnd hook and settings file and appends `--settings <path>` to
+// that leaf's launch arguments; pi sets a pane-creation env marker its
+// extension reads.
+//
+// internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
+// adapter by name (Augment there receives only a launch.Tuple, never a
+// runtime adapter); this CLI-level implementation is the one place that
+// knows what "claude" and "pi" mean and what each buys from
+// --close-on-exit. It is host-agnostic in acceptance the same way --target
+// is: nothing here refuses --close-on-exit for any deduced session-host
+// kind. The claude leg's hook itself is what guards on being inside a
+// Herdr pane (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some
+// future non-Herdr host simply gets a settings file whose hook exits 0
+// immediately. The pi leg's env marker is inert unless the pi extension
+// that reads it is also running inside a Herdr pane (duo-pi-reporter.ts).
+//
+// PROVISIONAL (dogfood, 2026-08-24): see host.ResolvedLaunchTuple.CloseOnExit
+// and terminal-multiplexers notes/46. Every agent runtime other than
+// "claude" and "pi" is untouched: Augment is a no-op unless closeOnExit is
+// set and t.AgentRuntime is one of those two.
+type stage1LeafAugmenter struct{}
+
+// closePaneOnExitEnvVar is the exact key duo-pi-reporter.ts reads
+// (internal/runtime/pi/extension/duo-pi-reporter.ts:
+// `process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1"`) to decide, on a
+// session_shutdown with reason "quit", whether to close its own pane.
+// Both the key and the value "1" are exact-match contracts with that
+// script, not a convention this package chose.
+const closePaneOnExitEnvVar = "DUO_CLOSE_PANE_ON_EXIT"
+
+func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf string, t launch.Tuple, closeOnExit bool) (launch.LeafAugmentation, error) {
+	if !closeOnExit {
+		return launch.LeafAugmentation{}, nil
+	}
+	switch t.AgentRuntime {
+	case "claude":
+		dir, err := claude.DefaultHarnessDir(launchResolutionID, leaf)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the close-on-exit harness directory for leaf %s: %w", leaf, err)
+		}
+		settingsPath, err := claude.MaterializeCloseOnExit(dir)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the close-on-exit harness for leaf %s: %w", leaf, err)
+		}
+		return launch.LeafAugmentation{Args: []string{"--settings", settingsPath}}, nil
+	case "pi":
+		return launch.LeafAugmentation{Env: map[string]string{closePaneOnExitEnvVar: "1"}}, nil
+	default:
+		return launch.LeafAugmentation{}, nil
 	}
 }

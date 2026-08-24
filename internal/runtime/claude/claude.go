@@ -10,12 +10,18 @@
 //
 // Deliberately out of scope, matching the internal/runtime package's own
 // Stage-1 cut: ConditionProvider, RuntimePromptProvider, UsageProvider,
-// RuntimeConfigurationProvider, and HarnessRenderer. Generated-hook
-// file installation is also out of scope — Correlate is built to accept
-// a runtime.RuntimeClaim that already carries hook-reported identity (the
-// session id and the launch-env reporter credential passed through to
+// RuntimeConfigurationProvider, and HarnessRenderer. Correlate is built to
+// accept a runtime.RuntimeClaim that already carries hook-reported identity
+// (the session id and the launch-env reporter credential passed through to
 // hook env, notes/16 §10), not to generate or install the hook
-// configuration itself.
+// configuration a correlation-reporting hook would need — that installation
+// path is still out of scope here.
+//
+// closeonexit.go is a narrow, PROVISIONAL exception (dogfood, 2026-08-24):
+// it generates and materializes one single-purpose SessionEnd hook plus a
+// `claude --settings` document for --close-on-exit, entirely independent of
+// Correlate and the RuntimeClaim path above. See
+// host.ResolvedLaunchTuple.CloseOnExit and terminal-multiplexers notes/46.
 package claude
 
 import (

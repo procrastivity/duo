@@ -116,6 +116,23 @@ type ResolvedLaunchTuple struct {
 	// Target is the requested placement inside the host's containment
 	// model. Empty asks for the host's built-in default. See LaunchTarget.
 	Target LaunchTarget
+	// CloseOnExit requests that the launched execution's host-side
+	// container close itself once the launched agent exits cleanly.
+	// PROVISIONAL (dogfood, 2026-08-24): this field is a dogfood-day
+	// expedient ahead of change control; the ratified design is sketched
+	// in terminal-multiplexers notes/46.
+	//
+	// A HostLauncher implementation carries no obligation from this field
+	// alone: the closing action Duo has verified — a Herdr pane closing
+	// itself synchronously from inside the launched agent's own
+	// SessionEnd hook — never runs as host-adapter behavior (no watcher,
+	// no send-keys, no shell injection from outside the pane). CloseOnExit
+	// exists on the tuple only so a runtime-specific launch.LeafAugmenter
+	// can see the request when it decides what extra arguments or env a
+	// leaf's launch needs (a `--settings <path>` pointing at a generated
+	// hook, or a pane-creation env marker like DUO_CLOSE_PANE_ON_EXIT); a
+	// HostLauncher that has nothing to add for it may ignore it entirely.
+	CloseOnExit bool
 }
 
 // HostLaunchRequest is HostLauncher.PrepareLaunch's input.

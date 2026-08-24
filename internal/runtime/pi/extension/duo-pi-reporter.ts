@@ -13,9 +13,11 @@
 // What this extension is for at Stage 1: it serves ONE correlation record —
 // the live session id, session file, and cwd that only the in-process runtime
 // knows — to Duo over a Unix socket, authenticated by a per-runtime-instance
-// credential. It reports nothing else. It is a generated harness component,
-// not part of the Go authority: if it fails, only its own paths disappear
-// (conformance §7.4).
+// credential. On clean quit it also, provisionally, closes its own Herdr
+// pane when Duo launched it with close-on-exit enabled (DUO_CLOSE_PANE_ON_EXIT,
+// read at module load alongside the credential — see closePaneOnExit below).
+// Neither responsibility is part of the Go authority: if either fails, only
+// its own paths disappear (conformance §7.4).
 //
 // Documented capability, deliberately NOT implemented here: the same
 // extension shape can also deliver prompts natively. A probe at 0.83.0 proved
@@ -26,6 +28,7 @@
 // stays read-only until the prompt-delivery contract lands.
 
 import { createServer } from "node:net";
+import { execFileSync } from "node:child_process";
 
 // Duo does not build against pi's published typings at generation time, so the
 // two shapes this file touches are local aliases, not imports.
@@ -45,6 +48,18 @@ const SOCKET_PATH = process.env["__DUO_SOCKET_ENV__"] ?? "";
 const TOKEN = process.env["__DUO_TOKEN_ENV__"] ?? "";
 delete process.env["__DUO_SOCKET_ENV__"];
 delete process.env["__DUO_TOKEN_ENV__"];
+
+// Close-on-exit activation, read once at module load for the same reason as
+// the credential above: it happens before any turn can run, in one place.
+// Unlike SOCKET_PATH/TOKEN these name no secret — an on/off flag and Herdr's
+// own pane identifiers, not a Duo credential — so nothing here scrubs them.
+// Leaving them in process.env for pi's whole lifetime costs nothing, and
+// HERDR_ENV/HERDR_PANE_ID/HERDR_BIN_PATH are Herdr's environment to keep or
+// remove, not Duo's.
+const CLOSE_PANE_ON_EXIT = process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1";
+const HERDR_ENV = process.env["HERDR_ENV"] === "1";
+const HERDR_PANE_ID = process.env["HERDR_PANE_ID"] ?? "";
+const HERDR_BIN_PATH = process.env["HERDR_BIN_PATH"] ?? "";
 
 export default function (pi: PiAPI) {
   let server: any = null;
@@ -119,6 +134,11 @@ export default function (pi: PiAPI) {
     if (event?.reason !== "quit") return;
     servedSessionId = null;
     stop();
+    // Close-on-exit last: closing the pane can tear this very process down
+    // (it is the process the pane is showing), so anything the reporter
+    // still owns — releasing its own socket server above — must happen
+    // before this call, not after.
+    closePaneOnExit();
   });
 
   function stop() {
@@ -128,6 +148,21 @@ export default function (pi: PiAPI) {
       // fire-and-forget: a reporter failure never surfaces in the user's turn.
     }
     server = null;
+  }
+}
+
+// Close-on-exit: when Duo launched this pane with close-on-exit enabled, ask
+// Herdr to close the pane so it does not sit empty after pi quits cleanly.
+function closePaneOnExit() {
+  if (!CLOSE_PANE_ON_EXIT || !HERDR_ENV) return;
+  if (!HERDR_PANE_ID || !HERDR_BIN_PATH) return;
+  try {
+    // Synchronous: the process is exiting, so async work would race the
+    // exit and might never run. A failed close must never break pi
+    // shutdown, so every error is swallowed.
+    execFileSync(HERDR_BIN_PATH, ["pane", "close", HERDR_PANE_ID], { stdio: "ignore" });
+  } catch {
+    // fire-and-forget: same contract as stop() above.
   }
 }
 

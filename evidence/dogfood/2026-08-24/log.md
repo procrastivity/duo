@@ -50,3 +50,41 @@ recorded an attachment that failed its own first validation (the
 capture-16 family of pain). Baseline now settles on the shell; handover
 requires a stable PID across two polls. `TestLiveHerdr` passed 3× per
 placement against a disposable 0.8.2 server.
+
+## Second evening addendum — close-on-exit (finding + provisional fix)
+
+Finding: a launched agent's `/exit` returns its pane to a shell prompt;
+the Duo-created tab lingers. Also confirmed the launch really is
+two-step (Herdr types the command into a live shell; the visible shell
+load is real, not rendering). Design sketch:
+terminal-multiplexers `notes/46-close-on-exit-sketch.md`.
+
+Dead end, probed live: `; exit` arg injection is impossible —
+`agent.start` shell-quotes each arg (the `pane run` raw-text behavior
+does not carry over).
+
+Provisional fix landed same day: `--close-on-exit` on
+`duo session launch`. The agent's own end-of-session hook closes the
+pane from inside — claude via a per-launch generated SessionEnd hook
+(`--settings` injection, reason-filtered to `prompt_input_exit logout`;
+`clear`/`resume` fire without process exit and are excluded), pi via
+the shipped reporter extension's `session_shutdown` `quit` handler,
+activated by `DUO_CLOSE_PANE_ON_EXIT=1` in the pane-creation env
+(delivered through the new `LeafAugmenter` seam in `internal/launch`).
+Crash asymmetry is the policy: SIGKILL fires no hook, the pane stays
+open with its evidence; a lost hook leaks a pane, never destroys one.
+
+Live verification (disposable marker-free 0.8.2 server, real CLI):
+claude `/exit` → container gone (lone-pane tab takes tab + workspace);
+`kill -9` → pane survives; flag off → unchanged (and no harness files
+materialized); pi Ctrl-D → lone-pane tab gone, shared workspace
+survives. Full transcripts: `close-on-exit/h-probe-results.md` and
+`close-on-exit/e2e-results.md` beside this log.
+
+Recorded limitations (accepted for provisional, listed in notes/46
+§10): per-launch harness dirs are never reaped; `--settings` is
+unguarded against a variant-authored duplicate; the activation env var
+outlives the launched agent in the pane; `duo doctor` does not warn
+when a deduced host's panes would fail the scrub gate. The first e2e
+attempt was itself refused by that gate (probe server carried inherited
+agent markers) — the gate failed closed, correctly.
