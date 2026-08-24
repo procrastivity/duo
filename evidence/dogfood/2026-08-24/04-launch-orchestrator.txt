@@ -1,0 +1,10 @@
+$ duo-go session launch orchestrator        # run by the user via the harness's ! runner (stdin not a tty)
+duo: herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock was deduced from the ambient environment of the pane this command is running in.
+duo: bind workspace ws_6f6f353db25ac388054ef073dda3deb0 to it, so later launches go to the same host? [y/N] duo: host binding skipped: no answer was read from the terminal, so nothing was recorded.
+duo: the launch itself succeeded; only the workspace<->host correlation was not recorded.
+session:  ses_7d775daabcc3feb7da6f50dd31714dc0
+record:   lrr_74224062d61b13cca377c45423f83a70
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=ambient-env)
+selection: ordered
+  main: claude / fable-5 (determined) -> selected
+exit=0

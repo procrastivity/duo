@@ -1,0 +1,3 @@
+$ duo-go session launch build_and_verify --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock   # explicit --host per the user's approval; binds silently (first bind)
+duo: session launch: launch: leaf verifier: starting launch: herdr agent.start: agent_name_taken: agent name duo-lrr_6e2421a36764505fdfe6de7a is already used; candidates: terminal_id=term_659cd1e3f73943 pane_id=w1:p8 workspace_id=w1 tab_id=w1:t1 cwd=/home/dev/Code/duo-vnext/evidence/dogfood/2026-08-24 status=Unknown
+exit=4

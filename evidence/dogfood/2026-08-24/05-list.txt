@@ -1,0 +1,4 @@
+$ duo-go session list
+SESSION                               WORKSPACE                            LIFECYCLE  VIEW        RUNTIME INSTANCE
+ses_7d775daabcc3feb7da6f50dd31714dc0  ws_6f6f353db25ac388054ef073dda3deb0  active     recovering  ri_1e30dd102189fc33882ad8d178b5b279
+exit=0

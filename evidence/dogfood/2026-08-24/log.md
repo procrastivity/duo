@@ -9,6 +9,20 @@ Binary: duo built from `go` @ c534067 (--output chassis-wide).
 | 02-dry-runs.txt | launch --dry-run: all four presets resolve; build_and_verify honors distinct_model_family |
 | 03-dry-run-json.txt | launch --dry-run --output json: duo.external/v1 envelope |
 | duo.config.yaml | the authored document (copy) |
+| 04-launch-orchestrator.txt | launch (real, Herdr+Claude): fable-5 spawned; ambient-env bind asked, read no tty, skipped by design — launch still succeeded |
+| 05-list.txt / 06-show.txt | list, show: active/recovering, the documented Stage-1 view |
+| 07-launch-build-and-verify.txt | FAILURE, kept as evidence: multi-leaf agent-name collision (agent_name_taken on the second leaf); also run from the wrong cwd, minting a workspace for the evidence dir |
+| 08-host-show.txt | workspace host show on the accidental workspace: unbound, correct detail line |
+| 09-launch-pi-require.txt | launch (real, Herdr+Pi) with --require agent_runtime=pi and explicit --host: gpt-5.6-luna spawned; first bind recorded silently (host_source=explicit-flag) with the pre-filled rebind line |
+| 10-host-show-bound.txt | workspace host show: full provenance + fingerprints for the new correlation |
+| 11-detach-reattach.txt | FAILURE, kept as evidence: detach/reattach refuse on a LAUNCHED session — no host attachment is recorded at launch commit; enroll-only today |
+| 12-enroll.txt | enroll: this Claude Code pane adopted as a session (credential redacted) |
+| 13-detach-reattach-enrolled.txt | detach, reattach, authority-restart recovery: each CLI invocation reopens the authority, so the detach→reattach pair across processes is the restart drill; view stays recovering per the known limit |
+| 14-launch-build-and-verify-fixed.txt | launch (real, multi-leaf) after fix a52c39c: builder and verifier spawn with DISTINCT agent names (duo-builder-…, duo-verifier-…); correlation-outranks-ambient note shown |
 
-Checkpoint verbs still to exercise live: launch (real), list, show,
-detach, reattach, authority-restart recovery.
+Checkpoint verbs all exercised at least once this day: launch-via-preset
+(claude and pi legs), list, show, enroll, detach, reattach, recovery.
+Open from this day: the multi-leaf name-collision fix (landed same day, a52c39c, proven by capture 14), the
+launch-has-no-attachment seam gap (surfaced), stray-pane teardown debt
+(live reproduction), and the full-day daily-use log that completes the
+checkpoint.

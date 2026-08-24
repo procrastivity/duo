@@ -1,0 +1,16 @@
+$ duo-go workspace host show
+workspace root:  /home/dev/Code/terminal-multiplexers
+workspace:       ws_6f6f353db25ac388054ef073dda3deb0
+host:            herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+host instance:   -
+host source:     explicit-flag
+session name:    -
+pane id:         w1:pA
+terminal id:     term_659cd2308f8535
+process birth:   pid=2499618 started=2026-08-24T16:04:10.640Z
+bound by:        workspace.host_bound (fact_1bf1c73327c2d5ebc0018481af71928c)
+bound at:        2026-08-24T16:04:11.491Z
+actor:           cli
+reason:          cold-start host correlation from launch deduction
+evidence:        host deduced by explicit-flag and proven by a successful spawn (launch-resolution record lrr_7ff917626fc115f1272338e20718a4d9)
+exit=0

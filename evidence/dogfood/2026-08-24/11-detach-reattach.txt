@@ -1,0 +1,29 @@
+$ duo-go session detach ses_565d7cd833625afe14a9ffe9e4ca84b6 --reason "dogfood detach/reattach drill"
+duo: session detach: domain: unknown duo object: session ses_565d7cd833625afe14a9ffe9e4ca84b6 has no host attachment
+exit=1
+
+$ duo-go session show ses_565d7cd833625afe14a9ffe9e4ca84b6
+session:            ses_565d7cd833625afe14a9ffe9e4ca84b6
+workspace:          ws_6f6f353db25ac388054ef073dda3deb0
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_865f5d23f02aa451b8a7fdcbb5af8e4b
+instance state:     starting
+owner:              cli
+quarantined:        false
+exit=0
+
+$ duo-go session reattach ses_565d7cd833625afe14a9ffe9e4ca84b6 --integration-instance herdr:terminal-multiplexers --epoch-kind herdr.terminal_id --epoch-value term_659cd2308f8535 --epoch-scope pane --container w1:pA
+duo: session reattach: domain: unknown duo object: session ses_565d7cd833625afe14a9ffe9e4ca84b6 has no host attachment
+exit=1
+
+$ duo-go session show ses_565d7cd833625afe14a9ffe9e4ca84b6
+session:            ses_565d7cd833625afe14a9ffe9e4ca84b6
+workspace:          ws_6f6f353db25ac388054ef073dda3deb0
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_865f5d23f02aa451b8a7fdcbb5af8e4b
+instance state:     starting
+owner:              cli
+quarantined:        false
+exit=0

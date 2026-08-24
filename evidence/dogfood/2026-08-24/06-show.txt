@@ -1,0 +1,10 @@
+$ duo-go session show ses_7d775daabcc3feb7da6f50dd31714dc0
+session:            ses_7d775daabcc3feb7da6f50dd31714dc0
+workspace:          ws_6f6f353db25ac388054ef073dda3deb0
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_1e30dd102189fc33882ad8d178b5b279
+instance state:     starting
+owner:              cli
+quarantined:        false
+exit=0

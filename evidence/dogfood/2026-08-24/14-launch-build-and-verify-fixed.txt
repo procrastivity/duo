@@ -1,0 +1,13 @@
+$ duo-go session launch build_and_verify   # re-run after fix a52c39c, from the workspace root; correlation now bound
+duo: this workspace's recorded correlation chose herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock and outranked the ambient environment of the pane you are in.
+duo:   outranked: HERDR_SOCKET_PATH=/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+duo:   outranked: HERDR_SESSION=terminal-multiplexers
+duo: change it later with: duo workspace host rebind --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --evidence "<what you checked>"
+session:  ses_cd80e7492a59ec179582cb748473b652
+record:   lrr_0fee61ebcea88caa0b5c9a7ca272378d
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=workspace-correlation)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by workspace-correlation)
+selection: ordered
+  builder: claude / sonnet-5 (open) -> selected
+  verifier: pi / gpt-5.6-terra (open) -> selected
+exit=0

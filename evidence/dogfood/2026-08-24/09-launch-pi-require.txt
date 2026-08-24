@@ -1,0 +1,10 @@
+$ duo-go session launch builder --require agent_runtime=pi --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock   # from the workspace root this time; explicit --host binds silently (user-approved); --require forces the pi leg
+duo: host bound: workspace ws_6f6f353db25ac388054ef073dda3deb0 -> herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=explicit-flag, fact fact_1bf1c73327c2d5ebc0018481af71928c)
+duo: change it later with: duo workspace host rebind --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --evidence "<what you checked>"
+session:  ses_565d7cd833625afe14a9ffe9e4ca84b6
+record:   lrr_7ff917626fc115f1272338e20718a4d9
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=explicit-flag)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+selection: ordered
+  main: pi / gpt-5.6-luna (open) -> selected
+exit=0

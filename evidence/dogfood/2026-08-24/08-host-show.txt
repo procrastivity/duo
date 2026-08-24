@@ -1,0 +1,6 @@
+$ duo-go workspace host show
+workspace root:  /home/dev/Code/duo-vnext/evidence/dogfood/2026-08-24
+workspace:       ws_864bc94b979466c8d4d48dab0a09955a
+host:            none
+                 (no host correlation; the next launch in this workspace deduces one and binds it)
+exit=0
