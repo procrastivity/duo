@@ -84,7 +84,14 @@ type HostCandidate struct {
 // step; this is the minimal shape PrepareLaunch needs to receive its
 // output.
 type ResolvedLaunchTuple struct {
-	LaunchResolutionID    string
+	LaunchResolutionID string
+	// Leaf is the assignment's leaf name (§6.7's per-leaf spawn loop) —
+	// every preset declares one, single-leaf presets included. Real
+	// callers always set it; it is empty only in a hand-built test tuple
+	// that has no assignment to draw it from. LaunchResolutionID is the
+	// same for every leaf of one launch, so Leaf is what a HostLauncher
+	// needs to tell two leaves of the same launch apart.
+	Leaf                  string
 	IntegrationInstanceID string
 	WorkspacePath         string
 	Command               string

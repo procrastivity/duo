@@ -240,12 +240,12 @@ func (h *Host) PrepareLaunch(ctx context.Context, req host.HostLaunchRequest) (h
 		return host.PreparedHostLaunch{}, err
 	}
 	prepared := preparedLaunch{
-		AgentName: agentName(h.cfg.AgentNamePrefix, tuple.LaunchResolutionID),
+		AgentName: agentName(h.cfg.AgentNamePrefix, tuple.Leaf, tuple.LaunchResolutionID),
 		Kind:      kind,
 		Args:      append([]string(nil), tuple.Args...),
 		Cwd:       tuple.WorkspacePath,
 		Env:       copyEnv(tuple.Env),
-		Label:     agentName(h.cfg.AgentNamePrefix, tuple.LaunchResolutionID),
+		Label:     agentName(h.cfg.AgentNamePrefix, tuple.Leaf, tuple.LaunchResolutionID),
 	}
 	target := splitTarget(snap)
 	if target == "" {
@@ -545,19 +545,60 @@ func splitTarget(snap sessionSnapshot) string {
 	return snap.Panes[0].PaneID
 }
 
-// agentName builds a Herdr agent name from a launch-resolution ID. Herdr
-// agent names are a flat per-server namespace, so the resolution ID (which
-// is unique per launch) is what keeps two launches apart.
+// agentName builds a Herdr agent name from a launch-resolution ID and the
+// leaf that ID's spawn belongs to. Herdr agent names are a flat
+// per-server namespace, so the resolution ID (which is unique per launch)
+// is what keeps two launches apart — but §6.7's per-leaf spawn loop calls
+// PrepareLaunch/Start once per leaf of one launch, and every leaf of that
+// launch shares the same LaunchResolutionID. Without leaf, a multi-leaf
+// preset's second leaf mints the same name as its first and Herdr's
+// agent.start refuses it as agent_name_taken (reproduced live at the
+// Stage 1 dogfood run, 2026-08-24: "duo_lrr_6e2421a36764505fdfe6de7a"
+// twice for one build_and_verify launch). leaf is what keeps two leaves of
+// the same launch apart.
 //
 // Herdr 0.8.2 validates the name at agent.start: lowercase start,
 // [a-z0-9_-] only, 1–32 characters (invalid_agent_name observed live at
 // the Stage 1 gate — "duo-" plus a full lr_<32 hex> ID is 39 characters
 // and was refused). Uppercase folds to lowercase, and the name truncates
 // to the 32-character cap: it only has to be unique among agents on one
-// server, and the surviving ~24 hex characters of a 128-bit random ID are
-// far more entropy than that needs.
-func agentName(prefix, launchResolutionID string) string {
-	safe := strings.Map(func(r rune) rune {
+// server, and the surviving hex characters of a 128-bit random ID are far
+// more entropy than that needs.
+//
+// leaf sits between the prefix and the ID, ahead of where truncation
+// cuts, and is itself capped short — so a cap-triggered truncation always
+// eats into the ID's entropy first and never removes the part that tells
+// two leaves of one launch apart. Losing that order would silently
+// restore the very collision this exists to prevent.
+func agentName(prefix, leaf, launchResolutionID string) string {
+	const herdrAgentNameMax = 32
+	// Generous enough for every leaf name this domain mints today
+	// ("builder", "verifier", ...) while still reserving most of the cap
+	// for the launch-resolution ID's entropy.
+	const leafSegmentMax = 12
+
+	safeLeaf := sanitizeAgentNamePart(leaf)
+	if len(safeLeaf) > leafSegmentMax {
+		safeLeaf = safeLeaf[:leafSegmentMax]
+	}
+	safeID := sanitizeAgentNamePart(launchResolutionID)
+
+	name := prefix
+	if safeLeaf != "" {
+		name += "-" + safeLeaf
+	}
+	name += "-" + safeID
+
+	if len(name) > herdrAgentNameMax {
+		name = name[:herdrAgentNameMax]
+	}
+	return name
+}
+
+// sanitizeAgentNamePart folds one agentName input into Herdr's live
+// character rules: lowercase [a-z0-9_-], everything else mapped to '-'.
+func sanitizeAgentNamePart(s string) string {
+	return strings.Map(func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
 			return r
@@ -566,13 +607,7 @@ func agentName(prefix, launchResolutionID string) string {
 		default:
 			return '-'
 		}
-	}, launchResolutionID)
-	name := prefix + "-" + safe
-	const herdrAgentNameMax = 32
-	if len(name) > herdrAgentNameMax {
-		name = name[:herdrAgentNameMax]
-	}
-	return name
+	}, s)
 }
 
 func copyEnv(env map[string]string) map[string]string {

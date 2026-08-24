@@ -201,6 +201,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 		prepared, err := launcher.PrepareLaunch(ctx, host.HostLaunchRequest{
 			ResolvedLaunchTuple: host.ResolvedLaunchTuple{
 				LaunchResolutionID:    c.record.ID,
+				Leaf:                  assignment.Leaf,
 				IntegrationInstanceID: assignment.Tuple.IntegrationInstanceID,
 				WorkspacePath:         req.WorkspacePath,
 				Command:               assignment.Tuple.Executable,

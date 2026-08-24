@@ -135,6 +135,49 @@ func TestPrepareLaunchMutatesNothing(t *testing.T) {
 	}
 }
 
+// End-to-end shape of the Stage 1 dogfood bug: PrepareLaunch called twice
+// for the two leaves of one build_and_verify launch, same
+// LaunchResolutionID, different Leaf. Before the fix both calls produced
+// the same AgentName and the second leaf's Start would have collided with
+// the first at Herdr's agent.start.
+func TestPrepareLaunchGivesEachLeafOfOneLaunchADistinctAgentName(t *testing.T) {
+	f := newFakeHerdr(t)
+	f.addPane("w1")
+	h := testHost(t, f)
+	ctx := context.Background()
+
+	builderTuple := testTuple()
+	builderTuple.Leaf = "builder"
+	verifierTuple := testTuple()
+	verifierTuple.Leaf = "verifier"
+
+	builder, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: builderTuple})
+	if err != nil {
+		t.Fatalf("PrepareLaunch(builder): %v", err)
+	}
+	verifier, err := h.PrepareLaunch(ctx, host.HostLaunchRequest{ResolvedLaunchTuple: verifierTuple})
+	if err != nil {
+		t.Fatalf("PrepareLaunch(verifier): %v", err)
+	}
+
+	builderStaged, ok := builder.Opaque.(preparedLaunch)
+	if !ok {
+		t.Fatalf("builder prepared.Opaque is %T", builder.Opaque)
+	}
+	verifierStaged, ok := verifier.Opaque.(preparedLaunch)
+	if !ok {
+		t.Fatalf("verifier prepared.Opaque is %T", verifier.Opaque)
+	}
+
+	if builderStaged.AgentName == verifierStaged.AgentName {
+		t.Fatalf("both leaves of one launch got AgentName %q", builderStaged.AgentName)
+	}
+	if len(builderStaged.AgentName) > 32 || len(verifierStaged.AgentName) > 32 {
+		t.Fatalf("AgentName exceeds Herdr's 32-character cap: builder %q, verifier %q",
+			builderStaged.AgentName, verifierStaged.AgentName)
+	}
+}
+
 // The environment-scrub seam: whatever the resolved tuple carries has to
 // reach the pane, because a Herdr pane otherwise inherits the Herdr
 // server's environment wholesale.
@@ -534,27 +577,67 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // [a-z0-9_-] only, 1-32 characters. invalid_agent_name was observed live
 // at the Stage 1 gate with a full-length resolution-ID suffix, so this
 // pins the generated name to the live rules for every ID shape the domain
-// mints.
+// mints, and every leaf-name shape too (a1249de covered the ID axis; the
+// leaf axis was added when leaf joined the signature).
 func TestAgentNameFitsHerdrsLiveRules(t *testing.T) {
-	cases := []struct{ prefix, id string }{
-		{"duo", "lr_0123456789abcdef0123456789abcdef"},
-		{"duo", "LR_UPPER-Case.and/odd chars"},
-		{"duo", "short"},
+	cases := []struct{ prefix, leaf, id string }{
+		{"duo", "", "lr_0123456789abcdef0123456789abcdef"},
+		{"duo", "", "LR_UPPER-Case.and/odd chars"},
+		{"duo", "", "short"},
+		{"duo", "builder", "lrr_6e2421a36764505fdfe6de7a"},
+		{"duo", "verifier", "lrr_6e2421a36764505fdfe6de7a"},
+		{"duo", "AnUnreasonablyLongLeafNameNoPresetShouldEverDeclare", "lrr_6e2421a36764505fdfe6de7a"},
 	}
 	for _, tc := range cases {
-		got := agentName(tc.prefix, tc.id)
+		got := agentName(tc.prefix, tc.leaf, tc.id)
 		if len(got) == 0 || len(got) > 32 {
-			t.Errorf("agentName(%q, %q) = %q: length %d, want 1-32", tc.prefix, tc.id, got, len(got))
+			t.Errorf("agentName(%q, %q, %q) = %q: length %d, want 1-32", tc.prefix, tc.leaf, tc.id, got, len(got))
 		}
 		if got[0] < 'a' || got[0] > 'z' {
-			t.Errorf("agentName(%q, %q) = %q: must start with a lowercase letter", tc.prefix, tc.id, got)
+			t.Errorf("agentName(%q, %q, %q) = %q: must start with a lowercase letter", tc.prefix, tc.leaf, tc.id, got)
 		}
 		for _, r := range got {
 			switch {
 			case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
 			default:
-				t.Errorf("agentName(%q, %q) = %q: invalid rune %q", tc.prefix, tc.id, got, r)
+				t.Errorf("agentName(%q, %q, %q) = %q: invalid rune %q", tc.prefix, tc.leaf, tc.id, got, r)
 			}
 		}
+	}
+}
+
+// The bug reproduced live at the Stage 1 dogfood run (2026-08-24):
+// launching the two-leaf preset build_and_verify spawned "builder" fine,
+// then "verifier" failed at agent.start with agent_name_taken, because
+// both leaves of one launch share a LaunchResolutionID and the
+// pre-existing agentName ignored leaf entirely. This pins the fix: two
+// leaves of the same launch — same prefix, same launch-resolution ID —
+// must mint distinct names, each still inside Herdr's cap.
+func TestAgentNameDistinguishesLeavesOfTheSameLaunch(t *testing.T) {
+	const id = "lrr_6e2421a36764505fdfe6de7a"
+
+	builder := agentName("duo", "builder", id)
+	verifier := agentName("duo", "verifier", id)
+
+	if builder == verifier {
+		t.Fatalf("agentName(duo, builder, %s) == agentName(duo, verifier, %s) = %q: two leaves of one launch collide", id, id, builder)
+	}
+	for _, got := range []string{builder, verifier} {
+		if len(got) == 0 || len(got) > 32 {
+			t.Errorf("agentName(...) = %q: length %d, want 1-32", got, len(got))
+		}
+	}
+}
+
+// A single-leaf preset's PrepareLaunch still gets an empty tuple.Leaf in
+// hand-built test tuples (see testTuple), and the fix must not regress
+// that shape: no stray separator, no change from the pre-leaf name a
+// caller with no leaf to give still gets.
+func TestAgentNameWithNoLeafMatchesThePreLeafShape(t *testing.T) {
+	const id = "lr-1"
+	got := agentName("duo", "", id)
+	want := "duo-" + id
+	if got != want {
+		t.Fatalf("agentName(duo, \"\", %q) = %q, want %q", id, got, want)
 	}
 }
