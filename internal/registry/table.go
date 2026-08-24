@@ -367,6 +367,52 @@ var table = []Descriptor{
 		Route:          &Route{Method: "GET", Path: "/v1/sessions/{session_id}/terminal/snapshot"},
 		Fixtures:       []string{"fixtures/duo-external-v1/terminal-snapshot.json"},
 	},
+
+	// --- Provider state (duo-config-v3 step 08) ---
+	//
+	// `duo provider disable|enable|list` are local_admin, CLI-only: the
+	// synced contract set names no provider.* operation and carries no
+	// fixture for one yet, so these rows follow session.enroll's shape
+	// (externalV1 envelope, no named result def) rather than one of their
+	// own. Disabling or enabling a name no launch_variant declares is a
+	// normal, non-error result (workplan Step 08), so no operation-specific
+	// error code is registered beyond the shared baseline.
+	{
+		Name:           "provider.disable",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"session.manage"},
+		Idempotency:    IdempotencyOptional,
+		Audit:          AuditPrivilegedWrite,
+		CLI:            []string{"provider", "disable"},
+		MCPTool:        "",
+		Route:          nil,
+	},
+	{
+		Name:           "provider.enable",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"session.manage"},
+		Idempotency:    IdempotencyOptional,
+		Audit:          AuditPrivilegedWrite,
+		CLI:            []string{"provider", "enable"},
+		MCPTool:        "",
+		Route:          nil,
+	},
+	{
+		Name:           "provider.list",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"diagnostics.read"},
+		Idempotency:    IdempotencyNotApplicable,
+		Audit:          AuditNone,
+		CLI:            []string{"provider", "list"},
+		MCPTool:        "",
+		Route:          nil,
+	},
 }
 
 // deferredOperations names operations the synced contract set mentions but

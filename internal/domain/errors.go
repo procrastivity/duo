@@ -50,6 +50,9 @@ var (
 	// starts a new runtime instance (§6.4). See degraded.go.
 	ErrContinuityUnverified = errors.New(
 		"domain: host attachment continuity is unverified; the report was parked and exact-target writes are disabled")
+	// ErrProviderNameRequired reports a provider.disabled or
+	// provider.enabled write with no provider name (step 08).
+	ErrProviderNameRequired = errors.New("domain: provider name is required")
 )
 
 // ConflictError is §4.2 step 5's outcome: evidence that overlaps two Duo

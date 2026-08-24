@@ -97,6 +97,26 @@ const (
 	// correlation. It carries both instances with their fingerprints, so
 	// the fact alone answers "what was it before, and what is it now".
 	FactWorkspaceHostRebound FactKind = "workspace.host_rebound"
+
+	// --- Provider state facts (duo.config/v3 step 08; notes/42 §8, notes/43
+	// item 14) ---
+	//
+	// A provider is config data, not a durable Duo object — a launch_variant
+	// names it, and nothing mints an ID for it. These two facts record a
+	// standing administrative decision about one provider name: the latest
+	// one recorded for a name wins on replay, and the default for a name
+	// with no fact at all is enabled. See ProviderFact and
+	// Authority.StandingProviderFacts.
+
+	// FactProviderDisabled records that launch resolution must not choose
+	// the named provider until a later provider.enabled fact supersedes it.
+	FactProviderDisabled FactKind = "provider.disabled"
+	// FactProviderEnabled records that the named provider is eligible again,
+	// superseding any earlier provider.disabled fact for the same name. It
+	// is also the fact a first-ever "enable" writes, even though enabled is
+	// already the default for a name with no standing fact — the write is
+	// durable evidence of the decision, not merely a state change.
+	FactProviderEnabled FactKind = "provider.enabled"
 )
 
 // Fact is one durable, attributable lifecycle change.
@@ -143,6 +163,13 @@ type Fact struct {
 	// interprets them (see LaunchResolution).
 	LaunchResolution *LaunchResolution
 
+	// Provider is the payload of a provider.disabled or provider.enabled
+	// fact (see the Provider-facts block in the FactKind enumeration
+	// above). It is not a "creation payload" in the sense of the block
+	// above — no Duo ID is minted for a provider — but the same
+	// exactly-one-pointer-set shape applies, keyed by name instead.
+	Provider *ProviderFact
+
 	// Transition targets. A transition fact names the object it changes and
 	// the new value.
 	WorkspaceID   WorkspaceID
@@ -165,4 +192,31 @@ type Fact struct {
 	// of a replay that happens to have seen the earlier fact.
 	HostBinding         *HostBinding
 	PreviousHostBinding *HostBinding
+}
+
+// --- Provider state (duo.config/v3 step 08) --------------------------------
+
+// ProviderFact is one provider.disabled or provider.enabled fact's payload:
+// the provider name the standing decision targets.
+//
+// Note is reserved, always empty in this stage. It is thread 4's extension
+// point (workplan Risk 3: `duo provider disable --until` / a recorded
+// reason payload) — leaving the field present but unused now means thread 4
+// adds a value to it later without a wire-shape change.
+type ProviderFact struct {
+	Name string
+	Note string
+}
+
+// ProviderStanding is one provider's current standing state, as
+// Authority.StandingProviderFacts reports it: the latest provider.disabled
+// or provider.enabled fact recorded for the name, replayed in commit order.
+// A name with no ProviderStanding entry has no standing fact at all — the
+// default-enabled rule applies at the reader, not by seeding this map (see
+// Authority.StandingProviderFacts).
+type ProviderStanding struct {
+	Enabled bool
+	// FactID is the ID of the fact that set this standing state — the exact
+	// fact step 11's evidence bundle snapshots provider state by.
+	FactID FactID
 }

@@ -274,7 +274,8 @@ func duoerrFromDomain(err error) *duoerr.Error {
 		errors.Is(err, domain.ErrIntentRequired),
 		errors.Is(err, domain.ErrContinuityUnverified):
 		return duoerr.New("refusal.session_guard", err.Error())
-	case errors.Is(err, domain.ErrWeakFingerprint), errors.Is(err, domain.ErrRootPathRequired):
+	case errors.Is(err, domain.ErrWeakFingerprint), errors.Is(err, domain.ErrRootPathRequired),
+		errors.Is(err, domain.ErrProviderNameRequired):
 		return duoerr.New("invalid.request", err.Error())
 	default:
 		return duoerr.New("internal.session_command_failed", err.Error())

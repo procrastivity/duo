@@ -66,6 +66,12 @@ type Authority struct {
 	// workspace.host_bound / workspace.host_rebound facts. See
 	// hostcorrelation.go.
 	hostBindings map[WorkspaceID]*HostCorrelation
+
+	// providers is the "standing provider facts" read model (step 08): the
+	// latest provider.disabled or provider.enabled fact per name, keyed by
+	// name rather than by a minted Duo ID. A name absent from this map has
+	// no standing fact — see ProviderStanding and StandingProviderFacts.
+	providers map[string]ProviderStanding
 }
 
 // Option configures an Authority.
@@ -101,6 +107,7 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 		recovering:     map[InstanceID]bool{},
 		parked:         map[SessionID][]*ParkedReport{},
 		hostBindings:   map[WorkspaceID]*HostCorrelation{},
+		providers:      map[string]ProviderStanding{},
 
 		launchResolutions: map[LaunchResolutionID]*recordedLaunchResolution{},
 		sessionLaunch:     map[SessionID]LaunchResolutionID{},
@@ -215,6 +222,17 @@ func (a *Authority) apply(f Fact) {
 		if f.Parked != nil {
 			p := *f.Parked
 			a.parked[p.Session] = append(a.parked[p.Session], &p)
+		}
+	case FactProviderDisabled:
+		// Provider state (step 08): the latest fact per name wins on
+		// replay, and the fact ID it wins with is retained (step 11 snaps
+		// provider state by fact ID).
+		if f.Provider != nil {
+			a.providers[f.Provider.Name] = ProviderStanding{Enabled: false, FactID: f.ID}
+		}
+	case FactProviderEnabled:
+		if f.Provider != nil {
+			a.providers[f.Provider.Name] = ProviderStanding{Enabled: true, FactID: f.ID}
 		}
 	case FactInstanceStarted:
 		if f.Instance != nil {
@@ -391,6 +409,22 @@ func (a *Authority) Recovering() []InstanceID {
 	return out
 }
 
+// StandingProviderFacts returns the "standing provider facts" read model
+// (step 08): every provider name that has at least one recorded
+// provider.disabled or provider.enabled fact, mapped to its latest standing
+// state. A name with no standing fact is absent from the result — a reader
+// that also needs config-declared names (a provider a launch_variant names
+// but no fact has ever toggled) merges those in itself and applies the
+// default-enabled rule, since the kernel holds no config to consult. The
+// returned map is a copy.
+func (a *Authority) StandingProviderFacts() map[string]ProviderStanding {
+	out := make(map[string]ProviderStanding, len(a.providers))
+	for name, st := range a.providers {
+		out[name] = st
+	}
+	return out
+}
+
 // View returns the state a presentation shows for one session, deriving
 // attached, detached, and recovering rather than storing them.
 func (a *Authority) View(id SessionID) (SessionView, bool) {
@@ -550,4 +584,56 @@ func (a *Authority) requireInstance(id InstanceID) (*RuntimeInstance, error) {
 		return nil, fmt.Errorf("%w: runtime instance %s", ErrUnknownObject, id)
 	}
 	return inst, nil
+}
+
+// --- provider state (step 08) ------------------------------------------
+//
+// A provider is config data — a launch_variant names it — not a durable Duo
+// object, so unlike every verb above these two take a bare name rather than
+// a minted Duo ID, and never refuse an unrecognized one: the kernel holds no
+// config and cannot know whether any launch_variant names the provider. The
+// CLI layer decides what to say about that ("no variant names this
+// provider"); the kernel only ever records the standing decision.
+
+// DisableProvider records a standing decision that launch resolution must
+// not choose the named provider, superseding any earlier provider.disabled
+// or provider.enabled fact for the same name. It returns the ID of the fact
+// it wrote.
+func (a *Authority) DisableProvider(ctx context.Context, name, actor, reason string) (FactID, error) {
+	return a.setProviderStanding(ctx, FactProviderDisabled, name, actor, reason)
+}
+
+// EnableProvider records a standing decision that the named provider is
+// eligible, superseding any earlier provider.disabled or provider.enabled
+// fact for the same name. It returns the ID of the fact it wrote — a
+// provider with no standing fact at all is already enabled by default (see
+// StandingProviderFacts), but this still writes durable evidence of the
+// explicit decision.
+func (a *Authority) EnableProvider(ctx context.Context, name, actor, reason string) (FactID, error) {
+	return a.setProviderStanding(ctx, FactProviderEnabled, name, actor, reason)
+}
+
+// setProviderStanding builds and commits one provider.disabled or
+// provider.enabled fact through the identity boundary (CommitIdentity):
+// like most administrative state changes that touch no session,
+// runtime-instance, or launch-resolution boundary specifically, provider
+// standing rides the general identity/lifecycle commit path (see
+// Repository.CommitIdentity's doc comment).
+func (a *Authority) setProviderStanding(ctx context.Context, kind FactKind, name, actor, reason string) (FactID, error) {
+	if name == "" {
+		return "", ErrProviderNameRequired
+	}
+	b := a.change(actor)
+	b.fact(kind, Fact{
+		Provider: &ProviderFact{Name: name},
+		Reason:   reason,
+	}).auditEntry(AuditEntry{Target: name, Reason: reason})
+	change, err := b.build()
+	if err != nil {
+		return "", err
+	}
+	if err := a.commit(ctx, a.repo.CommitIdentity, change); err != nil {
+		return "", err
+	}
+	return change.Facts[len(change.Facts)-1].ID, nil
 }

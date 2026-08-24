@@ -33,6 +33,7 @@ type wireFact struct {
 	Correlation *wireCorrelation `json:"correlation,omitempty"`
 	Claim       *wireClaim       `json:"claim,omitempty"`
 	Parked      *wireParked      `json:"parked,omitempty"`
+	Provider    *wireProvider    `json:"provider,omitempty"`
 
 	LaunchResolution *wireLaunchResolution `json:"launch_resolution,omitempty"`
 
@@ -209,6 +210,15 @@ type wireCorrelation struct {
 	Status          string `json:"status"`
 }
 
+// wireProvider is one provider.disabled or provider.enabled fact's payload
+// on the wire (step 08). Note is carried even though nothing populates it
+// yet, so thread 4 (a recorded disable reason / until-schedule) is a value
+// change here, not a wire-shape change.
+type wireProvider struct {
+	Name string `json:"name"`
+	Note string `json:"note,omitempty"`
+}
+
 type wireClaim struct {
 	Kind       string `json:"kind"`
 	Key        string `json:"key"`
@@ -281,6 +291,9 @@ func toWire(f domain.Fact) wireFact {
 	}
 	if v := f.LaunchResolution; v != nil {
 		w.LaunchResolution = &wireLaunchResolution{ID: string(v.ID), Body: v.Body}
+	}
+	if v := f.Provider; v != nil {
+		w.Provider = &wireProvider{Name: v.Name, Note: v.Note}
 	}
 	if v := f.Correlation; v != nil {
 		w.Correlation = &wireCorrelation{
@@ -377,6 +390,9 @@ func fromWire(w wireFact) domain.Fact {
 		f.LaunchResolution = &domain.LaunchResolution{
 			ID: domain.LaunchResolutionID(v.ID), Body: v.Body,
 		}
+	}
+	if v := w.Provider; v != nil {
+		f.Provider = &domain.ProviderFact{Name: v.Name, Note: v.Note}
 	}
 	if v := w.Correlation; v != nil {
 		f.Correlation = &domain.Correlation{

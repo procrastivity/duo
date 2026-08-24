@@ -57,6 +57,7 @@ func NewRootCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Com
 	root.AddCommand(sessionCommand(streams))
 	root.AddCommand(configCommand(streams))
 	root.AddCommand(workspaceCommand(streams))
+	root.AddCommand(providerCommand(streams))
 
 	// DUO_SELFTEST-gated fixture command: an end-to-end, through-the-built-
 	// binary exercise of the code-3/--json refusal path before any real
