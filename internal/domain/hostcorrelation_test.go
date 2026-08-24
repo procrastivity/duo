@@ -320,9 +320,9 @@ func TestRebindWorkspaceHost_Refusals(t *testing.T) {
 }
 
 // TestHostSourceVocabularyIsClosed pins the enum to duo.external/v1's sealed
-// host_source values. A fifth rung is a schema change, not a code change.
+// host_source values. A sixth rung is a schema change, not a code change.
 func TestHostSourceVocabularyIsClosed(t *testing.T) {
-	want := []string{"explicit-flag", "workspace-correlation", "ambient-env", "policy-default"}
+	want := []string{"explicit-flag", "workspace-correlation", "cwd-correlation", "ambient-env", "policy-default"}
 	if len(domain.HostSources) != len(want) {
 		t.Fatalf("HostSources has %d values, want %d", len(domain.HostSources), len(want))
 	}

@@ -87,6 +87,7 @@ const (
 	envSocket     = "/run/user/1000/herdr/ambient.sock"
 	flagSocket    = "/run/user/1000/herdr/flagged.sock"
 	foundSocket   = "/run/user/1000/herdr/discovered.sock"
+	cwdSocket     = "/run/user/1000/herdr/claimed.sock"
 )
 
 func fixedClock() func() time.Time {
@@ -175,6 +176,25 @@ func TestMaterializeEachRungWins(t *testing.T) {
 			wantSource:   domain.HostSourceWorkspaceCorrelation,
 			wantInstance: boundSocket,
 			wantID:       "herdr:work",
+		},
+		{
+			name: "cwd correlation",
+			mutate: func(o *materialize.Options) {
+				o.Correlations = unboundCorrelations()
+				o.LookupEnv = newEnv(map[string]string{
+					"HERDR_SOCKET_PATH": envSocket,
+					"HERDR_SESSION":     "ambient",
+				}).lookup
+				o.Roots = &fakeRoots{byKind: map[string][]materialize.InstanceRoots{
+					"herdr": {{
+						Instance: materialize.Instance{Locator: cwdSocket, InstanceID: "herdr:claimed"},
+						Roots:    []string{workspacePath},
+					}},
+				}}
+			},
+			wantSource:   domain.HostSourceCwdCorrelation,
+			wantInstance: cwdSocket,
+			wantID:       "herdr:claimed",
 		},
 		{
 			name: "ambient environment",
@@ -554,7 +574,9 @@ func TestPolicyDefaultUsesTheFirstEnabledKind(t *testing.T) {
 
 // TestDiscoveryIsNotCalledWhenAnEvidenceRungWins: the default rung is the
 // only one that costs I/O, so it is asked only when nothing above it
-// answered.
+// answered. The cwd rung reads its own RootDiscovery (a filesystem read,
+// never a dial) and is never routed through InstanceDiscovery, so a nil
+// opts.Roots here does not change what this test pins.
 func TestDiscoveryIsNotCalledWhenAnEvidenceRungWins(t *testing.T) {
 	opts := baseOptions()
 	opts.Correlations = boundCorrelations()
@@ -639,6 +661,7 @@ func TestUnresolvableExplicitFlagStopsTheLadder(t *testing.T) {
 	}
 	for _, source := range []domain.HostSource{
 		domain.HostSourceWorkspaceCorrelation,
+		domain.HostSourceCwdCorrelation,
 		domain.HostSourceAmbientEnv,
 		domain.HostSourcePolicyDefault,
 	} {
@@ -711,8 +734,8 @@ func TestHostUnresolvedCarriesTheFullTrail(t *testing.T) {
 	if details.DeductionTrail[0].Detail != "no --host flag supplied" {
 		t.Errorf("flag rung detail = %q", details.DeductionTrail[0].Detail)
 	}
-	if details.DeductionTrail[3].Detail != "no enabled kind in session_hosts.prefer" {
-		t.Errorf("policy-default detail = %q", details.DeductionTrail[3].Detail)
+	if details.DeductionTrail[4].Detail != "no enabled kind in session_hosts.prefer" {
+		t.Errorf("policy-default detail = %q", details.DeductionTrail[4].Detail)
 	}
 	if details.EnabledKinds == nil || len(details.EnabledKinds) != 0 {
 		t.Errorf("enabled_kinds = %#v, want an empty array", details.EnabledKinds)
@@ -958,6 +981,7 @@ func TestDeduceSourceForCoversEveryRung(t *testing.T) {
 	want := map[domain.HostSource]string{
 		domain.HostSourceExplicitFlag:         "",
 		domain.HostSourceWorkspaceCorrelation: "workspace",
+		domain.HostSourceCwdCorrelation:       "cwd",
 		domain.HostSourceAmbientEnv:           "env",
 		domain.HostSourcePolicyDefault:        "default",
 	}

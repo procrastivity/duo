@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -161,6 +163,7 @@ func (h *bindHarness) materializeWith(hostFlag string, env map[string]string) ma
 		Correlations:    h.authority,
 		Providers:       h.authority,
 		Discovery:       stage1Discovery{},
+		Roots:           stage1Discovery{},
 		LookupEnv: func(name string) (string, bool) {
 			v, ok := env[name]
 			return v, ok
@@ -289,6 +292,53 @@ func TestAmbientBindIsRefusedWithoutConfirmation(t *testing.T) {
 
 	said := h.err.String()
 	for _, want := range []string{"host binding skipped", "the launch itself succeeded", "--host"} {
+		if !strings.Contains(said, want) {
+			t.Errorf("refusal output does not say %q:\n%s", want, said)
+		}
+	}
+}
+
+// TestCwdCorrelationBindIsRefusedWithoutConfirmation is the same hazard for
+// the cwd rung (notes/43's 2026-08-24 addendum): a session's claim on the
+// workspace directory is inferred circumstance, not declared intent, so a
+// non-interactive run asks nobody and writes nothing, exactly as an
+// ambient-env bind does.
+func TestCwdCorrelationBindIsRefusedWithoutConfirmation(t *testing.T) {
+	h := newBindHarness(t, nil) // no In at all: nothing to ask
+
+	sessionsDir, err := herdr.SessionsDir()
+	if err != nil {
+		t.Fatalf("SessionsDir: %v", err)
+	}
+	sessionDir := filepath.Join(sessionsDir, "claimed")
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", sessionDir, err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionDir, herdr.SessionSocketName), nil, 0o600); err != nil {
+		t.Fatalf("writing session socket: %v", err)
+	}
+	sessionJSON := `{"version":3,"workspaces":[{"identity_cwd":"` + h.root + `"}]}`
+	if err := os.WriteFile(filepath.Join(sessionDir, herdr.SessionFileName), []byte(sessionJSON), 0o600); err != nil {
+		t.Fatalf("writing session.json: %v", err)
+	}
+
+	mat := h.materializeWith("", nil)
+	if mat.Host().Source != domain.HostSourceCwdCorrelation {
+		t.Fatalf("host_source = %q, want %q", mat.Host().Source, domain.HostSourceCwdCorrelation)
+	}
+
+	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	if c, bound := h.correlation(); bound {
+		t.Fatalf("a cwd-correlation bind was written without confirmation: %+v", c.Binding)
+	}
+
+	said := h.err.String()
+	for _, want := range []string{
+		"host binding skipped", "the launch itself succeeded",
+		"asked nobody and recorded nothing", "--host",
+	} {
 		if !strings.Contains(said, want) {
 			t.Errorf("refusal output does not say %q:\n%s", want, said)
 		}

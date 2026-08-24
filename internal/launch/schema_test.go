@@ -151,6 +151,7 @@ func TestHostSourceVocabularyMatchesTheSchema(t *testing.T) {
 	got := []string{
 		string(domain.HostSourceExplicitFlag),
 		string(domain.HostSourceWorkspaceCorrelation),
+		string(domain.HostSourceCwdCorrelation),
 		string(domain.HostSourceAmbientEnv),
 		string(domain.HostSourcePolicyDefault),
 	}

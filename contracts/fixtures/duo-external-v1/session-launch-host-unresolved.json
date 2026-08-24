@@ -14,6 +14,7 @@
       "deduction_trail": [
         {"source": "explicit-flag", "consulted": false, "yielded_host": false, "detail": "no --host flag supplied"},
         {"source": "workspace-correlation", "consulted": true, "yielded_host": false, "detail": "no persisted workspace-host correlation for ws_none"},
+        {"source": "cwd-correlation", "consulted": true, "yielded_host": false, "detail": "no discovered session claims the workspace path"},
         {"source": "ambient-env", "consulted": true, "yielded_host": false, "detail": "HERDR_SOCKET_PATH not set"},
         {"source": "policy-default", "consulted": true, "yielded_host": false, "detail": "no enabled kind in session_hosts.prefer"}
       ],

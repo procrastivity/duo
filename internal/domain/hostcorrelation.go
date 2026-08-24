@@ -27,8 +27,9 @@ import (
 // binding it is handed, and the application layer decides what to hand it.
 //
 // What this file deliberately does not do: it never deduces a host (the
-// fixed M1 ladder — explicit flag > correlation > ambient env > policy
-// default — belongs to the materializer), never reads the environment, never
+// fixed M1 ladder — explicit flag > correlation > cwd correlation >
+// ambient env > policy default — belongs to the materializer), never reads
+// the environment, never
 // consults a launch, and never checks that an instance is reachable. A dead
 // socket fails at spawn, not here (notes/42 §5).
 
@@ -38,7 +39,7 @@ import (
 // launch record, and a wire envelope all spell provenance the same way.
 type HostSource string
 
-// The four host-deduction rungs, in rank order.
+// The five host-deduction rungs, in rank order.
 const (
 	// HostSourceExplicitFlag is rung 0: an operator named the host. It is
 	// also the provenance of every audited rebind, which by construction
@@ -47,11 +48,16 @@ const (
 	// HostSourceWorkspaceCorrelation is rung 1: a persisted binding — one
 	// of these records. Intent, which is why it outranks the environment.
 	HostSourceWorkspaceCorrelation HostSource = "workspace-correlation"
-	// HostSourceAmbientEnv is rung 2: an ambient host variable captured at
+	// HostSourceCwdCorrelation is rung 2: a discovered session claims the
+	// workspace path as its directory identity. Observed identity — weaker
+	// than a recorded intent, stronger than the pane you happen to be
+	// standing in, which is why it sits between correlation and ambient.
+	HostSourceCwdCorrelation HostSource = "cwd-correlation"
+	// HostSourceAmbientEnv is rung 3: an ambient host variable captured at
 	// materialization. Accident, not intent (notes/19 §0's precedence
 	// footgun is the reason this rung sits below correlation).
 	HostSourceAmbientEnv HostSource = "ambient-env"
-	// HostSourcePolicyDefault is rung 3: the first enabled kind in the
+	// HostSourcePolicyDefault is rung 4: the first enabled kind in the
 	// installed host policy, with the instance from host discovery.
 	HostSourcePolicyDefault HostSource = "policy-default"
 )
@@ -60,11 +66,12 @@ const (
 var HostSources = []HostSource{
 	HostSourceExplicitFlag,
 	HostSourceWorkspaceCorrelation,
+	HostSourceCwdCorrelation,
 	HostSourceAmbientEnv,
 	HostSourcePolicyDefault,
 }
 
-// Valid reports whether s is one of the four sealed rungs.
+// Valid reports whether s is one of the five sealed rungs.
 func (s HostSource) Valid() bool {
 	for _, known := range HostSources {
 		if s == known {

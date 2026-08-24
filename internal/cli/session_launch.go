@@ -125,6 +125,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				Correlations:    a,
 				Providers:       a,
 				Discovery:       stage1Discovery{},
+				Roots:           stage1Discovery{},
 			})
 			if err != nil {
 				return launchFailure(streams, mode, err)
@@ -425,13 +426,23 @@ func writeFailureRail(streams *iostreams.Streams, details any) {
 // that a Duo run from inside pane B, in a workspace bound to server A,
 // launches into A — correctly, and invisibly, unless the output says so.
 //
-// So whenever the correlation won over a captured ambient environment, the
-// note names both instances and the audited verb that changes the binding.
-// It goes to stderr in both output modes: --output json's stdout carries
-// exactly one envelope, and the machine reader already has the same facts
-// in `result.host.outranked_evidence`.
+// So whenever the correlation — recorded or cwd-deduced — won over a
+// captured ambient environment, the note names both instances and the
+// audited verb that changes the binding. It goes to stderr in both output
+// modes: --output json's stdout carries exactly one envelope, and the
+// machine reader already has the same facts in
+// `result.host.outranked_evidence`.
 func writeCorrelationNote(streams *iostreams.Streams, host *launch.WireHost) {
-	if host == nil || host.HostSource != string(domain.HostSourceWorkspaceCorrelation) {
+	if host == nil {
+		return
+	}
+	var chose string
+	switch host.HostSource {
+	case string(domain.HostSourceWorkspaceCorrelation):
+		chose = "this workspace's recorded correlation chose"
+	case string(domain.HostSourceCwdCorrelation):
+		chose = "the session claiming this directory chose"
+	default:
 		return
 	}
 	for _, outranked := range host.OutrankedEvidence {
@@ -439,8 +450,8 @@ func writeCorrelationNote(streams *iostreams.Streams, host *launch.WireHost) {
 			continue
 		}
 		_, _ = fmt.Fprintf(streams.Err,
-			"duo: this workspace's recorded correlation chose %s:%s and outranked the ambient environment of the pane you are in.\n",
-			host.Kind, host.InstanceLabel)
+			"duo: %s %s:%s and outranked the ambient environment of the pane you are in.\n",
+			chose, host.Kind, host.InstanceLabel)
 		for _, capture := range outranked.Captures {
 			_, _ = fmt.Fprintf(streams.Err, "duo:   outranked: %s=%s\n", capture.Name, capture.Value)
 		}

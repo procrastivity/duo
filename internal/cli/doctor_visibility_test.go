@@ -3,10 +3,13 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/exitcode"
+	"github.com/procrastivity/duo/internal/host/herdr"
 )
 
 // doctorJSON is the subset of `duo doctor --output json`'s output these tests
@@ -35,6 +38,7 @@ type doctorJSON struct {
 		Host *struct {
 			Kind          string `json:"kind"`
 			InstanceLabel string `json:"instance_label"`
+			InstanceID    string `json:"instance_id"`
 			HostSource    string `json:"host_source"`
 		} `json:"host"`
 		HostSource        string `json:"host_source"`
@@ -93,7 +97,7 @@ func clearAmbientHerdrEnv(t *testing.T) {
 	t.Setenv("HERDR_SESSION", "")
 }
 
-// hostSourceIsClosed reports whether s is one of the four sealed
+// hostSourceIsClosed reports whether s is one of the five sealed
 // host_source rungs, or "" (no deduction/binding at all) — the closed set
 // the goal names.
 func hostSourceIsClosed(t *testing.T, s string) {
@@ -196,12 +200,12 @@ func TestDoctorVisibility_UnboundWithAmbientEnv(t *testing.T) {
 }
 
 // TestDoctorVisibility_NoHostResolves covers the case where every rung
-// comes up empty: no correlation, no ambient environment, and no policy
-// default (this test's process environment carries no HERDR_SOCKET_PATH,
-// and the doctor command wires no session_hosts.prefer policy without a
-// duo.config/v3 document present). The deduction section then carries the
-// full four-rung trail, and every host_source in it is still in the closed
-// set.
+// comes up empty: no correlation, no discovered session claims the
+// workspace, no ambient environment, and no policy default (this test's
+// process environment carries no HERDR_SOCKET_PATH, and the doctor command
+// wires no session_hosts.prefer policy without a duo.config/v3 document
+// present). The deduction section then carries the full five-rung trail,
+// and every host_source in it is still in the closed set.
 func TestDoctorVisibility_NoHostResolves(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // no duo.config.yaml written under it
@@ -216,12 +220,91 @@ func TestDoctorVisibility_NoHostResolves(t *testing.T) {
 	if report.HostDeduction.HostSource != "" {
 		t.Errorf("host_deduction.host_source = %q, want empty", report.HostDeduction.HostSource)
 	}
-	if len(report.HostDeduction.DeductionTrail) != 4 {
-		t.Fatalf("deduction_trail has %d rungs, want 4", len(report.HostDeduction.DeductionTrail))
+	if len(report.HostDeduction.DeductionTrail) != 5 {
+		t.Fatalf("deduction_trail has %d rungs, want 5", len(report.HostDeduction.DeductionTrail))
 	}
 	for _, rung := range report.HostDeduction.DeductionTrail {
 		hostSourceIsClosed(t, rung.Source)
 	}
+}
+
+// TestDoctorVisibility_UnboundWithCwdCorrelation covers a workspace with no
+// correlation and no ambient environment, where a discovered Herdr session
+// claims the workspace directory as its own identity_cwd: the deduction
+// section reports host_source "cwd-correlation" and the claiming session's
+// instance ID, even though nothing bound the workspace and nothing is
+// exported into this process's environment.
+//
+// Unlike the other cases in this file, this one needs a duo.config/v3
+// document: the cwd rung, like policy-default, only tries the kinds named
+// in session_hosts.prefer (materialize.go's cwdCorrelationRung walks
+// enabledKinds()), so with no document present it would never look at
+// "herdr" at all.
+func TestDoctorVisibility_UnboundWithCwdCorrelation(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	clearAmbientHerdrEnv(t)
+	dir := t.TempDir()
+
+	duoConfigDir := filepath.Join(configHome, "duo")
+	if err := os.MkdirAll(duoConfigDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", duoConfigDir, err)
+	}
+	const minimalV3 = `
+schema: duo.config/v3
+session_hosts:
+  prefer: [herdr]
+agent_runtimes:
+  claude_default:
+    kind: claude
+    executable: claude
+launch_variants:
+  daily:
+    agent_runtime: claude_default
+    model_line: claude-opus-4
+    model_family: claude
+presets:
+  daily:
+    selection: ordered
+    leaves:
+      primary:
+        candidates:
+          - variant: daily
+`
+	if err := os.WriteFile(filepath.Join(duoConfigDir, "duo.config.yaml"), []byte(minimalV3), 0o600); err != nil {
+		t.Fatalf("writing duo.config.yaml: %v", err)
+	}
+
+	sessionDir := filepath.Join(configHome, herdr.ConfigDirName, herdr.SessionsDirName, "proj")
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", sessionDir, err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionDir, herdr.SessionSocketName), nil, 0o600); err != nil {
+		t.Fatalf("writing session socket: %v", err)
+	}
+	sessionJSON := `{"version":3,"workspaces":[{"identity_cwd":"` + dir + `"}]}`
+	if err := os.WriteFile(filepath.Join(sessionDir, herdr.SessionFileName), []byte(sessionJSON), 0o600); err != nil {
+		t.Fatalf("writing session.json: %v", err)
+	}
+
+	report := runDoctorJSON(t, "--workspace", dir)
+
+	if report.HostBinding.Bound {
+		t.Fatalf("host_binding = %+v, want an unbound workspace", report.HostBinding)
+	}
+	if report.HostDeduction.Host == nil {
+		t.Fatal("host_deduction.host is nil, want the session claiming this directory")
+	}
+	if report.HostDeduction.HostSource != string(domain.HostSourceCwdCorrelation) {
+		t.Errorf("host_deduction.host_source = %q, want %q",
+			report.HostDeduction.HostSource, domain.HostSourceCwdCorrelation)
+	}
+	if report.HostDeduction.Host.InstanceID != "herdr:proj" {
+		t.Errorf("host_deduction.host.instance_id = %q, want %q",
+			report.HostDeduction.Host.InstanceID, "herdr:proj")
+	}
+	hostSourceIsClosed(t, report.HostDeduction.HostSource)
 }
 
 // TestDoctorVisibility_DisabledProvider covers the standing-provider-facts

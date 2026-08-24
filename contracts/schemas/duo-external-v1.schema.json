@@ -268,7 +268,7 @@
         "provider_disabled"
       ]
     },
-    "host_source": {"enum": ["explicit-flag", "workspace-correlation", "ambient-env", "policy-default"]},
+    "host_source": {"enum": ["explicit-flag", "workspace-correlation", "cwd-correlation", "ambient-env", "policy-default"]},
     "launch_constraint_predicate": {
       "type": "object",
       "required": ["axis", "value"],

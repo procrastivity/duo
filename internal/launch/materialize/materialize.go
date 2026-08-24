@@ -42,6 +42,10 @@ type Options struct {
 	// rung and for the kind-only form of --host. Nil means this build can
 	// discover nothing, which the trail says out loud.
 	Discovery InstanceDiscovery
+	// Roots enumerates instances with the directory identities they claim,
+	// for the cwd-correlation rung. Nil means this build cannot read
+	// session roots, which the trail says out loud.
+	Roots RootDiscovery
 
 	// AmbientSources is the ambient signature table. Nil means
 	// DefaultAmbientSources.
@@ -78,12 +82,14 @@ func (o Options) withDefaults() Options {
 // resolver reads.
 //
 // M1 resolves the workspace (--workspace, else the working directory) and
-// walks the fixed ranking. The three evidence rungs — explicit flag,
-// workspace correlation, ambient environment — are always evaluated, even
-// once one of them has won, because a beaten rung is exactly the evidence
-// that makes a wrong binding visible. The policy-default rung is evaluated
-// only when none of them yielded, because it is the one rung that costs
-// I/O. M2 then snapshots the standing provider facts.
+// walks the fixed ranking. The four evidence rungs — explicit flag,
+// workspace correlation, cwd correlation, ambient environment — are always
+// evaluated, even once one of them has won, because a beaten rung is
+// exactly the evidence that makes a wrong binding visible. Evidence rungs
+// never dial; the cwd rung reads session metadata from disk. The
+// policy-default rung is evaluated only when none of them yielded, because
+// it is the one rung that consults instance discovery. M2 then snapshots
+// the standing provider facts.
 //
 // The one exception to "evaluate every evidence rung" is an explicit flag
 // that cannot be honored: an operator who named a host and did not get it
@@ -157,11 +163,12 @@ func (m *pass) run(ctx context.Context) (Result, error) {
 
 	if !flagOut.stop {
 		outcomes = append(outcomes, m.correlationRung())
+		outcomes = append(outcomes, m.cwdCorrelationRung(ctx))
 		outcomes = append(outcomes, m.ambientRung())
 	}
 
-	// The policy-default rung is the only one that costs discovery I/O, so
-	// it is asked only when no evidence rung answered.
+	// The policy-default rung is the only one that consults instance
+	// discovery, so it is asked only when no evidence rung answered.
 	if !flagOut.stop && !anyYielded(outcomes) {
 		defaultOut, err := m.policyDefaultRung(ctx)
 		if err != nil {
@@ -263,7 +270,7 @@ func (m *pass) snapshotProviders() map[string]domain.ProviderStanding {
 	return out
 }
 
-// --- the four rungs, in rank order ---------------------------------------
+// --- the five rungs, in rank order ----------------------------------------
 
 // explicitFlagRung is rung 1. It has no `deduce` key: installed policy
 // never switches off a host the operator typed.
@@ -356,7 +363,81 @@ func (m *pass) correlationRung() outcome {
 	}}
 }
 
-// ambientRung is rung 3: the host variables published into the pane this
+// cwdCorrelationRung is rung 3: a discovered session that claims the
+// workspace path as its directory identity. Observed identity — weaker
+// than a recorded intent, stronger than the pane this Duo happens to be
+// standing in — which is why it sits between correlation and ambient.
+//
+// It is an evidence rung: it always runs, never dials (the claims come
+// from on-disk session metadata), and never stops the ladder. A tie —
+// several sessions claiming the path at equal depth — yields nothing, so
+// the ambient rung keeps its chance. A root-discovery failure is folded
+// into the trail rather than returned: a metadata read error must not
+// fail a launch a higher rung already resolved.
+func (m *pass) cwdCorrelationRung(ctx context.Context) outcome {
+	rung := DeductionRung{Source: domain.HostSourceCwdCorrelation}
+	if !m.deduceEnabled(DeduceCwd) {
+		rung.Detail = disabledDetail(DeduceCwd)
+		return outcome{rung: rung}
+	}
+	rung.Consulted = true
+	if m.opts.Roots == nil {
+		rung.Detail = "no session-root discovery is available in this build"
+		return outcome{rung: rung}
+	}
+
+	path := normalizePath(m.path)
+	for _, kind := range m.enabledKinds() {
+		cands, err := m.opts.Roots.DiscoverInstanceRoots(ctx, kind)
+		if err != nil {
+			rung.Detail = "session-root discovery failed: " + err.Error()
+			return outcome{rung: rung}
+		}
+		winner, root, tied := bestRootMatch(path, cands)
+		if winner == nil && len(tied) == 0 {
+			continue
+		}
+		rung.Kind = kind
+		if len(tied) > 0 {
+			labels := make([]string, 0, len(tied))
+			for _, t := range tied {
+				labels = append(labels, instanceLabel(kind, t.Instance))
+			}
+			sort.Strings(labels)
+			rung.Detail = fmt.Sprintf(
+				"%d %s sessions claim %s (%s); name one as --host %s:<instance>",
+				len(tied), kind, root, strings.Join(labels, ", "), kind)
+			return outcome{rung: rung}
+		}
+		rung.YieldedHost = true
+		rung.Instance = winner.Instance.Locator
+		relation := "contains"
+		if root == path {
+			relation = "is"
+		}
+		rung.Detail = fmt.Sprintf("session %s claims %s, which %s %s",
+			instanceLabel(kind, winner.Instance), root, relation, m.path)
+		return outcome{rung: rung, host: DeducedHost{
+			Kind:       kind,
+			Instance:   winner.Instance.Locator,
+			InstanceID: winner.Instance.InstanceID,
+			Source:     domain.HostSourceCwdCorrelation,
+		}}
+	}
+	rung.Detail = "no discovered session claims " + m.path
+	return outcome{rung: rung}
+}
+
+// instanceLabel names an instance in a trail detail: the integration
+// instance ID when the discoverer has one, else the addressable form.
+func instanceLabel(kind string, inst Instance) string {
+	if inst.InstanceID != "" {
+		return inst.InstanceID
+	}
+	return kind + ":" + inst.Locator
+}
+
+// ambientRung is rung 4: the host variables published into the pane this
 // Duo is running in. Accident, not intent — notes/19 §0's precedence
 // footgun is why it sits below the correlation.
 //
@@ -416,7 +497,7 @@ func (m *pass) ambientRung() outcome {
 	return outcome{rung: rung}
 }
 
-// policyDefaultRung is rung 4: the first enabled kind in
+// policyDefaultRung is rung 5: the first enabled kind in
 // `session_hosts.prefer`, with the instance from discovery.
 //
 // It never falls through to the second-preferred kind when the first yields
@@ -536,7 +617,7 @@ func anyYielded(outcomes []outcome) bool {
 }
 
 // fillSkipped appends the rungs the ladder never reached, so the trail
-// always carries all four in rank order. stopped distinguishes the two
+// always carries every rung in rank order. stopped distinguishes the two
 // reasons a rung goes unreached, which is the difference between "an
 // earlier rung already answered" and "an explicit flag failed and nothing
 // below it was allowed to answer".

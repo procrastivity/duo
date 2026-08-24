@@ -8,10 +8,10 @@
 // item 13, 2026-08-24 handoff 22). Two passes do that binding:
 //
 //   - M1 resolves the workspace (--workspace, else the working directory)
-//     and deduces exactly one host instance by a fixed four-rung ranking:
-//     explicit flag > workspace↔host correlation > ambient environment >
-//     policy default. It emits the deduced instance, its host_source, and
-//     every captured-but-outranked piece of evidence.
+//     and deduces exactly one host instance by a fixed five-rung ranking:
+//     explicit flag > workspace↔host correlation > cwd correlation >
+//     ambient environment > policy default. It emits the deduced instance,
+//     its host_source, and every captured-but-outranked piece of evidence.
 //   - M2 snapshots the standing provider facts by fact ID, so the resolver
 //     eliminates a provider-disabled variant against the same facts the
 //     record later cites.

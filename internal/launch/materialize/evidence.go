@@ -21,6 +21,8 @@ const CaptureTimeLayout = "2006-01-02T15:04:05.000Z"
 const (
 	// DeduceWorkspace enables the workspace↔host-correlation rung.
 	DeduceWorkspace = "workspace"
+	// DeduceCwd enables the cwd-correlation rung.
+	DeduceCwd = "cwd"
 	// DeduceEnv enables the ambient-environment rung.
 	DeduceEnv = "env"
 	// DeduceDefault enables the policy-default rung.
@@ -33,6 +35,7 @@ const (
 var Rungs = []domain.HostSource{
 	domain.HostSourceExplicitFlag,
 	domain.HostSourceWorkspaceCorrelation,
+	domain.HostSourceCwdCorrelation,
 	domain.HostSourceAmbientEnv,
 	domain.HostSourcePolicyDefault,
 }
@@ -43,6 +46,8 @@ func DeduceSourceFor(s domain.HostSource) string {
 	switch s {
 	case domain.HostSourceWorkspaceCorrelation:
 		return DeduceWorkspace
+	case domain.HostSourceCwdCorrelation:
+		return DeduceCwd
 	case domain.HostSourceAmbientEnv:
 		return DeduceEnv
 	case domain.HostSourcePolicyDefault:
@@ -99,6 +104,28 @@ type Instance struct {
 // reachable (I-3); enumerating is not attesting.
 type InstanceDiscovery interface {
 	DiscoverInstances(ctx context.Context, kind string) ([]Instance, error)
+}
+
+// InstanceRoots is one discovered instance together with the directory
+// identities it claims — for Herdr, the `identity_cwd` values persisted in
+// the session's on-disk metadata. Roots may be empty: an instance that
+// claims no directory is still an instance.
+type InstanceRoots struct {
+	Instance Instance
+	Roots    []string
+}
+
+// RootDiscovery enumerates one kind's instances with the directory
+// identities each claims, for the cwd-correlation rung.
+//
+// This is deliberately not InstanceDiscovery: policy-default is the one
+// rung that consults instance discovery, and the cwd rung is evidence that
+// runs on every materialization. An implementation must read the claims
+// from on-disk metadata only — it must never dial or otherwise prove an
+// instance is reachable (I-3) — and it owns its kind's conventions, such
+// as filtering roots that are fallback markers rather than identity.
+type RootDiscovery interface {
+	DiscoverInstanceRoots(ctx context.Context, kind string) ([]InstanceRoots, error)
 }
 
 // --- ambient environment --------------------------------------------------
@@ -352,7 +379,7 @@ func (r Result) OutrankedEvidence() []OutrankedEvidence {
 	return out
 }
 
-// Trail returns all four rungs in rank order, as a copy. Every rung is
+// Trail returns every rung in rank order, as a copy. Every rung is
 // present on every materialization, successful or not: the trail is the
 // explanation, and an explanation with holes in it is not one.
 func (r Result) Trail() []DeductionRung {

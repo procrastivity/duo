@@ -42,9 +42,9 @@
           "additionalProperties": {"$ref": "#/$defs/session_host_kind"}
         },
         "deduce": {
-          "description": "Per-source stanzas over the closed source set. Unordered by construction: enabling or disabling a source never changes the fixed ranking. An absent source, and an absent enabled flag, both mean enabled. workspace = the persisted workspace<->host correlation; env = ambient environment evidence captured at materialization; default = the first enabled kind in prefer.",
+          "description": "Per-source stanzas over the closed source set. Unordered by construction: enabling or disabling a source never changes the fixed ranking. An absent source, and an absent enabled flag, both mean enabled. workspace = the persisted workspace<->host correlation; cwd = a discovered session's directory identity matched against the workspace path; env = ambient environment evidence captured at materialization; default = the first enabled kind in prefer.",
           "type": "object",
-          "propertyNames": {"enum": ["workspace", "env", "default"]},
+          "propertyNames": {"enum": ["workspace", "cwd", "env", "default"]},
           "additionalProperties": {"$ref": "#/$defs/session_host_deduce_source"}
         }
       },

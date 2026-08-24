@@ -92,7 +92,8 @@ type SessionHostPolicy struct {
 	// Prefer is the ordered, unique host-kind preference list. It is the
 	// only ordered field in the block, consumed only at the policy-default
 	// rung of the resolver's fixed deduction ranking (explicit flag >
-	// workspace correlation > ambient environment > policy default).
+	// workspace correlation > cwd correlation > ambient environment >
+	// policy default).
 	//
 	// Thread-2 decision (workplan Risk 1, step 01's grammar call): a
 	// prefer entry does not need a matching Kinds stanza. Kinds is where a
@@ -110,7 +111,7 @@ type SessionHostPolicy struct {
 	// Prefer's doc comment.
 	Kinds map[string]SessionHostKind
 	// Deduce holds a stanza only for deduction sources a document wants
-	// to say something about, over the closed set {workspace, env,
+	// to say something about, over the closed set {workspace, cwd, env,
 	// default}. It only ever enables or disables a source — it never
 	// reorders the fixed ranking (schema description; also Step 11's
 	// boundary).

@@ -237,8 +237,8 @@ type doctorHostDeductionSection struct {
 	OutrankedEvidence []doctorOutrankedEvidence `json:"outranked_evidence"`
 	// DeductionTrail is every rung materialize.Rungs walked, in rank
 	// order. It is populated only when Host is nil: a resolved deduction
-	// already names its winner and what it outranked, and repeating all
-	// four rows on top of that would explain nothing further.
+	// already names its winner and what it outranked, and repeating every
+	// rung's row on top of that would explain nothing further.
 	DeductionTrail []materialize.WireRung `json:"deduction_trail,omitempty"`
 	// Detail carries an unexpected materialization failure that is not
 	// itself a "no host deduced" answer (e.g. the working directory could
@@ -422,6 +422,7 @@ func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, 
 		Correlations:  a,
 		Providers:     a,
 		Discovery:     stage1Discovery{},
+		Roots:         stage1Discovery{},
 	})
 
 	var partial *materialize.Error

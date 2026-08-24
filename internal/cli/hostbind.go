@@ -43,7 +43,10 @@ import (
 // type inventing a second vocabulary for the same fact.
 type stage1Discovery struct{}
 
-var _ materialize.InstanceDiscovery = stage1Discovery{}
+var (
+	_ materialize.InstanceDiscovery = stage1Discovery{}
+	_ materialize.RootDiscovery     = stage1Discovery{}
+)
 
 func (stage1Discovery) DiscoverInstances(_ context.Context, kind string) ([]materialize.Instance, error) {
 	if kind != herdr.AdapterID {
@@ -58,6 +61,36 @@ func (stage1Discovery) DiscoverInstances(_ context.Context, kind string) ([]mate
 		out = append(out, materialize.Instance{
 			Locator:    instance.SocketPath,
 			InstanceID: instance.InstanceID,
+		})
+	}
+	return out, nil
+}
+
+// DiscoverInstanceRoots is the same enumeration with each instance's
+// directory identities read from its persisted session.json
+// (herdr.SessionRoots). Still no dialing: the claims are on-disk metadata,
+// and an instance that claims nothing is returned rootless so the
+// enumeration stays single-sourced.
+func (stage1Discovery) DiscoverInstanceRoots(_ context.Context, kind string) ([]materialize.InstanceRoots, error) {
+	if kind != herdr.AdapterID {
+		return nil, nil
+	}
+	found, err := herdr.DiscoverInstances()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]materialize.InstanceRoots, 0, len(found))
+	for _, instance := range found {
+		roots, err := herdr.SessionRoots(instance.Session)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, materialize.InstanceRoots{
+			Instance: materialize.Instance{
+				Locator:    instance.SocketPath,
+				InstanceID: instance.InstanceID,
+			},
+			Roots: roots,
 		})
 	}
 	return out, nil
@@ -138,6 +171,9 @@ const bindReason = "cold-start host correlation from launch deduction"
 //     scrub work targeted, so it is confirmed on an interactive terminal
 //     and refused outright without one. The launch still succeeded; only
 //     the bind is skipped.
+//   - `cwd-correlation` asks the same way (notes/43's 2026-08-24
+//     addendum): a session claiming the directory is inferred
+//     circumstance, not declared intent.
 //   - `explicit-flag` and `policy-default` write silently — the operator
 //     declared the host, or installed policy did — with loud output naming
 //     the bind and the rebind path.
@@ -181,7 +217,7 @@ func bindFirstHost(
 		return
 	}
 
-	if deduced.Source == domain.HostSourceAmbientEnv && !confirmAmbientBind(streams, ws.ID, deduced) {
+	if deducedBindNeedsConfirmation(deduced.Source) && !confirmDeducedBind(streams, ws.ID, deduced) {
 		return
 	}
 
@@ -207,25 +243,42 @@ func bindFirstHost(
 	_, _ = fmt.Fprintf(streams.Err, "duo: %s\n", rebindPointer(deduced.Locator()))
 }
 
-// confirmAmbientBind asks before recording a bind whose provenance is the
-// ambient environment, and reports what it decided.
+// deducedBindNeedsConfirmation reports whether a first bind from this
+// rung is confirmed rather than written silently: the two rungs whose
+// provenance is inferred circumstance, not declared intent.
+func deducedBindNeedsConfirmation(source domain.HostSource) bool {
+	return source == domain.HostSourceAmbientEnv || source == domain.HostSourceCwdCorrelation
+}
+
+// deducedProvenance is the human phrase for how an inferred rung found the
+// host, used by the confirmation both ways it can go.
+func deducedProvenance(deduced materialize.DeducedHost) string {
+	if deduced.Source == domain.HostSourceCwdCorrelation {
+		return fmt.Sprintf("deduced because the %s session claims this directory as its identity", deduced.Kind)
+	}
+	return "deduced from the ambient environment of the pane this command is running in"
+}
+
+// confirmDeducedBind asks before recording a bind whose provenance is
+// inferred circumstance — the ambient environment, or a session's claim on
+// the working directory — and reports what it decided.
 //
 // A non-interactive run is a refusal, not a default-yes and not a prompt
-// nobody can answer: the whole point of the hybrid rule is that this rung's
-// write is never automatic. The message names the way to get the bind
-// deliberately — re-launch with --host, whose provenance is explicit-flag
-// and writes silently.
-func confirmAmbientBind(streams *iostreams.Streams, ws domain.WorkspaceID, deduced materialize.DeducedHost) bool {
+// nobody can answer: the whole point of the hybrid rule is that these
+// rungs' write is never automatic. The message names the way to get the
+// bind deliberately — re-launch with --host, whose provenance is
+// explicit-flag and writes silently.
+func confirmDeducedBind(streams *iostreams.Streams, ws domain.WorkspaceID, deduced materialize.DeducedHost) bool {
 	if !streams.Interactive() {
 		bindSkipped(streams,
-			"%s was deduced from the ambient environment (host_source=%s) and this run is not interactive, "+
+			"%s was %s (host_source=%s) and this run is not interactive, "+
 				"so duo asked nobody and recorded nothing. Re-launch with --host %s to bind it deliberately",
-			deduced.Locator(), domain.HostSourceAmbientEnv, deduced.Locator())
+			deduced.Locator(), deducedProvenance(deduced), deduced.Source, deduced.Locator())
 		return false
 	}
 
 	_, _ = fmt.Fprintf(streams.Err,
-		"duo: %s was deduced from the ambient environment of the pane this command is running in.\n", deduced.Locator())
+		"duo: %s was %s.\n", deduced.Locator(), deducedProvenance(deduced))
 	_, _ = fmt.Fprintf(streams.Err,
 		"duo: bind workspace %s to it, so later launches go to the same host? [y/N] ", ws)
 
