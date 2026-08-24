@@ -28,3 +28,25 @@ Open from this day: the multi-leaf name-collision fix (landed same day, a52c39c,
 launch-has-no-attachment seam gap (surfaced), stray-pane teardown debt
 (live reproduction), and the full-day daily-use log that completes the
 checkpoint.
+
+## Evening addendum — launch placement (finding + provisional fix)
+
+Finding: every launch opened a right-split pane; expected a tab, with a
+per-host default and a per-launch override. Cause was the adapter's
+hardcoded `pane.split {direction: "right"}`. Design sketch:
+terminal-multiplexers `notes/44-launch-placement-sketch.md`.
+
+Provisional fix landed same day (`go` @ 2258c63, installed as
+`~/.local/bin/duo-go`): Herdr launches default to a **background tab**;
+`--target=tab|pane` overrides per launch (an override like `--host`,
+not a constraint axis). Config-authored default, record fields, and
+contract updates are deferred to change control per the sketch.
+
+Bonus catches while live-proving the tab path (both fixed in 2258c63,
+both placement-independent): the pre-agent baseline could fingerprint a
+shell-startup transient, and the handover wait could crown a
+prompt-helper transient as the agent — either way a launched session
+recorded an attachment that failed its own first validation (the
+capture-16 family of pain). Baseline now settles on the shell; handover
+requires a stable PID across two polls. `TestLiveHerdr` passed 3× per
+placement against a disposable 0.8.2 server.
