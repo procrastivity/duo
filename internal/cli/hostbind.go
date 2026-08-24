@@ -272,3 +272,138 @@ func rebindPointer(locator string) string {
 	return fmt.Sprintf(
 		"change it later with: duo workspace host rebind --host %s --evidence \"<what you checked>\"", locator)
 }
+
+// --- the post-spawn host attachment ---------------------------------------
+
+// herdrEpochKind is the kernel-side name of Herdr's epoch-equivalent. The
+// domain fixes the shape ("<integration>.<surface>", HostEpoch.Kind's own
+// doc names this exact string) and internal/host/herdr fixes what it reads
+// (evidence.go: terminal_id is the pane's incarnation, and there is no
+// server-scoped epoch at 0.8.2). Neither package may name the other, so the
+// one string that joins them lives here, beside the fingerprint bridge, for
+// the same reason hostFingerprint does.
+//
+// It is also what an operator types at `duo session reattach --epoch-kind`,
+// which is only true as long as launch and enroll spell it identically.
+const herdrEpochKind = "herdr.terminal_id"
+
+// attachReason is the phrase the attachment facts and the audit row carry.
+const attachReason = "host attachment from the launch's own spawn evidence"
+
+// liveRuntimeFingerprint maps one leaf's spawn evidence onto the kernel's
+// live-runtime fingerprint (decision-01 §4.2) — the sibling of
+// hostFingerprint, aimed at domain.Fingerprint instead of at
+// domain.HostFingerprint.
+//
+// The two kernel types split the same evidence differently, and the split
+// is the whole of this function. domain.Fingerprint wants the *stable*
+// container coordinate in Container and the *incarnation* in Epoch; the
+// Herdr adapter puts the incarnation (terminal_id) in
+// host.Evidence.HostContainerID and the stable coordinate (pane_id) in
+// PaneID. So the two fields cross over here, at pane scope, exactly as
+// `duo session enroll --epoch-value <terminal_id> --container <pane_id>`
+// asks an operator to type them.
+//
+// An unrecognised host kind gets the zero fingerprint, which Validate
+// refuses. Inventing an epoch kind and scope for a host whose incarnation
+// evidence nobody has probed is the guess docs/cli/decisions.md refused to
+// make for enroll, and a fingerprint is recorded from proven evidence or
+// not at all.
+func liveRuntimeFingerprint(kind string, e host.Evidence) domain.Fingerprint {
+	if kind != herdr.AdapterID {
+		return domain.Fingerprint{}
+	}
+	fp := domain.Fingerprint{
+		IntegrationInstance: e.IntegrationInstanceID,
+		Epoch: domain.HostEpoch{
+			Kind:  herdrEpochKind,
+			Value: e.HostContainerID,
+			Scope: domain.EpochScopePane,
+		},
+		Container: e.PaneID,
+	}
+	if e.ProcessBirth.PID > 0 && !e.ProcessBirth.StartTime.IsZero() {
+		// PID and start time together, or neither: decision-01 §3.6 makes a
+		// bare PID not present at all, and a fingerprint with no process
+		// birth is claimable but degraded.
+		fp.Process = domain.ProcessBirth{
+			PID:       e.ProcessBirth.PID,
+			StartedAt: e.ProcessBirth.StartTime.UTC().Format(materialize.CaptureTimeLayout),
+		}
+	}
+	return fp
+}
+
+// recordLaunchAttachments records one host attachment per spawned leaf,
+// after Start returned and from the spawn's own evidence.
+//
+// Duo opened the pane, so it observes it: a session `duo session launch`
+// created is attached by default, exactly as an enrolled one is. Until this
+// existed, only `duo session enroll` wrote a host attachment, and
+// `duo session detach`/`reattach` refused every launched session with
+// "session <id> has no host attachment" (found live, 2026-08-24 dogfood).
+//
+// It does not weaken invariant I-1. The session and its runtime instance
+// still commit before anything spawns; the attachment is a *post*-spawn
+// fact, because the evidence it rests on — the pane's terminal_id and the
+// agent's process birth — does not exist until the spawn produced it. This
+// is the same shape as bindFirstHost, one object down: spawn, then record
+// what the spawn proved.
+//
+// Like bindFirstHost it never returns an error; see attachmentSkipped.
+func recordLaunchAttachments(
+	ctx context.Context,
+	streams *iostreams.Streams,
+	a *domain.Authority,
+	mat materialize.Result,
+	result *launch.Result,
+	actor string,
+) {
+	if result == nil || result.Record.SessionID == "" {
+		// A dry run, or a resolution that never committed: no session to
+		// attach anything to.
+		return
+	}
+	session := domain.SessionID(result.Record.SessionID)
+	kind := mat.Host().Kind
+
+	for _, leaf := range result.Leaves {
+		fingerprint := liveRuntimeFingerprint(kind, leaf.Evidence.Evidence)
+		if err := fingerprint.Validate(); err != nil {
+			attachmentSkipped(streams, session, "leaf %s: %v", leaf.Leaf, err)
+			continue
+		}
+		// A launch plan is one of §3.4's three admissible binding sources,
+		// and this is that plan's own spawn reporting back, so no separate
+		// attestation is needed or possible.
+		if err := a.Bind(ctx, domain.BindRequest{
+			Session:     session,
+			Actor:       actor,
+			Attestation: domain.Attestation{Source: domain.SourceLaunchPlan, Subject: actor},
+			Fingerprint: &fingerprint,
+			Reason:      attachReason,
+		}); err != nil {
+			attachmentSkipped(streams, session, "leaf %s: %v", leaf.Leaf, err)
+		}
+	}
+}
+
+// attachmentSkipped writes one "the launch worked, the attachment did not"
+// line, and names what the operator loses by it.
+//
+// A failed attachment write never fails the command. The pane is already
+// running an agent by the time this code runs, the launch-resolution record
+// and the session are already durable (§7.4), and there is nothing to roll
+// back — turning a live session into a failed command would be a lie about
+// the only fact that matters. It is the rule bindFirstHost already applies
+// to the workspace correlation, applied to the object one level down.
+//
+// Loud is the other half of that rule: the session is observable but not
+// detachable, and no verb adds an attachment afterwards, so an operator who
+// is not told here would only find out when detach refuses.
+func attachmentSkipped(streams *iostreams.Streams, session domain.SessionID, format string, args ...any) {
+	_, _ = fmt.Fprintf(streams.Err, "duo: host attachment not recorded for session %s: %s.\n",
+		session, fmt.Sprintf(format, args...))
+	_, _ = fmt.Fprintln(streams.Err,
+		"duo: the launch itself succeeded and the pane is live; duo session detach and duo session reattach will refuse for this session.")
+}

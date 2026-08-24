@@ -249,3 +249,80 @@ outright. The authored document is `duo.config/v3`; a dated copy sits in
 `evidence/dogfood/2026-08-24/`. No rename was taken to separate it from
 the merged `config.yaml` tool config — the two names stay adjacent in
 one directory, as this entry already described.
+
+## `session launch` records the host attachment too (2026-08-24)
+
+Found live on the first dogfood day: `duo session detach <id>` and `duo
+session reattach <id>` refused every session `duo session launch` created,
+with `domain: unknown duo object: session <id> has no host attachment`.
+Only `duo session enroll` wrote a `HostAttachment`, so the two verbs were
+reachable only for adopted runtimes — not for the ones Duo itself spawned.
+The user's call, ratified the same day: **duo opened the pane, so duo
+observes it.** A launched session is attached by default, exactly as an
+enrolled one is.
+
+**The verb is `domain.Authority.Bind` with a `Fingerprint`**, attested
+`SourceLaunchPlan` — §3.4's second admissible source, and this is that
+plan's own spawn reporting back. `Bind`'s fingerprint branch is the same
+code path enrollment's `createEnrollment` uses for the attachment half: it
+mints the `HostAttachment`, writes the `host.container` and `host.epoch`
+correlations, adds the process-birth correlation on the runtime instance,
+and seizes the live-runtime claim — which is what makes reattach possible
+at all, since reattach revalidates the observed fingerprint against the
+claim the session already holds. No domain change was needed.
+
+**It is a post-spawn fact, and that does not weaken invariant I-1.** The
+session, its runtime instance, and the launch-resolution record still
+commit before anything spawns; the attachment cannot, because the evidence
+it rests on — the pane's `terminal_id` and the agent's process birth — does
+not exist until the spawn produced it. `recordLaunchAttachments`
+(`internal/cli/hostbind.go`) therefore sits exactly where `bindFirstHost`
+does, unreachable from a `Launch` that returned an error, and runs first of
+the two because it is the session's own fact and asks nobody anything while
+the first bind may stop to confirm an ambient-env deduction.
+
+**The evidence bridge crosses two fields, and the crossing is the whole
+risk.** `liveRuntimeFingerprint` is `hostFingerprint`'s sibling, aimed at
+`domain.Fingerprint` instead of `domain.HostFingerprint`. The kernel wants
+the *stable* container coordinate in `Container` and the *incarnation* in
+`Epoch`; the Herdr adapter puts the incarnation (`terminal_id`) in
+`host.Evidence.HostContainerID` and the stable coordinate (`pane_id`) in
+`PaneID`. So the two cross over here, at `herdr.terminal_id` / pane scope —
+the same spelling `duo session enroll --epoch-value <terminal_id>
+--container <pane_id>` asks an operator to type, which is the only reason a
+human-typed reattach can match a launch-recorded claim. An unrecognised
+host kind gets the zero fingerprint and is refused: inventing an epoch kind
+and scope for a host whose incarnation evidence nobody has probed is the
+guess "`session enroll` is flag-driven, not Discover-driven" refused to
+make, and it stays refused.
+
+**A failed attachment write is loud, and never fails the command.** Same
+rule `bindFirstHost` already applies to the workspace correlation, applied
+to the object one level down, and for the same reason: by the time this
+code runs an agent is running in a pane that nothing can un-spawn, and the
+session and record are already durable (§7.4). Failing the command would
+report "launch failed" about the only fact that matters being true, and
+would leave the operator with a live pane and an error exit. So the write
+is reported on stderr instead — and loudly, naming both halves ("the launch
+itself succeeded", "`duo session detach` and `duo session reattach` will
+refuse for this session"), because the session is then observable but not
+detachable and no verb adds an attachment afterwards; an operator not told
+here would find out only when detach refuses.
+
+**Two limits this leaves standing**, both flagged rather than resolved:
+
+- **One current attachment per session.** Every leaf of a launch gets its
+  own attachment and its own live claim — two panes are two live runtimes
+  and may never share one — but `Session.Attachment` holds a single
+  current one, so the last leaf spawned is the one detach and reattach act
+  on. Making that per-leaf is a kernel change to how a session points at
+  its attachments, not a CLI one
+  (`TestEveryLeafOfOneLaunchIsAttached` pins today's behaviour).
+- **Reattach's fingerprint is not readable from any verb.** `duo session
+  show` reports lifecycle, view, and instance state, not the attachment's
+  epoch, container, or process birth, so an operator cannot look up the
+  five flags `duo session reattach` requires. Detach now works from the
+  session ID alone; reattach still needs values only the launch's own
+  evidence knows. Surfacing them on `session show` is the obvious next
+  step, and it is a projection-contract question this entry does not
+  settle.

@@ -247,14 +247,20 @@ func openLaunchAuthority(ctx context.Context, write bool) (*domain.Authority, io
 }
 
 // launchAndBind is the whole of the post-resolution path: spawn, and then —
-// only if the spawn succeeded — the cold-start first bind.
+// only if the spawn succeeded — the per-leaf host attachment and the
+// cold-start first bind, in that order.
 //
-// The two live in one function so the ordering is a property of the code
+// They live in one function so the ordering is a property of the code
 // rather than of the order two statements happen to appear in a command
 // handler. Launcher.Launch already makes "record before spawn" unforgeable
 // (its unexported `committed` token, invariant I-1); this makes "spawn
-// before bind" just as plain: the bind is unreachable from a Launch that
-// returned an error, so a failing Start writes no correlation fact.
+// before recording what the spawn proved" just as plain: neither
+// post-spawn write is reachable from a Launch that returned an error, so a
+// failing Start records no attachment and no correlation fact.
+//
+// The attachment goes first because it is the session's own fact and asks
+// nobody anything, while the first bind may stop to confirm an ambient-env
+// deduction on the terminal.
 func launchAndBind(
 	ctx context.Context,
 	streams *iostreams.Streams,
@@ -272,6 +278,7 @@ func launchAndBind(
 		// evidence a correlation may rest on.
 		return launch.Report{}, err
 	}
+	recordLaunchAttachments(ctx, streams, a, mat, result, actor)
 	bindFirstHost(ctx, streams, a, mat, result, actor)
 	return result.Report, nil
 }

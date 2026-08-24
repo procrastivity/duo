@@ -95,10 +95,26 @@ type bindHarness struct {
 	t         *testing.T
 	root      string
 	authority *domain.Authority
+	store     io.Closer
+	closed    bool
 	streams   *iostreams.Streams
 	out       *bytes.Buffer
 	err       *bytes.Buffer
 	doc       config.DocumentV3
+}
+
+// close releases the authority-writer lease the harness holds, so a
+// separate `duo` invocation (runSession) can open the same installation.
+// The registered cleanup calls it too, so a test that never needs a second
+// process pays no attention to it.
+func (h *bindHarness) close() {
+	if h.closed {
+		return
+	}
+	h.closed = true
+	if err := h.store.Close(); err != nil {
+		h.t.Fatalf("closing the authority store: %v", err)
+	}
 }
 
 func newBindHarness(t *testing.T, in io.Reader) *bindHarness {
@@ -115,18 +131,20 @@ func newBindHarness(t *testing.T, in io.Reader) *bindHarness {
 	if err != nil {
 		t.Fatalf("openWriteAuthority: %v", err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
-	return &bindHarness{
+	h := &bindHarness{
 		t:         t,
 		root:      t.TempDir(),
 		authority: a,
+		store:     store,
 		streams:   &iostreams.Streams{In: in, Out: out, Err: errOut},
 		out:       out,
 		err:       errOut,
 		doc:       doc,
 	}
+	t.Cleanup(h.close)
+	return h
 }
 
 // materializeWith runs the real M1/M2 pass against this harness's authority.
