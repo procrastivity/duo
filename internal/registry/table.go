@@ -51,6 +51,7 @@ var table = []Descriptor{
 			"preset.not_found",
 			"launch.constraints_exhausted",
 			"launch.no_eligible_candidate",
+			"launch.host_unresolved",
 			"config.composition_unresolved",
 		},
 		Fixtures: []string{
@@ -461,6 +462,13 @@ var stableErrorCodes = map[string]ErrorClass{
 	"command.queue_full":                "unavailable",
 	"config.composition_unresolved":     "unavailable",
 	"launch.no_eligible_candidate":      "unavailable",
+	// launch.host_unresolved is duo.config/v3's materialization failure:
+	// the fixed host-deduction ranking produced no single host instance
+	// (schemas/duo-external-v1.schema.json $defs/launch_host_unresolved_details,
+	// step 02; raised by internal/launch/materialize, step 11). Class
+	// unavailable, alongside its sibling launch.no_eligible_candidate: it
+	// is an installation-and-state fact, never a malformed request.
+	"launch.host_unresolved": "unavailable",
 
 	"operation.quality_insufficient": "degraded",
 
