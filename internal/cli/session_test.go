@@ -521,10 +521,11 @@ func TestSessionLaunch_BadRequireGrammar(t *testing.T) {
 
 // TestSessionLaunch_UnrelentingRequireExhausts drives a --require that no
 // declared candidate can satisfy (the fixture declares only "claude") to
-// launch.constraints_exhausted, and checks that --output json's early
-// --json sync (outputMode runs before config load or resolution) reaches
-// even this deep a failure: the error still renders through the chassis's
-// {"error": {...}} envelope, not the human-mode line.
+// launch.constraints_exhausted, and checks that --output json reaches even
+// this deep a failure: the error still renders through the chassis's
+// {"error": {...}} envelope, not the human-mode line. Execute reads the one
+// global --output flag directly off the failing command, so nothing in a
+// verb's own RunE has to run first for the envelope selection to hold.
 func TestSessionLaunch_UnrelentingRequireExhausts(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	withAmbientHerdr(t)

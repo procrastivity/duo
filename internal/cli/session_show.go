@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -40,10 +41,7 @@ func sessionShowCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "show one duo session's identity, lifecycle, and derived view",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 
 			a, closer, err := openReadAuthority(cmd.Context())
 			if err != nil {

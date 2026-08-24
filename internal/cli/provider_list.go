@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/surface"
@@ -39,10 +40,7 @@ func providerListCommand(streams *iostreams.Streams) *cobra.Command {
 }
 
 func runProviderList(cmd *cobra.Command, streams *iostreams.Streams, configPath string) error {
-	mode, err := outputMode(cmd)
-	if err != nil {
-		return err
-	}
+	mode := cliflags.FromContext(cmd.Context()).Output
 
 	doc, err := loadProviderConfig(configPath)
 	if err != nil {

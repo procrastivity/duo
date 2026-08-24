@@ -46,7 +46,7 @@ func manifestCommand(streams *iostreams.Streams, build buildinfo.Info, root *cob
 				return duoerr.New("internal.manifest_build_failed", fmt.Sprintf("building the manifest: %v", err))
 			}
 
-			if flags.JSON {
+			if flags.JSON() {
 				b, err := json.Marshal(m)
 				if err != nil {
 					return duoerr.New("internal.manifest_encode_failed", fmt.Sprintf("encoding the manifest: %v", err))

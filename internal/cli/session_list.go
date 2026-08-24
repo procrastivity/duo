@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -38,10 +39,7 @@ func sessionListCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "list every duo session this authority knows about",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 
 			a, closer, err := openReadAuthority(cmd.Context())
 			if err != nil {

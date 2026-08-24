@@ -9,7 +9,7 @@ import (
 	"github.com/procrastivity/duo/internal/exitcode"
 )
 
-// doctorJSON is the subset of `duo doctor --json`'s output these tests
+// doctorJSON is the subset of `duo doctor --output json`'s output these tests
 // assert on: the Step 15 visibility-rail sections. Every field name below
 // is asserted against its own literal string, never against another
 // package's Go constant, so a field-name typo in doctor.go would fail
@@ -67,7 +67,7 @@ type doctorJSON struct {
 
 func runDoctorJSON(t *testing.T, args ...string) doctorJSON {
 	t.Helper()
-	code, out, errOut := runSession(t, append([]string{"doctor", "--json"}, args...)...)
+	code, out, errOut := runSession(t, append([]string{"doctor", "--output", "json"}, args...)...)
 	if code != exitcode.Success {
 		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
 	}
@@ -284,8 +284,8 @@ func TestDoctorVisibility_ConfigMissing(t *testing.T) {
 }
 
 // TestDoctorVisibility_HumanModeIncludesNewSections is a light smoke test
-// that the text-mode render (not just --json) carries the four new
-// sections, so an operator without --json still sees them.
+// that the text-mode render (not just --output json) carries the four new
+// sections, so an operator who never asks for JSON still sees them.
 func TestDoctorVisibility_HumanModeIncludesNewSections(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

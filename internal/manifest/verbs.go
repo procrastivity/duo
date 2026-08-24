@@ -18,7 +18,7 @@ import (
 // registry.
 const outputSchemaAnnotation = "duo.output-schema"
 
-// SetOutputSchema records schema as cmd's declared --json output shape. No
+// SetOutputSchema records schema as cmd's declared --output json shape. No
 // verb calls this yet — the field exists in the manifest shape ready for
 // the first verb that earns one; it is not filled speculatively.
 func SetOutputSchema(cmd *cobra.Command, schema json.RawMessage) {
@@ -93,7 +93,7 @@ func verbPath(root, cmd *cobra.Command) string {
 var cobraBuiltinFlags = map[string]bool{"help": true}
 
 // walkArgs describes cmd's own declared flags (LocalFlags — not the
-// inherited global --json/-v pair the chassis binds at root).
+// inherited global --output/-v pair the chassis binds at root).
 func walkArgs(cmd *cobra.Command) []Arg {
 	var args []Arg
 	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {

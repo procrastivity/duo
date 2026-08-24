@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/procrastivity/duo/internal/asset"
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
@@ -70,10 +71,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "resolve and launch a named preset (Herdr+Claude Code or Herdr+Pi, Stage 1)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 
 			path := configPath
 			if path == "" {

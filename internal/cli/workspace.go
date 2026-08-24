@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -29,14 +30,14 @@ import (
 )
 
 // workspaceCommand builds the `duo workspace` parent verb and its host
-// correlation subcommands. It carries the same --output flag the session
-// family carries, for the same reason (see outputFlagName).
+// correlation subcommands. Result format comes from the chassis's one
+// global --output flag (internal/cliflags), read via context like every
+// other global flag.
 func workspaceCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace",
 		Short: "inspect and change duo workspace state",
 	}
-	cmd.PersistentFlags().String(outputFlagName, "text", `result format: "text" or "json"`)
 
 	host := &cobra.Command{
 		Use:   "host",
@@ -153,10 +154,7 @@ func workspaceHostShowCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "print the workspace's current session-host correlation, its provenance, and its fingerprints",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 			root, err := workspaceRoot(workspace)
 			if err != nil {
 				return err
@@ -291,10 +289,7 @@ func workspaceHostRebindCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "change the workspace's session-host correlation, recording old and new instance with fingerprints",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 			root, err := workspaceRoot(workspace)
 			if err != nil {
 				return err

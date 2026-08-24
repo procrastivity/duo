@@ -11,7 +11,7 @@ import (
 	"github.com/procrastivity/duo/internal/registry"
 )
 
-// TestDoctorCommand_JSON runs `duo doctor --json` through the same Execute
+// TestDoctorCommand_JSON runs `duo doctor --output json` through the same Execute
 // path main.go uses, against a store path isolated to a temp directory via
 // XDG_DATA_HOME so the test never touches a real installation.
 func TestDoctorCommand_JSON(t *testing.T) {
@@ -22,7 +22,7 @@ func TestDoctorCommand_JSON(t *testing.T) {
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	streams := &iostreams.Streams{Out: out, Err: errOut}
 	root := NewRootCommand(streams, buildinfo.Info{Version: "v0.1.0-test", Commit: "abcdef0", Date: "2026-08-23T00:00:00Z"})
-	root.SetArgs([]string{"doctor", "--json"})
+	root.SetArgs([]string{"doctor", "--output", "json"})
 
 	code := Execute(root, streams)
 	if code != exitcode.Success {
@@ -65,7 +65,7 @@ func TestDoctorCommand_JSON(t *testing.T) {
 	}
 }
 
-// TestDoctorCommand_Human runs `duo doctor` (no --json) and checks the
+// TestDoctorCommand_Human runs `duo doctor` (default --output text) and checks the
 // human-mode report lands on stdout with no error.
 func TestDoctorCommand_Human(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())

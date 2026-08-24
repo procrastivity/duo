@@ -12,8 +12,8 @@ import (
 )
 
 // RefusalCommand manufactures a refusal-style *duoerr.Error, unconditionally,
-// so the chassis's tests can assert the code-3 exit path and its --json
-// envelope without borrowing a real refusal check from a verb that has not
+// so the chassis's tests can assert the code-3 exit path and its
+// --output json envelope without borrowing a real refusal check from a verb that has not
 // been built yet.
 func RefusalCommand() *cobra.Command {
 	return &cobra.Command{

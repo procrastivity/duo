@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/exitcode"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -24,8 +25,14 @@ func Execute(root *cobra.Command, streams *iostreams.Streams) int {
 
 	var derr *duoerr.Error
 	if errors.As(err, &derr) {
-		jsonOut, _ := cmd.Flags().GetBool("json")
-		duoerr.Render(streams.Err, verbPath(root, cmd), derr, jsonOut)
+		// Read the flag off cmd rather than the context: a failure raised
+		// in root's own PersistentPreRunE (an unparseable --output value)
+		// happens before any context is set, and cmd is whichever command
+		// parsing stopped on. An unrecognized value renders human-mode,
+		// which is what an operator who mistyped the format asked for as
+		// closely as we can honor it.
+		mode, _ := cmd.Flags().GetString(cliflags.OutputFlag)
+		duoerr.Render(streams.Err, verbPath(root, cmd), derr, mode == cliflags.OutputJSON)
 		return exitcode.FromError(derr)
 	}
 

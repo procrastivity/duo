@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -29,10 +30,7 @@ func sessionDetachCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "disable duo's active host attachment while the external runtime continues",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 
 			a, s, err := openWriteAuthority(cmd.Context())
 			if err != nil {
@@ -80,10 +78,7 @@ func sessionReattachCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "revalidate a detached (or recovering) host and restore observation",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mode, err := outputMode(cmd)
-			if err != nil {
-				return err
-			}
+			mode := cliflags.FromContext(cmd.Context()).Output
 			scope, err := parseEpochScope(epochScope)
 			if err != nil {
 				return err

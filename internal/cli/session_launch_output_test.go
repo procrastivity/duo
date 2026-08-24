@@ -106,7 +106,7 @@ func TestDryRunTextOutputNamesTheDeduction(t *testing.T) {
 // TestExhaustionNamesTheHostAndThePointerSet is the failure half of the
 // rail. `details.pointers` is duo-external-v1's closed `launch_pointer_set`,
 // and the human output has to carry it verbatim: an operator who reads the
-// text mode and one who reads the --json envelope must be told to type the
+// text mode and one who reads the --output json envelope must be told to type the
 // same things (duo-vnext-projection-contracts.md §2.1's launch-verb block).
 func TestExhaustionNamesTheHostAndThePointerSet(t *testing.T) {
 	h := newBindHarness(t, nil)

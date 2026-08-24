@@ -34,21 +34,6 @@ import (
 	"github.com/procrastivity/duo/internal/store"
 )
 
-// outputFlagName is the session family's own result-format flag.
-//
-// Every session CLI shape the synced contract set carries
-// (contracts/fixtures/duo-external-v1/projection-cases.json: session.list
-// and session.inspect's "cli.arguments") ends in "--output json", not the
-// chassis's global "--json" boolean internal/cliflags documents ("the two
-// global flags... a verb never redeclares either flag"). That is a real
-// conflict between an already-merged, embedded contract fixture and a
-// doc-comment convention two verbs (doctor, manifest) established before
-// this fixture synced. This package follows the fixture — code the
-// registry's own conformance tests already hold every operation to — and
-// records the conflict rather than silently picking one. See
-// docs/cli/decisions.md and the step-21 wip findings.
-const outputFlagName = "output"
-
 // sessionCommand builds the `duo session` parent verb and every registered
 // session.* subcommand.
 func sessionCommand(streams *iostreams.Streams) *cobra.Command {
@@ -56,7 +41,6 @@ func sessionCommand(streams *iostreams.Streams) *cobra.Command {
 		Use:   "session",
 		Short: "list, inspect, enroll, launch, detach, and reattach duo sessions",
 	}
-	cmd.PersistentFlags().String(outputFlagName, "text", `result format: "text" or "json"`)
 
 	cmd.AddCommand(sessionListCommand(streams))
 	cmd.AddCommand(sessionShowCommand(streams))
@@ -65,34 +49,6 @@ func sessionCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd.AddCommand(sessionDetachCommand(streams))
 	cmd.AddCommand(sessionReattachCommand(streams))
 	return cmd
-}
-
-// outputMode reads cmd's --output flag, validates it, and — for "json" —
-// mirrors the choice onto the chassis's shared --json flag so that
-// internal/cli.Execute's error-envelope selection (which reads only
-// cmd.Flags().GetBool("json"), the one path a subcommand cannot otherwise
-// influence) agrees with what the operator asked this verb for. See the
-// outputFlagName doc comment for why the session family carries its own
-// flag instead of just reading --json.
-func outputMode(cmd *cobra.Command) (string, error) {
-	v, err := cmd.Flags().GetString(outputFlagName)
-	if err != nil {
-		return "", err
-	}
-	switch v {
-	case "", "text":
-		return "text", nil
-	case "json":
-		// Best-effort: a merged flag set always has "json" (root registers
-		// it), so this Set cannot fail in practice. Ignoring a failure here
-		// would only cost the JSON error envelope on a code path that is
-		// already about to fail some other way.
-		_ = cmd.Flags().Set("json", "true")
-		return "json", nil
-	default:
-		return "", duoerr.New("invalid.request",
-			fmt.Sprintf("--output must be \"text\" or \"json\", not %q.", v))
-	}
 }
 
 // requestID mints a diagnostic-only request identifier for a locally

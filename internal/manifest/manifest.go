@@ -24,7 +24,7 @@ const SchemaVersion = 1
 // Tool identifies the binary that produced the manifest. Its three fields
 // reuse the exact version/commit/date vars main sets via -ldflags — the
 // same names, the same package path — so `duo version` and `duo manifest
-// --json`'s tool object are never two sources for one fact. It is a
+// --output json`'s tool object are never two sources for one fact. It is a
 // chassis-internal extra, richer than the contract's own "product" object
 // (see Product) — duo.manifest/v1's additionalProperties: true root
 // permits both to coexist.
@@ -66,7 +66,7 @@ type HarnessTarget struct {
 }
 
 // Arg describes one flag a verb declares on itself (its LocalFlags — the
-// global --json/-v pair is the chassis's, not a per-verb arg, and is
+// global --output/-v pair is the chassis's, not a per-verb arg, and is
 // excluded). Positional arguments are not introspectable generically from a
 // Cobra command and are not described here.
 type Arg struct {

@@ -121,7 +121,7 @@ func TestConfigMigrateCommand_V1InputRefused(t *testing.T) {
 }
 
 // TestConfigMigrateCommand_JSONWithoutWrite runs `duo config migrate
-// --json` with no --write and checks the printed document plus report
+// --output json` with no --write and checks the printed document plus report
 // come back inside the shared duo.external/v1 envelope, unwritten.
 func TestConfigMigrateCommand_JSONWithoutWrite(t *testing.T) {
 	dir := t.TempDir()
@@ -133,7 +133,7 @@ func TestConfigMigrateCommand_JSONWithoutWrite(t *testing.T) {
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	streams := &iostreams.Streams{Out: out, Err: errOut}
 	root := NewRootCommand(streams, buildinfo.Info{Version: "v0.1.0-test", Commit: "abcdef0", Date: "2026-08-23T00:00:00Z"})
-	root.SetArgs([]string{"config", "migrate", "--to", "duo.config/v3", "--json", srcPath})
+	root.SetArgs([]string{"config", "migrate", "--to", "duo.config/v3", "--output", "json", srcPath})
 
 	code := Execute(root, streams)
 	if code != exitcode.Success {

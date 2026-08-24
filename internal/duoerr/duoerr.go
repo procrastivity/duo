@@ -1,6 +1,6 @@
 // Package duoerr is the structured error type every verb raises for a
 // user-facing failure, and the renderer that turns one into both the
-// human-mode line and the --json envelope from the exact same value — no
+// human-mode line and the --output json envelope from the exact same value — no
 // separate code paths that could diverge.
 package duoerr
 
@@ -20,7 +20,7 @@ type Error struct {
 	Message string
 	// Details is the failure's *safe* detail payload, in the shape the
 	// duo.external/v1 error object fixes for that code, or nil when the
-	// code carries none. It is rendered only under --json, where the
+	// code carries none. It is rendered only under --output json, where the
 	// envelope has somewhere to put it; human mode stays one line.
 	//
 	// It exists because two launch failures owe the caller more than a
@@ -53,7 +53,7 @@ func (e *Error) Error() string {
 
 // Render writes err to w in the chassis's fixed shape: one
 // "duo: <verb>: <message>" line in human mode, or the {"error": {"code",
-// "message"}} envelope under --json. verb is empty when the failure occurred
+// "message"}} envelope under --output json. verb is empty when the failure occurred
 // before a subcommand was identified.
 func Render(w io.Writer, verb string, err *Error, jsonMode bool) {
 	if jsonMode {

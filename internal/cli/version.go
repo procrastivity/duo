@@ -14,7 +14,7 @@ import (
 
 // versionCommand constructs the `duo version` verb — the chassis demo verb.
 // Version metadata is a chassis concern in its own right, which makes it the
-// natural vehicle for exercising --json/-v and the stdout/stderr discipline
+// natural vehicle for exercising --output/-v and the stdout/stderr discipline
 // every other verb inherits. streams is the writer pair threaded in at
 // construction; build is the version/commit/date triple main sets via
 // -ldflags.
@@ -31,7 +31,7 @@ func versionCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Com
 				}
 			}
 
-			if flags.JSON {
+			if flags.JSON() {
 				payload := struct {
 					Version string `json:"version"`
 					Commit  string `json:"commit"`

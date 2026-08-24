@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
@@ -67,12 +68,6 @@ func providerCommand(streams *iostreams.Streams) *cobra.Command {
 		Use:   "provider",
 		Short: "list, disable, and enable providers a launch_variant names",
 	}
-	// Reuses outputFlagName (session.go): the same result-format flag shape
-	// the session family's fixture-attested CLI already carries, kept
-	// consistent across every verb family rather than introducing a second
-	// convention for one that has no attested fixture of its own yet.
-	cmd.PersistentFlags().String(outputFlagName, "text", `result format: "text" or "json"`)
-
 	cmd.AddCommand(providerDisableCommand(streams))
 	cmd.AddCommand(providerEnableCommand(streams))
 	cmd.AddCommand(providerListCommand(streams))
@@ -109,10 +104,7 @@ type providerToggleParams struct {
 
 // runProviderToggle is the disable and enable verbs' shared body.
 func runProviderToggle(cmd *cobra.Command, streams *iostreams.Streams, p providerToggleParams) error {
-	mode, err := outputMode(cmd)
-	if err != nil {
-		return err
-	}
+	mode := cliflags.FromContext(cmd.Context()).Output
 
 	doc, err := loadProviderConfig(p.configPath)
 	if err != nil {

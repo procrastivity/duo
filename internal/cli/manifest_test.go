@@ -11,7 +11,7 @@ import (
 	"github.com/procrastivity/duo/internal/registry"
 )
 
-// TestManifestCommand_JSON runs `duo manifest --json` through the same
+// TestManifestCommand_JSON runs `duo manifest --output json` through the same
 // Execute path main.go uses, and checks the emitted document's shape and
 // exit code — a through-the-built-root-command exercise, not just a direct
 // call into internal/manifest.Build.
@@ -19,7 +19,7 @@ func TestManifestCommand_JSON(t *testing.T) {
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	streams := &iostreams.Streams{Out: out, Err: errOut}
 	root := NewRootCommand(streams, buildinfo.Info{Version: "v0.1.0-test", Commit: "abcdef0", Date: "2026-08-23T00:00:00Z"})
-	root.SetArgs([]string{"manifest", "--json"})
+	root.SetArgs([]string{"manifest", "--output", "json"})
 
 	code := Execute(root, streams)
 	if code != exitcode.Success {
@@ -47,7 +47,7 @@ func TestManifestCommand_JSON(t *testing.T) {
 	}
 }
 
-// TestManifestCommand_Human runs `duo manifest` (no --json) and checks the
+// TestManifestCommand_Human runs `duo manifest` (default --output text) and checks the
 // human-mode line lands on stdout with no error.
 func TestManifestCommand_Human(t *testing.T) {
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}

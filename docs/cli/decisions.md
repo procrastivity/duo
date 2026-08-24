@@ -51,6 +51,26 @@ family you're in. Reconciling that — either widening `--output` chassis-
 wide or amending the doc comment and the synced fixture — is a chassis-
 level call this step does not have standing to make unilaterally.
 
+**Resolved 2026-08-24 (dogfood Step 24).** That chassis-level call has now
+been made, by the user, while authoring the first daily-driver config:
+`--output text|json` is the single spelling, chassis-wide. It binds once as
+a root persistent flag; `internal/cliflags` carries it to every verb through
+context the way it already carried the global pair; and `session`,
+`workspace`, and `provider` no longer redeclare it on their own command
+trees. `doctor`, `manifest`, `version`, and `config migrate` read `--output`
+instead of the retired boolean, and `internal/cli.Execute`'s error-envelope
+selection reads the same flag off the failing command — which retires the
+`cmd.Flags().Set("json", "true")` mirror described above together with the
+conflict that forced it. Validation of the value now happens once, in root's
+`PersistentPreRunE`, so no verb re-checks it and every verb refuses an
+unrecognized format identically (`invalid.request`, exit 1).
+
+The global `--json` bool is gone outright: no alias, no deprecation shim,
+no hidden flag. `duo doctor --json` is an unknown flag and exits 2. Nothing
+has shipped against the old spelling, so there was no compatibility surface
+worth keeping and none was kept. The synced contract set needed no change —
+`projection-cases.json` always said `--output json`.
+
 ## Exit codes: nothing to reserve, because exit 12 does not exist
 
 The Workplan's Step 21 text says "exit codes per the registered

@@ -111,7 +111,7 @@ type MigrationReport struct {
 
 // MigrationResult is MigrateV2ToV3's return value: the migrated document
 // (both as parsed structure and pre-rendered bytes in Format) plus the
-// report the CLI prints or embeds in its --json envelope.
+// report the CLI prints or embeds in its --output json envelope.
 type MigrationResult struct {
 	Document DocumentV3Draft
 	Report   MigrationReport

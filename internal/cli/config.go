@@ -85,7 +85,7 @@ func configMigrateCommand(streams *iostreams.Streams) *cobra.Command {
 				written = true
 			}
 
-			return renderMigrateResult(streams, flags.JSON, result, write, written)
+			return renderMigrateResult(streams, flags.JSON(), result, write, written)
 		},
 	}
 
@@ -119,7 +119,7 @@ func parseModelFamilyOverrides(raw []string) (map[string]string, error) {
 	return out, nil
 }
 
-// migrateResultPayload is config.migrate's --json result shape, wrapped in
+// migrateResultPayload is config.migrate's --output json result shape, wrapped in
 // the shared duo.external/v1 envelope (newEnvelope, session.go).
 type migrateResultPayload struct {
 	Format      string               `json:"format"`
@@ -145,7 +145,7 @@ type stateToBindPayload struct {
 	RebindHint  string `json:"rebind_hint"`
 }
 
-// renderMigrateResult prints result, in either --json (wrapped in the
+// renderMigrateResult prints result, in either --output json (wrapped in the
 // shared envelope) or human-readable text: the migrated document (unless
 // it was written to writtenPath, in which case a one-line confirmation
 // stands in for it) followed by the migration report — renamed, defaulted,
@@ -206,7 +206,7 @@ func reportPayload(report config.MigrationReport) migrateReportPayload {
 	}
 }
 
-// nonNil turns a nil slice into an empty one so the --json envelope's
+// nonNil turns a nil slice into an empty one so the --output json envelope's
 // report arrays always render as "[]", never "null".
 func nonNil(s []string) []string {
 	if s == nil {

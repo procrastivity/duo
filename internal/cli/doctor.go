@@ -127,7 +127,7 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 				Config:        configSection,
 			}
 
-			if flags.JSON {
+			if flags.JSON() {
 				b, err := json.Marshal(report)
 				if err != nil {
 					return duoerr.New("internal.doctor_encode_failed", fmt.Sprintf("encoding the doctor report: %v", err))
@@ -227,7 +227,7 @@ type doctorHostDeductionSection struct {
 	// Host is the instance M1 would deduce, nil when no rung yields one.
 	Host *doctorDeducedHost `json:"host,omitempty"`
 	// HostSource duplicates Host.HostSource at the section's top level, so
-	// a --json reader can check "would this deduce, and from where" with
+	// an --output json reader can check "would this deduce, and from where" with
 	// one field lookup, the same shape session.launch's own launch output
 	// names at its top level.
 	HostSource string `json:"host_source,omitempty"`
