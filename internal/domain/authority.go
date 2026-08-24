@@ -60,6 +60,12 @@ type Authority struct {
 	// durable facts like everything else here; nothing in it has been
 	// applied to identity state.
 	parked map[SessionID][]*ParkedReport
+
+	// hostBindings is the workspace↔host-instance correlation read model:
+	// the current binding per workspace, replayed from the
+	// workspace.host_bound / workspace.host_rebound facts. See
+	// hostcorrelation.go.
+	hostBindings map[WorkspaceID]*HostCorrelation
 }
 
 // Option configures an Authority.
@@ -94,6 +100,7 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 		actorBinding:   map[ActorID]SessionID{},
 		recovering:     map[InstanceID]bool{},
 		parked:         map[SessionID][]*ParkedReport{},
+		hostBindings:   map[WorkspaceID]*HostCorrelation{},
 
 		launchResolutions: map[LaunchResolutionID]*recordedLaunchResolution{},
 		sessionLaunch:     map[SessionID]LaunchResolutionID{},
@@ -275,6 +282,11 @@ func (a *Authority) apply(f Fact) {
 				delete(a.claims, ref)
 			}
 		}
+
+	// Workspace↔host correlation (duo.config/v3, 2026-08-24 handoff 22).
+	// The fold lives in hostcorrelation.go beside the model it builds.
+	case FactWorkspaceHostBound, FactWorkspaceHostRebound:
+		a.applyHostCorrelation(f)
 	}
 }
 

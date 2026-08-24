@@ -78,6 +78,25 @@ const (
 	// (decision-02's 2026-08-14 G-03 amendment, "parked unresolved
 	// evidence").
 	FactReportParked FactKind = "report.parked"
+
+	// --- duo.config/v3 workspace<->host correlation facts -------------
+	//
+	// Added 2026-08-24 (handoff 22; notes/42 §8, notes/43 item 13). v3
+	// stops authoring the session host in configuration, so the host
+	// instance a workspace's new spawns go to is state, not intent.
+	// These two are the host siblings of FactWorkspaceRebound: one
+	// current correlation, established once and changed only by an
+	// explicit, audited rebind (decision-01 §3.3's shape, applied to the
+	// host instance instead of the root path). See hostcorrelation.go.
+
+	// FactWorkspaceHostBound records the first workspace<->host-instance
+	// correlation: the host kind, the instance locator, the HostSource
+	// rung that produced it, and the notes/19 §5 fingerprint set.
+	FactWorkspaceHostBound FactKind = "workspace.host_bound"
+	// FactWorkspaceHostRebound records an audited change of that
+	// correlation. It carries both instances with their fingerprints, so
+	// the fact alone answers "what was it before, and what is it now".
+	FactWorkspaceHostRebound FactKind = "workspace.host_rebound"
 )
 
 // Fact is one durable, attributable lifecycle change.
@@ -134,4 +153,16 @@ type Fact struct {
 	CorrelationID CorrelationID
 	State         string
 	Detail        string
+
+	// --- duo.config/v3 workspace<->host correlation payloads ----------
+	//
+	// HostBinding carries the whole correlation on both host_bound and
+	// host_rebound, because a correlation fact creates or replaces an
+	// object rather than moving one field of it. PreviousHostBinding is
+	// set only on host_rebound: notes/42 §11 requires a rebind to record
+	// old and new instance with fingerprints, and carrying the old one on
+	// the fact is what makes that true of the fact in isolation, not only
+	// of a replay that happens to have seen the earlier fact.
+	HostBinding         *HostBinding
+	PreviousHostBinding *HostBinding
 }

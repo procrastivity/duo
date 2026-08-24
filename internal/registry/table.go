@@ -187,6 +187,51 @@ var table = []Descriptor{
 		Route:          nil,
 	},
 
+	// --- duo.config/v3 workspace<->host correlation verbs ---
+	//
+	// Added 2026-08-24 (handoff 22, notes/43 item 13). v3 stops authoring
+	// the session host in configuration, so the host instance a workspace
+	// spawns into is state: `duo workspace host show` reads it and
+	// `duo workspace host rebind` changes it under audit. Both are
+	// local_admin and therefore absent from the initial generated MCP tool
+	// set — a correlation is installation state, and an in-session agent
+	// that could repoint where the next spawn lands is the same
+	// self-activation hazard that keeps session.launch out.
+	{
+		// "workspace.host.show" is an authored operation name for the
+		// accepted `duo workspace host show` command, on the same footing
+		// as manifest.show and doctor.run (docs/registry/decisions.md).
+		Name:           "workspace.host.show",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"workspace.read"},
+		Idempotency:    IdempotencyNotApplicable,
+		Audit:          AuditNone,
+		CLI:            []string{"workspace", "host", "show"},
+		MCPTool:        "",
+		Route:          nil,
+		// The v3 launch fixtures are re-authored in the same stage; this
+		// verb's own envelope has no synced fixture yet.
+		Milestone: true,
+	},
+	{
+		Name:           "workspace.host.rebind",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"workspace.mutate"},
+		// Required, not optional: the write is durable and attributable,
+		// and a retried rebind must not silently append a second audited
+		// change of the same correlation.
+		Idempotency: IdempotencyRequired,
+		Audit:       AuditPrivilegedWrite,
+		CLI:         []string{"workspace", "host", "rebind"},
+		MCPTool:     "",
+		Route:       nil,
+		Milestone:   true,
+	},
+
 	// --- Contract-attested v1 surface beyond the milestone (data rows) ---
 	{
 		Name:           "session.remove",

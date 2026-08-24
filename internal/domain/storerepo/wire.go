@@ -44,6 +44,77 @@ type wireFact struct {
 	CorrelationID string `json:"correlation_id,omitempty"`
 	State         string `json:"state,omitempty"`
 	Detail        string `json:"detail,omitempty"`
+
+	// Workspace↔host correlation payloads (duo.config/v3, 2026-08-24
+	// handoff 22). PreviousHostBinding appears only on a
+	// workspace.host_rebound fact, which records old and new instance
+	// together.
+	HostBinding         *wireHostBinding `json:"host_binding,omitempty"`
+	PreviousHostBinding *wireHostBinding `json:"previous_host_binding,omitempty"`
+}
+
+// wireHostBinding is one workspace↔host-instance correlation on the wire.
+// The fingerprint fields are notes/19 §5's set, spelled the way the host
+// surfaces spell them (pane_id, terminal_id) rather than the way the Go
+// struct does, because this is the durable format.
+type wireHostBinding struct {
+	Workspace  string `json:"workspace"`
+	Kind       string `json:"kind"`
+	Instance   string `json:"instance"`
+	InstanceID string `json:"instance_id,omitempty"`
+	HostSource string `json:"host_source"`
+
+	SessionName       string `json:"session_name,omitempty"`
+	PaneID            string `json:"pane_id,omitempty"`
+	TerminalID        string `json:"terminal_id,omitempty"`
+	ProcessHost       string `json:"process_host,omitempty"`
+	ProcessPID        int    `json:"process_pid,omitempty"`
+	ProcessStartedAt  string `json:"process_started_at,omitempty"`
+	ProcessExecutable string `json:"process_executable,omitempty"`
+}
+
+func hostBindingToWire(b *domain.HostBinding) *wireHostBinding {
+	if b == nil {
+		return nil
+	}
+	return &wireHostBinding{
+		Workspace:         string(b.Workspace),
+		Kind:              b.Kind,
+		Instance:          b.Instance,
+		InstanceID:        b.InstanceID,
+		HostSource:        string(b.Source),
+		SessionName:       b.Fingerprint.SessionName,
+		PaneID:            b.Fingerprint.PaneID,
+		TerminalID:        b.Fingerprint.TerminalID,
+		ProcessHost:       b.Fingerprint.Process.Host,
+		ProcessPID:        b.Fingerprint.Process.PID,
+		ProcessStartedAt:  b.Fingerprint.Process.StartedAt,
+		ProcessExecutable: b.Fingerprint.Process.Executable,
+	}
+}
+
+func hostBindingFromWire(w *wireHostBinding) *domain.HostBinding {
+	if w == nil {
+		return nil
+	}
+	return &domain.HostBinding{
+		Workspace:  domain.WorkspaceID(w.Workspace),
+		Kind:       w.Kind,
+		Instance:   w.Instance,
+		InstanceID: w.InstanceID,
+		Source:     domain.HostSource(w.HostSource),
+		Fingerprint: domain.HostFingerprint{
+			SessionName: w.SessionName,
+			PaneID:      w.PaneID,
+			TerminalID:  w.TerminalID,
+			Process: domain.ProcessBirth{
+				Host:       w.ProcessHost,
+				PID:        w.ProcessPID,
+				StartedAt:  w.ProcessStartedAt,
+				Executable: w.ProcessExecutable,
+			},
+		},
+	}
 }
 
 type wireWorkspace struct {
@@ -220,6 +291,8 @@ func toWire(f domain.Fact) wireFact {
 			ValidUntil: v.ValidUntil, Status: string(v.Status),
 		}
 	}
+	w.HostBinding = hostBindingToWire(f.HostBinding)
+	w.PreviousHostBinding = hostBindingToWire(f.PreviousHostBinding)
 	if v := f.Claim; v != nil {
 		w.Claim = &wireClaim{
 			Kind: string(v.Ref.Kind), Key: string(v.Ref.Key), Generation: v.Generation,
@@ -327,5 +400,7 @@ func fromWire(w wireFact) domain.Fact {
 			HeldAt:     v.HeldAt,
 		}
 	}
+	f.HostBinding = hostBindingFromWire(w.HostBinding)
+	f.PreviousHostBinding = hostBindingFromWire(w.PreviousHostBinding)
 	return f
 }
