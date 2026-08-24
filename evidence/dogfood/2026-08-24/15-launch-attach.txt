@@ -1,0 +1,12 @@
+$ duo-go session launch builder   # after fix 8c8deac: a LAUNCHED session must be detachable
+duo: this workspace's recorded correlation chose herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock and outranked the ambient environment of the pane you are in.
+duo:   outranked: HERDR_SOCKET_PATH=/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+duo:   outranked: HERDR_SESSION=terminal-multiplexers
+duo: change it later with: duo workspace host rebind --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --evidence "<what you checked>"
+session:  ses_c621fc4ff24ad7b1365a87309ee9e43a
+record:   lrr_1e92d33bd3b3385c41537637e5c19172
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=workspace-correlation)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by workspace-correlation)
+selection: ordered
+  main: claude / sonnet-5 (open) -> selected
+exit=0

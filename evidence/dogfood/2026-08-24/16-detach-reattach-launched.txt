@@ -1,0 +1,7 @@
+$ duo-go session detach ses_c621fc4ff24ad7b1365a87309ee9e43a --reason "post-fix drill on a launched session"
+session ses_c621fc4ff24ad7b1365a87309ee9e43a: attachment detached
+exit=0
+
+$ duo-go session reattach ses_c621fc4ff24ad7b1365a87309ee9e43a --integration-instance herdr:terminal-multiplexers --epoch-kind herdr.terminal_id --epoch-value term_659cd6576cf408 --epoch-scope pane --container w1:pD
+duo: session reattach: domain: enrollment conflict: observed fingerprint is not the claim this session holds; a new execution needs a new runtime instance
+exit=1

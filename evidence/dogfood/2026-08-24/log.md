@@ -19,6 +19,8 @@ Binary: duo built from `go` @ c534067 (--output chassis-wide).
 | 12-enroll.txt | enroll: this Claude Code pane adopted as a session (credential redacted) |
 | 13-detach-reattach-enrolled.txt | detach, reattach, authority-restart recovery: each CLI invocation reopens the authority, so the detach→reattach pair across processes is the restart drill; view stays recovering per the known limit |
 | 14-launch-build-and-verify-fixed.txt | launch (real, multi-leaf) after fix a52c39c: builder and verifier spawn with DISTINCT agent names (duo-builder-…, duo-verifier-…); correlation-outranks-ambient note shown |
+| 15-launch-attach.txt | launch (real) after fix 8c8deac: attachment recorded from the spawn's own evidence |
+| 16-detach-reattach-launched.txt | detach on a LAUNCHED session now works; reattach refuses on strict fingerprint match — the claim's process birth is unreadable from any verb (confirmed follow-on: surface it on session show) |
 
 Checkpoint verbs all exercised at least once this day: launch-via-preset
 (claude and pi legs), list, show, enroll, detach, reattach, recovery.
