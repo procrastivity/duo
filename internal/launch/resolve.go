@@ -378,14 +378,23 @@ func enumerate(p *plan, pool func(*leafPlan) []*candidate) ([][]*candidate, []Re
 }
 
 // violates checks one complete assignment against every declared relation.
-// distinct_model_line compares exact declared labels, pairwise, across the
-// leaves it names (§6.5 rule 5).
+// distinct_model_line compares exact declared model-line labels, pairwise,
+// across the leaves it names (§6.5 rule 5). distinct_model_family
+// (duo-config-v3 step 10, by reference to step 02's duo-external-v1
+// launch_relation_kind add) compares exact declared model-family labels the
+// same way.
 func violates(p *plan, assignment []*candidate) (RelationRejection, bool) {
 	for _, rel := range p.relations {
+		field := "model line"
+		value := func(t Tuple) string { return t.ModelLine }
+		if rel.kind == relationDistinctModelFamily {
+			field = "model family"
+			value = func(t Tuple) string { return t.ModelFamily }
+		}
 		seen := map[string]bool{}
 		for _, at := range rel.indexes {
-			line := assignment[at].tuple.ModelLine
-			if seen[line] {
+			v := value(assignment[at].tuple)
+			if seen[v] {
 				locators := make([]string, 0, len(assignment))
 				for _, c := range assignment {
 					locators = append(locators, c.locator())
@@ -394,10 +403,10 @@ func violates(p *plan, assignment []*candidate) (RelationRejection, bool) {
 					Kind:       rel.kind,
 					Leaves:     rel.leaves,
 					Assignment: locators,
-					Reason:     fmt.Sprintf("model line %q appears on more than one of the related leaves", line),
+					Reason:     fmt.Sprintf("%s %q appears on more than one of the related leaves", field, v),
 				}, true
 			}
-			seen[line] = true
+			seen[v] = true
 		}
 	}
 	return RelationRejection{}, false

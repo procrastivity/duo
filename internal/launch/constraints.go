@@ -6,21 +6,31 @@ import (
 	"strings"
 )
 
-// Axis is a launch-constraint axis. §6.6 fixes exactly two, and
-// duo-external-v1's launch_constraint_axis enumerates the same pair: a
-// constraint can name the public agent runtime or the declared model line
-// and nothing else. There is no session-host, launch-variant, composition,
-// provider, vendor, or capability axis, deliberately (§9.2).
+// Axis is a launch-constraint axis. notes/30-preset-selection-design.md
+// §8.2 and §6.6 fixed exactly two, and duo-external-v1's
+// launch_constraint_axis enumerated the same pair: a constraint could name
+// the public agent runtime or the declared model line and nothing else.
+// There was no session-host, launch-variant, composition, provider,
+// vendor, or capability axis, deliberately.
+//
+// duo-config-v3 step 10 extends this to three, by reference to step 02's
+// compatible duo-external-v1 add (2026-08-24 handoff 22, ratified in
+// notes/43): model_family becomes a third require/avoid axis alongside
+// agent_runtime and model_line. Provider, vendor, session-host,
+// launch-variant, and composition remain outside the vocabulary.
 type Axis string
 
-// The two constraint axes.
+// The three constraint axes.
 const (
 	AxisAgentRuntime Axis = "agent_runtime"
 	AxisModelLine    Axis = "model_line"
+	AxisModelFamily  Axis = "model_family"
 )
 
-// Valid reports whether a is one of the two declared axes.
-func (a Axis) Valid() bool { return a == AxisAgentRuntime || a == AxisModelLine }
+// Valid reports whether a is one of the three declared axes.
+func (a Axis) Valid() bool {
+	return a == AxisAgentRuntime || a == AxisModelLine || a == AxisModelFamily
+}
 
 // Predicate is one exact-equality axis/value pair, in the shape
 // duo-external-v1's launch_constraint_predicate fixes: axis and value, and
@@ -44,6 +54,8 @@ func (p Predicate) matches(t Tuple) bool {
 		return t.AgentRuntime == p.Value
 	case AxisModelLine:
 		return t.ModelLine == p.Value
+	case AxisModelFamily:
+		return t.ModelFamily == p.Value
 	default:
 		return false
 	}
@@ -154,8 +166,8 @@ func normalizeList(in []Constraint, verb string) ([]NormalizedConstraint, *Error
 	for _, c := range in {
 		if !c.Axis.Valid() {
 			return nil, invalidRequest(fmt.Sprintf(
-				"A %s names axis %q; the admissible axes are %s and %s.",
-				verb, c.Axis, AxisAgentRuntime, AxisModelLine))
+				"A %s names axis %q; the admissible axes are %s, %s, and %s.",
+				verb, c.Axis, AxisAgentRuntime, AxisModelLine, AxisModelFamily))
 		}
 		if c.Value == "" {
 			return nil, invalidRequest(fmt.Sprintf(

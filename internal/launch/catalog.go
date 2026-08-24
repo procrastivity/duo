@@ -31,6 +31,18 @@ type Tuple struct {
 	// model_line constraint compares against and the label a caller chains
 	// on.
 	ModelLine string `json:"model_line"`
+	// ModelFamily is the launch variant's declared model-family label
+	// (duo-config-v3 step 10, by reference to step 02's duo-external-v1
+	// add). It is the value a model_family constraint and a
+	// distinct_model_family relation compare against.
+	//
+	// duo.config/v2 has no model_family field, so materializeTuple leaves
+	// this "" for every v2-declared tuple; nothing in this Matter reads an
+	// empty ModelFamily as a meaningful value yet. duo.config/v3's
+	// materializeTuple (step 12) is what actually populates it from a
+	// launch variant's required model_family. This is the minimal add the
+	// step-10 finding records — Tuple is not otherwise restructured here.
+	ModelFamily string `json:"model_family,omitempty"`
 	// LaunchVariant, AgentRuntimeDecl, and SessionHost are the remaining
 	// declaration locators the tuple was materialized from.
 	LaunchVariant    string `json:"launch_variant"`
@@ -142,9 +154,19 @@ type relation struct {
 	indexes []int
 }
 
-// relationDistinctModelLine is the only cross-leaf relation this Matter
-// defines (§6.5 rule 5). It compares exact declared labels.
-const relationDistinctModelLine = "distinct_model_line"
+// relationDistinctModelLine was, until duo-config-v3 step 10, the only
+// cross-leaf relation this Matter defined (§6.5 rule 5). It compares exact
+// declared model-line labels.
+//
+// relationDistinctModelFamily is step 10's addition, by reference to step
+// 02's duo-external-v1 launch_relation_kind add (2026-08-24 handoff 22): it
+// compares exact declared model-family labels the same way. Both relations
+// live in the same closed kind vocabulary, and materializeRelations refuses
+// any third name.
+const (
+	relationDistinctModelLine   = "distinct_model_line"
+	relationDistinctModelFamily = "distinct_model_family"
+)
 
 // plan is one fully materialized and validated preset.
 type plan struct {
@@ -348,10 +370,10 @@ func materializeRelations(p *plan, declared []config.PresetRelation) ([]relation
 
 	out := make([]relation, 0, len(declared))
 	for _, r := range declared {
-		if r.Kind != relationDistinctModelLine {
+		if r.Kind != relationDistinctModelLine && r.Kind != relationDistinctModelFamily {
 			return nil, unresolved(p.locator, fmt.Sprintf(
-				"declares relation kind %q; %q is the only defined cross-leaf relation",
-				r.Kind, relationDistinctModelLine))
+				"declares relation kind %q; %q and %q are the only defined cross-leaf relations",
+				r.Kind, relationDistinctModelLine, relationDistinctModelFamily))
 		}
 		if len(r.Leaves) < 2 {
 			return nil, unresolved(p.locator, fmt.Sprintf(

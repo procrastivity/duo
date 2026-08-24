@@ -29,6 +29,14 @@ const (
 // The stable elimination reason codes (§6.4 graft 3). They are a closed
 // vocabulary: a caller can branch on them, and a new reason is a contract
 // change rather than a new sentence.
+//
+// I-2 extension (duo-config-v3 step 10, by reference to step 02's
+// duo-external-v1 amendment, 2026-08-24 handoff 22): ReasonProviderDisabled
+// is the vocabulary's first extension since it closed. It is an addition,
+// not a substitution — the four v2 reasons are unchanged — and step 10
+// wires the name only; nothing emits it until step 12's M2 provider-fact
+// check runs. avoid_matched stays the only reason the relent re-run may
+// undo.
 const (
 	// ReasonSessionHostDisabled: the tuple's session host is declared
 	// disabled. Installed policy, not a live reachability claim.
@@ -42,6 +50,11 @@ const (
 	// ReasonAvoidMatched: a soft avoid matched this candidate. It is the
 	// one reason that can be undone, by the relent re-run.
 	ReasonAvoidMatched = "avoid_matched"
+	// ReasonProviderDisabled: the tuple's provider is a standing-disabled
+	// fact (M2's snapshot). Installed policy, not a live reachability
+	// claim, the same shape as ReasonSessionHostDisabled. It is never
+	// undone by the relent re-run, which touches avoid_matched only.
+	ReasonProviderDisabled = "provider_disabled"
 )
 
 // Record is the launch-resolution record: §6.9's immutable, Duo-authored

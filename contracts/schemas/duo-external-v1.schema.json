@@ -167,7 +167,17 @@
     "lifecycle": {"enum": ["active", "archived", "removed"]},
     "collaboration_kind": {"enum": ["shared_value", "shared_document", "inbox", "timer", "subscription"]},
     "lease_state": {"enum": ["active", "released", "expired", "revoked", "void"]},
-    "launch_constraint_axis": {"enum": ["agent_runtime", "model_line"]},
+    "launch_constraint_axis": {"enum": ["agent_runtime", "model_line", "model_family"]},
+    "launch_relation_kind": {"enum": ["distinct_model_line", "distinct_model_family"]},
+    "launch_elimination_reason": {
+      "enum": [
+        "session_host_disabled",
+        "no_conformance_evidence",
+        "require_unmatched",
+        "avoid_matched",
+        "provider_disabled"
+      ]
+    },
     "launch_constraint_predicate": {
       "type": "object",
       "required": ["axis", "value"],
