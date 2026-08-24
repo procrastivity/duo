@@ -377,47 +377,59 @@ func TestSessionEnroll_MissingRequiredFlag(t *testing.T) {
 
 // --- session launch -------------------------------------------------------
 
-// duoConfigFixture is a minimal, schema-valid duo.config/v2 document
-// declaring one Herdr session host and one Claude Code composition —
-// enough for the resolver to produce a one-leaf ordered selection without
-// ever reaching a live Herdr socket (dry-run never calls the host set).
+// duoConfigFixture is a minimal, schema-valid duo.config/v3 document
+// declaring one Claude Code launch variant — enough for the resolver to
+// produce a one-leaf ordered selection without ever reaching a live Herdr
+// socket (dry-run never calls the host set).
+//
+// duo-config-v3 step 12: the document no longer names a session host
+// instance. `session_hosts` is kind policy, and the instance is deduced at
+// launch — which is why every test below sets the ambient Herdr variables
+// (withAmbientHerdr) to give the deduction something to land on.
 const duoConfigFixture = `
-schema: duo.config/v2
+schema: duo.config/v3
 session_hosts:
-  primary:
-    kind: herdr
-    socket_path: /tmp/does-not-need-to-exist-for-a-dry-run.sock
+  prefer: [herdr]
 agent_runtimes:
   claude:
     kind: claude
-launch_variants:
-  claude_default:
-    session_host: primary
-    agent_runtime: claude
     executable: claude
-compositions:
+launch_variants:
   daily_claude:
-    launch_variant: claude_default
+    agent_runtime: claude
     model_line: sonnet-5
+    model_family: claude
 presets:
   daily:
     leaves:
       main:
         candidates:
-          - composition: daily_claude
+          - variant: daily_claude
 `
+
+// withAmbientHerdr publishes the Herdr ambient signature into the test's
+// environment, so M1's ambient-environment rung deduces a host. It is the
+// rung a Duo running inside a Herdr pane actually uses, and the only one
+// reachable through the step-12 CLI shim, which wires neither a correlation
+// read model nor an instance discoverer (step 14 does).
+func withAmbientHerdr(t *testing.T) {
+	t.Helper()
+	t.Setenv("HERDR_SOCKET_PATH", "/tmp/does-not-need-to-exist-for-a-dry-run.sock")
+	t.Setenv("HERDR_SESSION", "duo-cli-test")
+}
 
 func writeDuoConfig(t *testing.T) string {
 	t.Helper()
 	path := t.TempDir() + "/duo.config.yaml"
 	if err := os.WriteFile(path, []byte(duoConfigFixture), 0o600); err != nil {
-		t.Fatalf("writing duo.config/v2 fixture: %v", err)
+		t.Fatalf("writing duo.config/v3 fixture: %v", err)
 	}
 	return path
 }
 
 func TestSessionLaunch_DryRun(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	withAmbientHerdr(t)
 	configPath := writeDuoConfig(t)
 
 	code, out, errOut := runSession(t, "session", "launch", "daily",
@@ -484,6 +496,7 @@ func TestSessionLaunch_DryRun(t *testing.T) {
 
 func TestSessionLaunch_UnknownPreset(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	withAmbientHerdr(t)
 	configPath := writeDuoConfig(t)
 
 	code, _, errOut := runSession(t, "session", "launch", "no-such-preset",
@@ -496,6 +509,7 @@ func TestSessionLaunch_UnknownPreset(t *testing.T) {
 
 func TestSessionLaunch_BadRequireGrammar(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	withAmbientHerdr(t)
 	configPath := writeDuoConfig(t)
 
 	code, _, errOut := runSession(t, "session", "launch", "daily",
@@ -513,6 +527,7 @@ func TestSessionLaunch_BadRequireGrammar(t *testing.T) {
 // {"error": {...}} envelope, not the human-mode line.
 func TestSessionLaunch_UnrelentingRequireExhausts(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	withAmbientHerdr(t)
 	configPath := writeDuoConfig(t)
 
 	code, _, errOut := runSession(t, "session", "launch", "daily",

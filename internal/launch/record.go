@@ -144,6 +144,11 @@ type RecordCandidate struct {
 	// SupportRecordDigest is the conformance record consulted for this
 	// tuple, whatever the verdict was.
 	SupportRecordDigest string `json:"support_record_digest,omitempty"`
+	// ProviderFactID is the standing provider fact that eliminated this
+	// candidate, present only on a provider_disabled row. It is the fact
+	// M2 snapshotted, not a re-read: a later `duo provider enable` does
+	// not change what this record says was consulted.
+	ProviderFactID string `json:"provider_fact_id,omitempty"`
 }
 
 // RelationRejection is one complete assignment a cross-leaf relation
@@ -253,25 +258,31 @@ func mintRecordID() (string, error) {
 }
 
 // configurationDigest hashes the launch-relevant subset of a resolved
-// configuration document: the five declaration families resolution reads.
+// configuration document: the declaration families resolution reads.
 //
 // §7.1 calls this "the resolved launch-configuration digest — the merged
 // declaration and policy, not observed effective runtime configuration".
 // Digesting only what resolution consults is deliberate: an edit to an
 // unrelated section (authority socket, presentation clients) must not
 // invalidate the replay of a launch it could not have changed.
-func configurationDigest(doc config.DocumentV2) (string, error) {
+//
+// Under v3 there are four families, not five: `compositions` is gone
+// (nothing authors one), and `session_hosts` is host-*kind policy* rather
+// than a set of instance declarations. The deduced host itself is not in
+// the digest and must not be — it is state, and it is replayed from the
+// evidence bundle the record cites separately. Two launches of the same
+// document against two different sockets share a configuration digest,
+// which is the honest answer: the configuration did not change.
+func configurationDigest(doc config.DocumentV3) (string, error) {
 	// encoding/json sorts map keys, so the same document always produces
 	// the same bytes regardless of decode order.
 	subset := struct {
-		Presets        map[string]config.Preset      `json:"presets"`
-		Compositions   map[string]config.Composition `json:"compositions"`
-		LaunchVariants map[string]map[string]any     `json:"launch_variants"`
-		AgentRuntimes  map[string]map[string]any     `json:"agent_runtimes"`
-		SessionHosts   map[string]map[string]any     `json:"session_hosts"`
+		Presets        map[string]config.PresetV3      `json:"presets"`
+		LaunchVariants map[string]config.LaunchVariant `json:"launch_variants"`
+		AgentRuntimes  map[string]config.AgentRuntime  `json:"agent_runtimes"`
+		SessionHosts   config.SessionHostPolicy        `json:"session_hosts"`
 	}{
 		Presets:        doc.Presets,
-		Compositions:   doc.Compositions,
 		LaunchVariants: doc.LaunchVariants,
 		AgentRuntimes:  doc.AgentRuntimes,
 		SessionHosts:   doc.SessionHosts,

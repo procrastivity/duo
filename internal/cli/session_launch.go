@@ -18,6 +18,7 @@ import (
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 	"github.com/procrastivity/duo/internal/launchrecord"
 	"github.com/procrastivity/duo/internal/runtime/claude"
 	"github.com/procrastivity/duo/internal/runtime/pi"
@@ -25,9 +26,9 @@ import (
 	"github.com/procrastivity/duo/internal/surface"
 )
 
-// defaultLaunchConfigPath resolves the duo.config/v2 launch-preset document
+// defaultLaunchConfigPath resolves the duo.config/v3 launch-preset document
 // the launch resolver reads. No planning document fixes a normative default
-// path yet (Step 24, "the user's real duo.config/v2", is where the shipped
+// path yet (Step 24, "the user's real duo.config/v3", is where the shipped
 // dogfood document lands); this follows internal/asset and internal/doctor's
 // existing "resolve under $XDG_CONFIG_HOME/duo" convention rather than
 // invent a new one. --config overrides it. See the step-21 wip findings.
@@ -85,11 +86,11 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 			if path == "" {
 				p, err := defaultLaunchConfigPath()
 				if err != nil {
-					return duoerr.New("internal.config_path_unresolved", fmt.Sprintf("resolving the default duo.config/v2 path: %v", err))
+					return duoerr.New("internal.config_path_unresolved", fmt.Sprintf("resolving the default duo.config/v3 path: %v", err))
 				}
 				path = p
 			}
-			doc, err := config.LoadV2(path)
+			doc, err := config.LoadV3(path)
 			if err != nil {
 				return err // already a *duoerr.Error (internal/config wraps every failure)
 			}
@@ -103,13 +104,38 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				return err
 			}
 
-			resolver, err := launch.NewResolver(doc, launch.Options{
-				Support: stage1Support{doc: doc},
-				Random:  launch.CryptoSource{},
+			// --- STEP-12 TEMPORARY SHIM -------------------------------
+			// duo-config-v3 step 12 replaced the resolver's v2 entry
+			// point, which left this command uncompilable. This block is
+			// the smallest thing that keeps the binary and its tests
+			// honest until step 14 owns the launch wiring properly.
+			//
+			// What it does NOT do, and what step 14 adds: the --host
+			// flag, the workspace<->host correlation and standing
+			// provider read models (M1 rungs 2 and 4's state inputs),
+			// instance discovery, the first-bind write after a successful
+			// spawn, and the launch-output rail that names the deduced
+			// instance, its host_source, and the outranked evidence. With
+			// no correlation source and no discoverer, deduction here
+			// reaches only the ambient-environment rung.
+			mat, err := materialize.Materialize(cmd.Context(), materialize.Options{
+				WorkspaceFlag:   ws,
+				RequestedPreset: args[0],
+				Policy:          doc.SessionHosts,
+			})
+			if err != nil {
+				return err // already a *duoerr.Error
+			}
+
+			resolver, err := launch.NewResolver(doc, mat, launch.Options{
+				Support:      stage1Support{},
+				Random:       launch.CryptoSource{},
+				HostVersions: stage1HostVersions(),
 			})
 			if err != nil {
 				return duoerr.New("internal.launch_resolver_build_failed", err.Error())
 			}
+			// --- end STEP-12 TEMPORARY SHIM ---------------------------
 
 			req := launch.Request{
 				Preset:    args[0],
@@ -144,7 +170,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				if err != nil {
 					return duoerr.New("internal.launch_recorder_build_failed", err.Error())
 				}
-				launcher, err := launch.NewLauncher(resolver, recorder, stage1HostSet{doc: doc})
+				launcher, err := launch.NewLauncher(resolver, recorder, stage1HostSet{})
 				if err != nil {
 					return duoerr.New("internal.launcher_build_failed", err.Error())
 				}
@@ -171,8 +197,8 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&workspace, "workspace", "", "the launched execution's working directory (defaults to the current directory)")
-	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v2 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
-	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime or model_line); repeatable")
+	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
+	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime, model_line, or model_family); repeatable")
 	cmd.Flags().StringArrayVar(&avoidFlags, "avoid", nil, "a soft launch constraint, axis=value; repeatable")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview the resolution: no durable record, no session, no spawn")
 	cmd.Flags().StringVar(&owner, "owner", "", "the session's owning subject (defaults to --actor)")
@@ -196,7 +222,7 @@ func parseConstraints(raw []string) ([]launch.Constraint, error) {
 		a := launch.Axis(axis)
 		if !a.Valid() {
 			return nil, duoerr.New("invalid.request",
-				fmt.Sprintf("constraint axis %q is not a declared axis (agent_runtime, model_line).", axis))
+				fmt.Sprintf("constraint axis %q is not a declared axis (agent_runtime, model_line, model_family).", axis))
 		}
 		out = append(out, launch.Constraint{Axis: a, Value: value, Source: "flag"})
 	}
@@ -253,16 +279,19 @@ func renderLaunchReportText(streams *iostreams.Streams, r launch.Report) error {
 // --- Stage-1 host set and support oracle --------------------------------
 
 // stage1Support is the CLI's launch.Support: an installation-evidence
-// lookup over the two adapter factories this build carries real conformance
+// lookup over the adapter factories this build carries real conformance
 // records for (Herdr as the only supported session host, Claude Code and
 // Pi as the only supported agent runtimes — the dogfood milestone's
 // narrowed Stage 1, roadmap Stage E). It performs no I/O and no live probe:
 // every digest it cites comes from a factory's static Descriptor(), never
 // from Probe(), which is what keeps it on §7.1's accepted "configuration
 // plus installed evidence" rung.
-type stage1Support struct {
-	doc config.DocumentV2
-}
+//
+// duo-config-v3 step 12 re-keyed it: the lookup is on
+// launch.Tuple.SupportKey() — (host kind, host version, agent-runtime
+// kind) — and no longer on a config session-host declaration name. Two
+// workspaces bound to two Herdr sockets are one evidence key.
+type stage1Support struct{}
 
 // herdrDigest and the two runtime digests are read once, as constants of
 // this build, exactly like doctor's registeredAdapters reads them for the
@@ -273,13 +302,26 @@ var (
 	piDigest     = pi.Factory{}.Descriptor().ConformanceRecordDigest
 )
 
-func (s stage1Support) Supported(t launch.Tuple) launch.Verdict {
-	decl, ok := s.doc.SessionHosts[t.IntegrationInstanceID]
-	kind, _ := decl["kind"].(string)
-	if !ok || kind != "herdr" {
+// stage1HostVersions is the pinned-version table launch.Options.HostVersions
+// takes: for every session-host kind this build carries an adapter for, the
+// external version string that adapter's own descriptor declares support
+// for. It is a build constant read off the descriptor, never a probe and
+// never a detected version — the thread-5 position (launch.SupportKey).
+func stage1HostVersions() map[string]string {
+	d := herdr.Factory{}.Descriptor()
+	versions := map[string]string{}
+	if len(d.SupportedExternalVersions) > 0 {
+		versions[d.AdapterID] = d.SupportedExternalVersions[0]
+	}
+	return versions
+}
+
+func (stage1Support) Supported(t launch.Tuple) launch.Verdict {
+	key := t.SupportKey()
+	if key.HostKind != herdr.AdapterID || key.HostVersion != herdr.PinnedVersion {
 		return launch.Verdict{OK: false}
 	}
-	switch t.AgentRuntime {
+	switch key.AgentRuntime {
 	case "claude":
 		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + claudeDigest}
 	case "pi":
@@ -289,32 +331,27 @@ func (s stage1Support) Supported(t launch.Tuple) launch.Verdict {
 	}
 }
 
-// stage1HostSet resolves a materialized launch tuple's session host to a
-// live Herdr adapter, by the session-host declaration's "kind" field —
-// the same config-map convention internal/launch/catalog.go already reads
-// "kind" off an agent-runtime declaration with. Stage 1 supports exactly
-// one session-host kind; anything else (a declared but unsupported "tmux"
-// entry, say) refuses with a clear, unambiguous message rather than
+// stage1HostSet resolves a materialized launch tuple's deduced session host
+// to a live Herdr adapter. Stage 1 supports exactly one session-host kind;
+// anything else refuses with a clear, unambiguous message rather than
 // guessing at a launcher for it.
-type stage1HostSet struct {
-	doc config.DocumentV2
-}
+//
+// STEP-12 TEMPORARY SHIM: the kind and the instance now come off the tuple
+// (the host M1 deduced) rather than off a config session-host declaration,
+// which is the shape step 14 keeps. Everything around it is still step
+// 14's: the --host flag that feeds the deduction, the correlation read
+// model, and the first bind after a successful spawn.
+type stage1HostSet struct{}
 
-func (hs stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
-	decl, ok := hs.doc.SessionHosts[t.IntegrationInstanceID]
-	if !ok {
-		return nil, fmt.Errorf("cli: session host %q is not declared in the loaded duo.config/v2 document", t.IntegrationInstanceID)
-	}
-	kind, _ := decl["kind"].(string)
-	switch kind {
-	case "herdr":
-		socketPath, _ := decl["socket_path"].(string)
-		if socketPath == "" {
-			return nil, fmt.Errorf("cli: session host %q declares kind \"herdr\" but no socket_path", t.IntegrationInstanceID)
+func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
+	switch t.HostKind {
+	case herdr.AdapterID:
+		if t.HostInstance == "" {
+			return nil, fmt.Errorf("cli: the deduced herdr host carries no instance locator")
 		}
 		h, err := herdr.New(herdr.Config{
 			IntegrationInstanceID: t.IntegrationInstanceID,
-			SocketPath:            socketPath,
+			SocketPath:            t.HostInstance,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cli: building the herdr host for %q: %w", t.IntegrationInstanceID, err)
@@ -322,7 +359,7 @@ func (hs stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 		return h, nil
 	default:
 		return nil, fmt.Errorf(
-			"cli: session host %q declares kind %q, which this Stage-1 build does not support (only \"herdr\")",
-			t.IntegrationInstanceID, kind)
+			"cli: the deduced session host %q is of kind %q, which this Stage-1 build does not support (only %q)",
+			t.IntegrationInstanceID, t.HostKind, herdr.AdapterID)
 	}
 }

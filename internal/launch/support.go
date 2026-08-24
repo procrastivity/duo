@@ -11,6 +11,14 @@ package launch
 // launch; a Support implementation that called an adapter would move launch
 // resolution onto the rejected live-state rung (§7.5) without the dated
 // contract change that rung requires.
+// Under duo.config/v3 an implementation keys on Tuple.SupportKey() —
+// (host kind, host version, agent-runtime kind) — and on nothing else. That
+// is the thread-5 re-key: config names are gone, and what an installed
+// conformance record is about is which host software at which pinned
+// version this build drives, and which agent runtime it starts. Two
+// variants that differ only in model line, model family, or provider are
+// one evidence key, and so are two workspaces bound to two sockets of the
+// same kind.
 type Support interface {
 	// Supported reports the verdict for one tuple. It must be pure: the
 	// same tuple and the same installed evidence must produce the same

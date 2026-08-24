@@ -15,50 +15,45 @@ import (
 	"github.com/procrastivity/duo/internal/host"
 	"github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 	"github.com/procrastivity/duo/internal/launchrecord"
 	"github.com/procrastivity/duo/internal/store"
 )
 
 // scenarioYAML is the same shape internal/launch's own tests resolve
 // against, trimmed to what these tests need: one ordered preset whose leaf
-// declares three candidates, all on one declared session host.
+// declares two launch-variant candidates. Under duo.config/v3 the session
+// host is not in the document at all — it is materialized before
+// resolution and joined to every candidate (see newHarness).
 const scenarioYAML = `
-schema: duo.config/v2
+schema: duo.config/v3
 session_hosts:
-  local_tmux:
-    kind: tmux
-    server: default
+  prefer: [tmux]
 agent_runtimes:
   codex_default:
     kind: codex
+    executable: codex
   claude_default:
     kind: claude
-launch_variants:
-  codex_in_tmux:
-    agent_runtime: codex_default
-    session_host: local_tmux
-    executable: codex
-    arguments: []
-  claude_in_tmux:
-    agent_runtime: claude_default
-    session_host: local_tmux
     executable: claude
     arguments: ["--continue"]
-compositions:
+launch_variants:
   review_codex_gpt56:
-    launch_variant: codex_in_tmux
+    agent_runtime: codex_default
     model_line: gpt-5.6
+    model_family: gpt
   review_claude_opus4:
-    launch_variant: claude_in_tmux
+    agent_runtime: claude_default
     model_line: claude-opus-4
+    model_family: claude
 presets:
   review:
     selection: ordered
     leaves:
       reviewer:
         candidates:
-          - composition: review_codex_gpt56
-          - composition: review_claude_opus4
+          - variant: review_codex_gpt56
+          - variant: review_claude_opus4
 `
 
 const workspacePath = "/work/example"
@@ -135,6 +130,21 @@ func (h *recordingHost) Start(ctx context.Context, prepared host.PreparedHostLau
 	return h.inner.Start(ctx, prepared)
 }
 
+// fixedDiscovery is an instance discoverer that reports one instance of one
+// kind, which is what lets M1's policy-default rung produce a host with a
+// known instance ID without an environment or a store.
+type fixedDiscovery struct {
+	kind     string
+	instance materialize.Instance
+}
+
+func (d fixedDiscovery) DiscoverInstances(_ context.Context, kind string) ([]materialize.Instance, error) {
+	if kind != d.kind {
+		return nil, nil
+	}
+	return []materialize.Instance{d.instance}, nil
+}
+
 // oneHost is a HostSet with a single launcher behind it.
 type oneHost struct{ launcher host.HostLauncher }
 
@@ -178,13 +188,26 @@ func newHarness(t *testing.T) *harness {
 		t.Fatalf("launchrecord.New: %v", err)
 	}
 
-	doc, err := config.ParseV2([]byte(scenarioYAML))
+	doc, err := config.ParseV3([]byte(scenarioYAML))
 	if err != nil {
-		t.Fatalf("config.ParseV2: %v", err)
+		t.Fatalf("config.ParseV3: %v", err)
 	}
-	resolver, err := launch.NewResolver(doc, launch.Options{
-		Support: launch.AllSupported{RecordDigest: "sha256:conformance-fixture"},
-		NewID:   func() (string, error) { return "lrr_test_1", nil },
+	// M1/M2 run before resolution and hand the resolver one deduced host.
+	// Everything that touches the outside world is pinned: no environment,
+	// no correlation store, one discoverable instance.
+	mat, err := materialize.Materialize(ctx, materialize.Options{
+		WorkspaceFlag: workspacePath,
+		Policy:        doc.SessionHosts,
+		Discovery:     fixedDiscovery{kind: "tmux", instance: materialize.Instance{Locator: "/run/tmux-1000/default", InstanceID: "local_tmux"}},
+		LookupEnv:     func(string) (string, bool) { return "", false },
+	})
+	if err != nil {
+		t.Fatalf("materialize.Materialize: %v", err)
+	}
+	resolver, err := launch.NewResolver(doc, mat, launch.Options{
+		Support:      launch.AllSupported{RecordDigest: "sha256:conformance-fixture"},
+		NewID:        func() (string, error) { return "lrr_test_1", nil },
+		HostVersions: map[string]string{"tmux": "3.5a"},
 	})
 	if err != nil {
 		t.Fatalf("launch.NewResolver: %v", err)

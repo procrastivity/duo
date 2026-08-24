@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 )
 
 // assignment renders a resolution as "leaf=agent_runtime/model_line" pairs,
@@ -142,7 +144,7 @@ func TestAvoidRelentsWhenItWouldPreventAnyAssignment(t *testing.T) {
 	if !res.Record.AvoidRelented {
 		t.Error("record does not mark the avoid relent")
 	}
-	if got, want := res.Record.RestoredCandidates, []string{"compositions.review_codex_gpt56"}; !reflect.DeepEqual(got, want) {
+	if got, want := res.Record.RestoredCandidates, []string{"launch_variants.review_codex_gpt56"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("restored candidates = %v, want %v", got, want)
 	}
 	want := []launch.Predicate{{Axis: launch.AxisModelLine, Value: "gpt-5.6"}}
@@ -274,7 +276,7 @@ func TestMultiLeafResolutionIsAtomic(t *testing.T) {
 	// reported as a survivor rather than as a launched leaf.
 	survivors := details["survivors"].(map[string]any)
 	after := survivors["after_require"].([]any)
-	if len(after) != 1 || after[0] != "compositions.review_codex_gpt56" {
+	if len(after) != 1 || after[0] != "launch_variants.review_codex_gpt56" {
 		t.Errorf("after_require survivors = %v, want just alpha's candidate", after)
 	}
 	if got := details["complete_assignments_survived"]; got != float64(0) {
@@ -400,33 +402,40 @@ func TestUnknownAxisIsInvalid(t *testing.T) {
 	wantCode(t, err, launch.CodeInvalidRequest)
 }
 
-// TestUnresolvedCompositionReference is §6.5 rule 3: a preset that
-// references a composition nothing declares is declaration ambiguity, not
-// narrowing.
-func TestUnresolvedCompositionReference(t *testing.T) {
+// TestUnresolvedVariantReference is §6.5 rule 3 in its v3 form: a preset
+// that references a launch variant nothing declares is declaration
+// ambiguity, not narrowing. The locator the failure names is the variant's,
+// which is what a person edits — never the composition the join would have
+// minted, which does not exist until the join succeeds.
+func TestUnresolvedVariantReference(t *testing.T) {
 	const yaml = `
-schema: duo.config/v2
+schema: duo.config/v3
 session_hosts:
-  local_tmux: {kind: tmux}
+  prefer: [tmux]
 agent_runtimes:
-  codex_default: {kind: codex}
+  codex_default: {kind: codex, executable: codex}
 launch_variants:
-  codex_in_tmux:
-    agent_runtime: codex_default
-    session_host: local_tmux
-    executable: codex
-compositions:
-  declared: {launch_variant: codex_in_tmux, model_line: gpt-5.6}
+  declared: {agent_runtime: codex_default, model_line: gpt-5.6, model_family: gpt}
 presets:
   review:
     leaves:
       reviewer:
         candidates:
-          - composition: missing
+          - variant: declared
 `
-	err := resolveErr(t, newResolver(t, yaml), launch.Request{Preset: "review"})
+	doc := parseDoc(t, yaml)
+	// internal/config refuses a dangling candidate reference at the
+	// configuration boundary, so the resolver only ever sees one by way of
+	// a hand-built document. Rewriting the resolved value is how this test
+	// reaches the resolver's own rule 3 refusal.
+	preset := doc.Presets["review"]
+	preset.Leaves["reviewer"] = config.PresetLeafV3{Candidates: []config.PresetCandidateV3{{Variant: "missing"}}}
+	doc.Presets["review"] = preset
+
+	r := newResolverOver(t, doc, materialized(t, doc))
+	err := resolveErr(t, r, launch.Request{Preset: "review"})
 	wantCode(t, err, launch.CodeCompositionUnresolved)
-	if !strings.Contains(err.Message, "compositions.missing") {
+	if !strings.Contains(err.Message, "launch_variants.missing") {
 		t.Errorf("message = %q, want the declaration locator", err.Message)
 	}
 }
@@ -437,39 +446,48 @@ presets:
 // unresolved rather than silently named after its config key.
 func TestAgentRuntimeKindIsNeverInferred(t *testing.T) {
 	const yaml = `
-schema: duo.config/v2
+schema: duo.config/v3
 session_hosts:
-  local_tmux: {kind: tmux}
+  prefer: [tmux]
 agent_runtimes:
-  codex_default: {}
+  codex_default: {executable: codex}
 launch_variants:
-  codex_in_tmux:
-    agent_runtime: codex_default
-    session_host: local_tmux
-    executable: codex
-compositions:
-  review: {launch_variant: codex_in_tmux, model_line: gpt-5.6}
+  review: {agent_runtime: codex_default, model_line: gpt-5.6, model_family: gpt}
 presets:
   review:
     leaves:
       reviewer:
         candidates:
-          - composition: review
+          - variant: review
 `
 	err := resolveErr(t, newResolver(t, yaml), launch.Request{Preset: "review"})
 	wantCode(t, err, launch.CodeCompositionUnresolved)
+	if !strings.Contains(err.Message, "agent_runtimes.codex_default") {
+		t.Errorf("message = %q, want the runtime declaration locator", err.Message)
+	}
 }
 
-// TestDisabledSessionHostLeavesNoEligibleCandidate is §6.8's installation
-// row: an enabled-host declaration, not a constraint, emptied the pool, so
-// the failure is unavailable/launch.no_eligible_candidate and never
-// constraints_exhausted.
-func TestDisabledSessionHostLeavesNoEligibleCandidate(t *testing.T) {
+// TestDisabledSessionHostKindLeavesNoEligibleCandidate is §6.8's
+// installation row, re-seated on v3's kind policy: `session_hosts` no
+// longer declares instances, so what can be switched off is a *kind*, and
+// what it eliminates is every join onto the one deduced host of that kind.
+//
+// The deduction has to have come from a rung that bypasses policy for this
+// to fire at all — an explicit --host, since the policy-default rung
+// already skips disabled kinds — which is exactly
+// contracts/fixtures/duo-external-v1/session-launch-explicit-host.json.
+// Installed policy, not a constraint, emptied the pool, so the failure is
+// unavailable/launch.no_eligible_candidate and never constraints_exhausted.
+func TestDisabledSessionHostKindLeavesNoEligibleCandidate(t *testing.T) {
 	yaml := strings.Replace(scenarioYAML,
-		"  local_tmux:\n    kind: tmux\n    server: default\n",
-		"  local_tmux:\n    kind: tmux\n    server: default\n    enabled: false\n", 1)
+		"session_hosts:\n  prefer: [tmux]\n",
+		"session_hosts:\n  prefer: [tmux]\n  kinds:\n    tmux:\n      enabled: false\n", 1)
+	doc := parseDoc(t, yaml)
+	mat := materialized(t, doc, func(o *materialize.Options) {
+		o.HostFlag = testHostKind + ":" + testHostInstance
+	})
 
-	err := resolveErr(t, newResolver(t, yaml), launch.Request{Preset: "review"})
+	err := resolveErr(t, newResolverOver(t, doc, mat), launch.Request{Preset: "review"})
 	wantCode(t, err, launch.CodeNoEligibleCandidate)
 	if err.Class != "unavailable" {
 		t.Errorf("class = %q, want unavailable", err.Class)
@@ -481,6 +499,18 @@ func TestDisabledSessionHostLeavesNoEligibleCandidate(t *testing.T) {
 			t.Errorf("candidate %v, want reason %q", row, launch.ReasonSessionHostDisabled)
 		}
 	}
+}
+
+// TestEnabledIsTheAbsentDefaultForAHostKind is the other half of the same
+// policy rule: a kinds stanza that says nothing about `enabled`, and no
+// stanza at all, both leave the kind enabled. A declaration that says
+// nothing about being enabled is not a declaration that it is off.
+func TestEnabledIsTheAbsentDefaultForAHostKind(t *testing.T) {
+	yaml := strings.Replace(scenarioYAML,
+		"session_hosts:\n  prefer: [tmux]\n",
+		"session_hosts:\n  prefer: [tmux]\n  kinds:\n    tmux: {}\n", 1)
+	res := resolveOK(t, newResolver(t, yaml), launch.Request{Preset: "review"})
+	wantAssignment(t, res, "reviewer=codex/gpt-5.6")
 }
 
 // TestMissingConformanceEvidenceEliminatesACandidate is §6.7 step 3 and
@@ -580,9 +610,9 @@ func TestRecordCarriesTheWholeExplanation(t *testing.T) {
 		t.Errorf("record leaf carries %d candidates, want all 3 declared", len(leaf.Candidates))
 	}
 	if got, want := leaf.Survivors.BeforeConstraints, []string{
-		"compositions.review_codex_gpt56",
-		"compositions.review_opencode_gpt56",
-		"compositions.review_claude_opus4",
+		"launch_variants.review_codex_gpt56",
+		"launch_variants.review_opencode_gpt56",
+		"launch_variants.review_claude_opus4",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pre-constraint pool = %v, want %v", got, want)
 	}

@@ -7,157 +7,235 @@ import (
 	"time"
 
 	"github.com/procrastivity/duo/internal/config"
+	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/host"
 	"github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 )
 
-// scenarioYAML is notes/30 §6.5's accepted configuration shape, verbatim
-// for the parts §6.5 prints, plus the session-host, agent-runtime, and
-// launch-variant declarations those compositions reference (§6.5's excerpt
-// shows only compositions and presets, but a composition resolves through a
-// launch variant to an agent runtime and a session host, and this package
-// never infers any of them).
+// The deduced host every test resolves against, unless it says otherwise.
+// Under duo.config/v3 the host is not in the document at all: it is
+// materialized (M1) before resolution and handed to the resolver as a
+// value, so a test fixes it by fixing the materialization inputs rather
+// than by writing a session_hosts declaration.
+const (
+	testHostKind       = "tmux"
+	testHostInstance   = "/run/tmux-1000/default"
+	testHostInstanceID = "local_tmux"
+	testHostVersion    = "3.5a"
+)
+
+// scenarioYAML is notes/30 §6.5's accepted configuration shape carried onto
+// duo.config/v3: the compositions are gone, the preset's candidates name
+// launch variants directly, every variant carries the required model_family,
+// and the command shape (executable plus base arguments) has moved onto the
+// agent runtime, leaving the variant only append_arguments.
 //
-// The `review` preset is what
-// contracts/fixtures/duo-external-v1/session-launch.json reports on: three
-// ordered candidates under one leaf named `reviewer`, whose first candidate
-// is codex on gpt-5.6.
+// The declared model lines and runtime kinds are deliberately unchanged from
+// the v2 scenario, so
+// contracts/fixtures/duo-external-v1/session-launch.json still describes the
+// same ordinary result: three ordered candidates under one leaf named
+// `reviewer`, whose first candidate is codex on gpt-5.6.
+//
+// The provider tags are v3's addition. `review_opencode_gpt56` is
+// deliberately left untagged, because "an untagged variant is never affected
+// by a provider fact" is a rule that needs an untagged variant to test it.
 const scenarioYAML = `
-schema: duo.config/v2
+schema: duo.config/v3
 workspaces:
   main:
     root: /work/example
 session_hosts:
-  local_tmux:
-    kind: tmux
-    server: default
+  prefer: [tmux]
 agent_runtimes:
   codex_default:
     kind: codex
+    executable: codex
   opencode_default:
     kind: opencode
+    executable: opencode
   claude_default:
     kind: claude
-launch_variants:
-  codex_in_tmux:
-    agent_runtime: codex_default
-    session_host: local_tmux
-    executable: codex
-    arguments: []
-  opencode_in_tmux:
-    agent_runtime: opencode_default
-    session_host: local_tmux
-    executable: opencode
-    arguments: []
-  claude_in_tmux:
-    agent_runtime: claude_default
-    session_host: local_tmux
     executable: claude
     arguments: ["--continue"]
-compositions:
+launch_variants:
   review_codex_gpt56:
-    launch_variant: codex_in_tmux
+    agent_runtime: codex_default
     model_line: gpt-5.6
+    model_family: gpt
+    provider: openai
   review_opencode_gpt56:
-    launch_variant: opencode_in_tmux
+    agent_runtime: opencode_default
     model_line: gpt-5.6
+    model_family: gpt
   review_claude_opus4:
-    launch_variant: claude_in_tmux
+    agent_runtime: claude_default
     model_line: claude-opus-4
+    model_family: claude
+    provider: anthropic
 presets:
   review:
     selection: ordered
     leaves:
       reviewer:
         candidates:
-          - composition: review_codex_gpt56
-          - composition: review_opencode_gpt56
-          - composition: review_claude_opus4
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
   review_random:
     selection: random
     leaves:
       reviewer:
         candidates:
-          - composition: review_codex_gpt56
-          - composition: review_opencode_gpt56
-          - composition: review_claude_opus4
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
   determined_review:
     selection: ordered
     leaves:
       reviewer:
         candidates:
-          - composition: review_codex_gpt56
+          - variant: review_codex_gpt56
   adversarial_pair:
     selection: ordered
     leaves:
       first:
         candidates:
-          - composition: review_codex_gpt56
-          - composition: review_opencode_gpt56
-          - composition: review_claude_opus4
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
       second:
         candidates:
-          - composition: review_codex_gpt56
-          - composition: review_opencode_gpt56
-          - composition: review_claude_opus4
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
     relations:
       - kind: distinct_model_line
+        leaves: [first, second]
+  distinct_family_pair:
+    selection: ordered
+    leaves:
+      first:
+        candidates:
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
+      second:
+        candidates:
+          - variant: review_codex_gpt56
+          - variant: review_opencode_gpt56
+          - variant: review_claude_opus4
+    relations:
+      - kind: distinct_model_family
         leaves: [first, second]
   mixed_pair:
     selection: ordered
     leaves:
       alpha:
         candidates:
-          - composition: review_codex_gpt56
+          - variant: review_codex_gpt56
       beta:
         candidates:
-          - composition: review_claude_opus4
+          - variant: review_claude_opus4
 `
 
 // exhaustionYAML is the declaration
 // contracts/fixtures/duo-external-v1/session-launch-exhausted.json reports
-// on: a `review` preset whose one leaf `reviewer` declares exactly one
-// candidate, `compositions.review_codex_gpt56`. The fixture's survivor
-// pools list that one locator, which is only true of a one-candidate
-// declaration.
+// on, carried onto v3: a `review` preset whose one leaf `reviewer` declares
+// exactly one candidate. The fixture's survivor pools list that one
+// locator, which is only true of a one-candidate declaration.
 const exhaustionYAML = `
-schema: duo.config/v2
+schema: duo.config/v3
 session_hosts:
-  local_tmux:
-    kind: tmux
+  prefer: [tmux]
 agent_runtimes:
   codex_default:
     kind: codex
-launch_variants:
-  codex_in_tmux:
-    agent_runtime: codex_default
-    session_host: local_tmux
     executable: codex
-    arguments: []
-compositions:
+launch_variants:
   review_codex_gpt56:
-    launch_variant: codex_in_tmux
+    agent_runtime: codex_default
     model_line: gpt-5.6
+    model_family: gpt
 presets:
   review:
     selection: ordered
     leaves:
       reviewer:
         candidates:
-          - composition: review_codex_gpt56
+          - variant: review_codex_gpt56
 `
 
-// parseDoc resolves one duo.config/v2 document through the real strict
+// parseDoc resolves one duo.config/v3 document through the real strict
 // resolver. Every test starts from a document internal/config accepted, so
 // nothing here can pass on a shape the configuration boundary would reject.
-func parseDoc(t *testing.T, yaml string) config.DocumentV2 {
+func parseDoc(t *testing.T, yaml string) config.DocumentV3 {
 	t.Helper()
-	doc, err := config.ParseV2([]byte(yaml))
+	doc, err := config.ParseV3([]byte(yaml))
 	if err != nil {
-		t.Fatalf("config.ParseV2: %v", err)
+		t.Fatalf("config.ParseV3: %v", err)
 	}
 	return doc
+}
+
+// fixedDiscovery is an instance discoverer that reports one instance of one
+// kind. It is what lets the policy-default rung of M1 produce a host with a
+// known instance ID in a test, with no environment and no store.
+type fixedDiscovery struct {
+	kind      string
+	instances []materialize.Instance
+}
+
+func (d fixedDiscovery) DiscoverInstances(_ context.Context, kind string) ([]materialize.Instance, error) {
+	if kind != d.kind {
+		return nil, nil
+	}
+	return d.instances, nil
+}
+
+// fixedProviders is a standing-provider read model. M2 snapshots it once,
+// and the resolver reads the snapshot, never this.
+type fixedProviders struct {
+	standing map[string]domain.ProviderStanding
+}
+
+func (p fixedProviders) StandingProviderFacts() map[string]domain.ProviderStanding {
+	return p.standing
+}
+
+// disabledProviders builds a read model in which every named provider is
+// standing-disabled, each with its own fact ID.
+func disabledProviders(names ...string) fixedProviders {
+	standing := map[string]domain.ProviderStanding{}
+	for _, name := range names {
+		standing[name] = domain.ProviderStanding{Enabled: false, FactID: domain.FactID("f_disabled_" + name)}
+	}
+	return fixedProviders{standing: standing}
+}
+
+// materialized runs the real M1/M2 pass with every outside input pinned:
+// no environment, no correlation store, and one discoverable instance of
+// the scenario's host kind. The result is what a v3 resolver is built over.
+func materialized(t *testing.T, doc config.DocumentV3, opts ...func(*materialize.Options)) materialize.Result {
+	t.Helper()
+	o := materialize.Options{
+		WorkspaceFlag: "/work/example",
+		Policy:        doc.SessionHosts,
+		Discovery: fixedDiscovery{kind: testHostKind, instances: []materialize.Instance{
+			{Locator: testHostInstance, InstanceID: testHostInstanceID},
+		}},
+		LookupEnv: func(string) (string, bool) { return "", false },
+		Now:       fixedClock(),
+	}
+	for _, apply := range opts {
+		apply(&o)
+	}
+	res, err := materialize.Materialize(context.Background(), o)
+	if err != nil {
+		t.Fatalf("materialize.Materialize: %v", err)
+	}
+	return res
 }
 
 // fixedIDs mints predictable record IDs so a test can compare a whole
@@ -180,18 +258,34 @@ func fixedClock() func() time.Time {
 	return func() time.Time { return time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC) }
 }
 
-// newResolver builds a resolver over scenarioYAML with the permissive
-// installed-evidence oracle and a pinned ID.
+// defaultOptions are the resolver options every test starts from: the
+// permissive installed-evidence oracle, a pinned ID, and the pinned host
+// version the SupportKey is built from.
+func defaultOptions() launch.Options {
+	return launch.Options{
+		Support:      launch.AllSupported{RecordDigest: "sha256:conformance-fixture"},
+		NewID:        fixedIDs("lrr_test_1", "lrr_test_2", "lrr_test_3"),
+		HostVersions: map[string]string{testHostKind: testHostVersion},
+	}
+}
+
+// newResolver builds a resolver over one document and the default
+// materialization.
 func newResolver(t *testing.T, yaml string, opts ...func(*launch.Options)) *launch.Resolver {
 	t.Helper()
-	o := launch.Options{
-		Support: launch.AllSupported{RecordDigest: "sha256:conformance-fixture"},
-		NewID:   fixedIDs("lrr_test_1", "lrr_test_2", "lrr_test_3"),
-	}
+	doc := parseDoc(t, yaml)
+	return newResolverOver(t, doc, materialized(t, doc), opts...)
+}
+
+// newResolverOver builds a resolver over an explicit materialization, for
+// the tests that are about what M1/M2 produced.
+func newResolverOver(t *testing.T, doc config.DocumentV3, mat materialize.Result, opts ...func(*launch.Options)) *launch.Resolver {
+	t.Helper()
+	o := defaultOptions()
 	for _, apply := range opts {
 		apply(&o)
 	}
-	r, err := launch.NewResolver(parseDoc(t, yaml), o)
+	r, err := launch.NewResolver(doc, mat, o)
 	if err != nil {
 		t.Fatalf("launch.NewResolver: %v", err)
 	}
@@ -302,7 +396,7 @@ func (s oneHost) LauncherFor(launch.Tuple) (host.HostLauncher, error) { return s
 // over the fake adapter, returning the launcher and the shared call log.
 func newLauncher(t *testing.T, r *launch.Resolver, recorder *recordingRecorder, log *callLog) *launch.Launcher {
 	t.Helper()
-	h := &recordingHost{inner: fake.New("local_tmux"), log: log}
+	h := &recordingHost{inner: fake.New(testHostInstanceID), log: log}
 	l, err := launch.NewLauncher(r, recorder, oneHost{launcher: h})
 	if err != nil {
 		t.Fatalf("launch.NewLauncher: %v", err)

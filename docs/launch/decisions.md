@@ -255,3 +255,79 @@ human mode.
   tables that the recorder implementation will already be holding open.
 - **No permission check.** `session.manage` is enforced where a request
   enters, not in the decision component.
+
+## Amendment — `duo.config/v3`, the mint-join resolver (2026-08-24)
+
+Ratified in handoff 22 (`notes/43-config-v3-change-control.md`), designed in
+`notes/42-config-v3-late-binding.md` §4–§6, implemented as duo-config-v3
+step 12. Everything above stands as the record of the v2 resolver. The
+clauses below supersede the parts of it they name; nothing above is
+rewritten.
+
+- **Supersedes "one declared session host is one integration instance".**
+  v3 removes the `compositions` object and the authored session host
+  entirely. A candidate is now a **join**: one `launch_variants.<name>`
+  declaration × the single host M1 deduced for this launch
+  (`internal/launch/materialize`). The join is where a composition is
+  *minted* — `<variant>@<host_kind>`, the form step 03 fixed across the
+  re-authored `session-launch*.json` fixtures — and nothing authors one.
+  `Tuple.IntegrationInstanceID` survives, but it is no longer a config
+  declaration name: it is the deduced host's own instance ID, falling back
+  to its `<kind>:<instance>` locator when the winning rung carried no ID.
+  `Tuple.SessionHost` is gone; `Tuple.HostKind`, `HostInstance`, and
+  `HostVersion` replace it, and `candidate.locator` is the launch-variant
+  locator, which is what a person edits.
+
+- **`NewResolver` takes the materialization by value.** Its signature is
+  `NewResolver(config.DocumentV3, materialize.Result, Options)`. The
+  resolver never asks where the host is; it is told, once, before it runs.
+  That is invariant I-3 made structural. A materialization with no deduced
+  host is refused at construction — M1 raises `launch.host_unresolved`
+  before the resolver is ever built, and the refusal exists so a hand-built
+  caller cannot skip that.
+
+- **Step 3 runs three checks, in a fixed order.** `session_host_disabled`
+  from `session_hosts.kinds` (absent `enabled` means enabled, and the check
+  is per-resolution because there is one host); then `provider_disabled`
+  against M2's snapshot, with the consulted fact ID carried onto the
+  candidate; then `Support.Supported`. Each check is more categorical than
+  the next, so the reason a caller reads is the first thing that was
+  actually wrong. Every reason step 3 assigns is hard: the relent re-run
+  still undoes `avoid_matched` and nothing else (invariant I-2).
+
+- **Conformance evidence is re-keyed** on `Tuple.SupportKey()` — (host kind,
+  host version, agent-runtime kind). Under v2 the key rode on a config
+  session-host declaration name, so two entries pointing at one socket were
+  two evidence keys for one real host. **Thread 5's position:** `HostVersion`
+  is the pinned external-version string on the host adapter's own descriptor
+  (`Descriptor().SupportedExternalVersions[0]`, e.g. `herdr.PinnedVersion`),
+  a build constant, never a probe and never a detected version, matched
+  **exactly** as a string. The resolver holds no adapter knowledge, so the
+  caller supplies the table as `Options.HostVersions`; a kind absent from it
+  has no version, and the Support oracle refuses it for want of evidence.
+  **The risk this carries:** an installation whose Herdr is not the pinned
+  release resolves to "no conformance evidence" rather than to a
+  version-compatibility verdict, and a Herdr upgrade needs a Duo build to
+  match. Changing the version source or the match semantics (ranges, rules,
+  lineage) belongs to the conformance-record contract, not to this package.
+
+- **Supersedes "five declaration families".** `configurationDigest` hashes
+  four: presets, launch variants, agent runtimes, and the `session_hosts`
+  *policy* block. The deduced host is deliberately not in it — it is state,
+  and the record cites it through the evidence bundle instead. Two launches
+  of one document against two sockets share a configuration digest, which is
+  the honest answer: the configuration did not change.
+
+- **The command shape moved.** `executable` and the base `arguments` are the
+  agent runtime's; a variant contributes only `append_arguments`, appended
+  in that order.
+
+- **Still deliberately not done here.** The exhaustion rows and the grown
+  record and report payloads — per-reason tallies, the deduced host with its
+  `host_source`, the outranked evidence, the evidence-bundle references, the
+  pointer set, the minted composition per leaf, and
+  `config.variant_unresolved` in place of `config.composition_unresolved` —
+  are step 13's. The CLI wiring (the `--host` flag, the correlation and
+  provider read models, instance discovery, the first bind, and the launch
+  output rail) is step 14's; `internal/cli/session_launch.go` currently
+  carries a marked temporary shim.

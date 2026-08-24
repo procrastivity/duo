@@ -3,6 +3,7 @@ package launch_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/contracts"
@@ -98,7 +99,7 @@ func TestExhaustionMatchesLaunchExhaustedFixture(t *testing.T) {
 	err := resolveErr(t, r, launch.Request{
 		Preset: "review",
 		Require: []launch.Constraint{
-			{Axis: launch.AxisModelLine, Value: "claude-opus-4", Source: "flag"},
+			{Axis: launch.AxisModelLine, Value: "claude-opus-4"},
 		},
 	})
 
@@ -108,10 +109,49 @@ func TestExhaustionMatchesLaunchExhaustedFixture(t *testing.T) {
 		Operation: "session.launch",
 		Error:     err,
 	})
-	want := fixture(t, "fixtures/duo-external-v1/session-launch-exhausted.json")
+	want := v3Locators(fixture(t, "fixtures/duo-external-v1/session-launch-exhausted.json"))
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("session.launch error envelope does not match the fixture\n got: %#v\nwant: %#v", got, want)
 	}
+}
+
+// v3Locators rewrites the embedded fixture's declaration locators from
+// their v2 spelling to their v3 one.
+//
+// This is duo-config-v3 Risk 6's mitigation, at its narrowest. The embedded
+// contract set is still the pre-v3 one — step 16 syncs step 03's
+// re-authored fixtures, and step 13 is what grows the failure payload to
+// match them (per-reason tallies, the deduced host, the pointer set). Until
+// then the *only* difference between this build's exhaustion envelope and
+// the embedded fixture is that a candidate's declaration locator is now the
+// launch variant it was minted from rather than the composition that no
+// longer exists, so rewriting exactly that prefix keeps the assertion a
+// whole-document equality rather than a weaker field-by-field check.
+//
+// Step 13 deletes this helper and compares against step 03's fixture.
+func v3Locators(doc map[string]any) map[string]any {
+	var walk func(v any) any
+	walk = func(v any) any {
+		switch t := v.(type) {
+		case map[string]any:
+			out := make(map[string]any, len(t))
+			for k, item := range t {
+				out[k] = walk(item)
+			}
+			return out
+		case []any:
+			out := make([]any, 0, len(t))
+			for _, item := range t {
+				out = append(out, walk(item))
+			}
+			return out
+		case string:
+			return strings.Replace(t, "compositions.", "launch_variants.", 1)
+		default:
+			return v
+		}
+	}
+	return walk(doc).(map[string]any)
 }
 
 // TestErrorCodesAreRegistered holds every code this package raises to

@@ -15,12 +15,21 @@
 //   - **Resolution is static.** §7.1 fixes the consulted-input list at the
 //     resolved configuration document, the normalized constraints and their
 //     provenance, the digests of accepted immutable conformance evidence,
-//     and — for explicit random mode only — the recorded draw. Nothing in
-//     this package reads current reachability, process state, selected or
-//     effective runtime configuration, provider, vendor, source model, or
+//     and — for explicit random mode only — the recorded draw. Under
+//     `duo.config/v3` it also fixes the materialized evidence bundle: the
+//     one deduced host and the standing provider snapshot, both taken
+//     *before* resolution by [materialize] and handed in by value. Nothing
+//     in this package reads current reachability, process state, selected
+//     or effective runtime configuration, vendor, source model, or
 //     normalized family, and nothing probes a host or a runtime. Support is
 //     an injected [Support] oracle over installed evidence, never a live
 //     call.
+//
+//   - **A candidate is a join, not a dereference.** `duo.config/v3` removes
+//     the authored composition and late-binds the session host, so each
+//     declared launch variant is joined to the single deduced host and the
+//     join mints the composition name. See docs/launch/decisions.md's
+//     2026-08-24 amendment.
 //
 //   - **Resolution is atomic and whole-plan.** Every leaf and every
 //     cross-leaf relation resolves before anything spawns; ordered and
@@ -44,8 +53,11 @@
 // The package deliberately owns no I/O: no file reads, no SQL, no adapter
 // protocol, and no clock or entropy of its own that a test cannot replace.
 // Durability arrives through [Recorder], host spawning through [HostSet],
-// randomness through [RandomSource], and time and identity through
-// [Options].
+// randomness through [RandomSource], host deduction and provider state
+// through the [materialize.Result] handed to [NewResolver], and time and
+// identity through [Options].
 //
 // See docs/launch/decisions.md for what building this forced.
+//
+// [materialize]: github.com/procrastivity/duo/internal/launch/materialize
 package launch

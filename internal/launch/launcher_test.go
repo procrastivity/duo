@@ -79,7 +79,8 @@ func TestRecordCommitsBeforePrepareLaunch(t *testing.T) {
 
 // TestPreparedLaunchCarriesTheResolvedTuple proves PrepareLaunch receives
 // the already-resolved tuple and nothing else to decide: the record ID, the
-// integration instance, and the launch variant's declared command.
+// integration instance of the host that was deduced for this launch, and
+// the agent runtime's declared command.
 func TestPreparedLaunchCarriesTheResolvedTuple(t *testing.T) {
 	l, _, _ := newTestLauncher(t, scenarioYAML, nil)
 
@@ -104,13 +105,13 @@ func TestPreparedLaunchCarriesTheResolvedTuple(t *testing.T) {
 		t.Fatalf("fake host staged %T, want a host.ResolvedLaunchTuple", prepared.Opaque)
 	}
 	if tuple.Command != "claude" {
-		t.Errorf("command = %q, want the launch variant's declared executable", tuple.Command)
+		t.Errorf("command = %q, want the agent runtime's declared executable", tuple.Command)
 	}
 	if !reflect.DeepEqual(tuple.Args, []string{"--continue"}) {
-		t.Errorf("args = %v, want the launch variant's declared arguments", tuple.Args)
+		t.Errorf("args = %v, want the agent runtime's declared arguments", tuple.Args)
 	}
-	if tuple.IntegrationInstanceID != "local_tmux" {
-		t.Errorf("integration instance = %q, want the declared session host", tuple.IntegrationInstanceID)
+	if tuple.IntegrationInstanceID != testHostInstanceID {
+		t.Errorf("integration instance = %q, want the deduced host %q", tuple.IntegrationInstanceID, testHostInstanceID)
 	}
 	if tuple.WorkspacePath != "/work/example" {
 		t.Errorf("workspace path = %q", tuple.WorkspacePath)

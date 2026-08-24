@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/procrastivity/duo/internal/config"
+	"github.com/procrastivity/duo/internal/launch/materialize"
 )
 
 // timestampLayout matches the store's and the domain's: fixed width, UTC,
@@ -20,6 +21,18 @@ type Options struct {
 	// Support is the installed-evidence oracle. It is required: see
 	// AllSupported for why there is no permissive default.
 	Support Support
+	// HostVersions maps a session-host kind to the pinned external
+	// version string the installed adapter for that kind declares —
+	// `Descriptor().SupportedExternalVersions[0]`, a build constant. It is
+	// the caller's job to supply it because this package holds no adapter
+	// knowledge; it is never probed, never detected, and never read from
+	// configuration (I-3, I-4).
+	//
+	// A kind absent from the map resolves to an empty HostVersion, which
+	// is the honest answer for a host kind this build carries no adapter
+	// for: the SupportKey then names no version, and the Support oracle
+	// refuses it for want of conformance evidence.
+	HostVersions map[string]string
 	// Random is required only to resolve a preset whose selection is
 	// random. A resolver without one refuses such a preset rather than
 	// reaching for a package-level generator.
@@ -41,17 +54,40 @@ type Options struct {
 // the injected Now. That is §7.1's accepted rung — configuration plus
 // installed evidence — made structural rather than promised.
 type Resolver struct {
-	doc    config.DocumentV2
-	digest string
-	opts   Options
+	doc config.DocumentV3
+	// host is the single host instance M1 deduced for this launch, and
+	// bundle is M2's immutable evidence snapshot. Both are values, taken
+	// once at construction: the resolver reads facts that cannot move
+	// under it, which is what makes I-3's purity structural rather than
+	// promised.
+	host                  materialize.DeducedHost
+	bundle                materialize.EvidenceBundle
+	hostVersion           string
+	integrationInstanceID string
+	digest                string
+	opts                  Options
 }
 
-// NewResolver builds a resolver over one already-validated duo.config/v2
-// document.
-func NewResolver(doc config.DocumentV2, opts Options) (*Resolver, error) {
+// NewResolver builds a resolver over one already-validated duo.config/v3
+// document and one completed materialization.
+//
+// mat is M1/M2's output (internal/launch/materialize), produced in the CLI
+// layer *before* resolution. Passing it by value is the whole of I-3: the
+// resolver never asks where the host is, it is told, and it is told once.
+//
+// A materialization that produced no host is refused here rather than
+// resolved against an empty join. The CLI raises the materialization
+// failure (launch.host_unresolved) before it ever reaches this
+// constructor; this refusal exists so a hand-built caller cannot skip that.
+func NewResolver(doc config.DocumentV3, mat materialize.Result, opts Options) (*Resolver, error) {
 	if opts.Support == nil {
 		return nil, errors.New(
 			"launch: NewResolver needs a Support oracle; pass launch.AllSupported{RecordDigest: ...} to declare that installed evidence supports every declaration")
+	}
+	host := mat.Host()
+	if !host.Present() {
+		return nil, errors.New(
+			"launch: NewResolver needs a deduced host; materialization produced none, which the caller reports as launch.host_unresolved before resolving")
 	}
 	defaults := DefaultLimits()
 	if opts.Limits.MaxLeaves <= 0 {
@@ -74,7 +110,15 @@ func NewResolver(doc config.DocumentV2, opts Options) (*Resolver, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Resolver{doc: doc, digest: digest, opts: opts}, nil
+	return &Resolver{
+		doc:                   doc,
+		host:                  host,
+		bundle:                mat.Bundle(),
+		hostVersion:           opts.HostVersions[host.Kind],
+		integrationInstanceID: integrationInstanceIDFor(host),
+		digest:                digest,
+		opts:                  opts,
+	}, nil
 }
 
 // Request is one launch-resolution request: the preset to resolve and the
@@ -108,9 +152,11 @@ type Request struct {
 //
 // The pipeline is §6.7 in order:
 //
-//	1-2. validate and materialize the whole preset;
-//	  3. drop candidates installed evidence or a disabled host declaration
-//	     does not support;
+//	1-2. validate the whole preset and mint a tuple for every candidate by
+//	     joining it to the one host materialization deduced;
+//	  3. drop candidates a disabled host kind, a standing-disabled
+//	     provider, or missing installed conformance evidence rules out, in
+//	     that order;
 //	  4. apply every non-relenting require;
 //	  5. apply every avoid to form the strictly narrowed pools;
 //	  6. enumerate complete assignments in leaf order then array order,
@@ -139,7 +185,7 @@ func (r *Resolver) resolve(req Request) (*Resolution, *Error) {
 		return nil, err
 	}
 
-	p, err := materialize(r.doc, req.Preset, r.opts.Limits)
+	p, err := r.materializePlan(req.Preset, r.opts.Limits)
 	if err != nil {
 		return nil, err
 	}
@@ -186,21 +232,47 @@ func (r *Resolver) resolve(req Request) (*Resolution, *Error) {
 }
 
 // applyInstalledEvidence is §6.7 step 3: drop every candidate that
-// installed evidence or an enabled-host declaration does not support,
-// recording the reason on each. It returns the consulted record digests, in
-// first-consulted order.
+// installed policy, standing state, or installed conformance evidence does
+// not support, recording the stable reason on each. It returns the
+// consulted conformance-record digests, in first-consulted order.
+//
+// v3 runs three checks, in this fixed order (notes/42 §4 step 3):
+//
+//  1. session_host_disabled — the deduced host's *kind* is switched off in
+//     `session_hosts.kinds`. Absent `enabled` means enabled.
+//  2. provider_disabled — the variant's provider tag is standing-disabled
+//     in M2's snapshot. An untagged variant is never affected.
+//  3. no_conformance_evidence — the Support oracle, keyed on
+//     (host kind, host version, runtime kind), does not support the join.
+//
+// The order is not incidental. Each check is cheaper and more categorical
+// than the next, and a candidate is eliminated at most once, so the reason
+// a caller reads is the *first* thing that was actually wrong: a disabled
+// host kind is reported as a disabled host kind, not as missing
+// conformance evidence for a host nobody would have used.
 //
 // This is the one stage that can raise launch.no_eligible_candidate — an
 // installation fact, class unavailable — and it runs strictly before any
 // launch constraint so that an installation gap can never be misreported as
-// a caller's over-narrowing.
+// a caller's over-narrowing. Every reason it assigns is hard: relenting
+// touches ReasonAvoidMatched and nothing else (§6.7 step 8).
+//
+// I-4: nothing here observes anything live. The kind policy is installed
+// configuration, the provider standing is a snapshot taken at M2, and
+// Support is a lookup over immutable records.
 func (r *Resolver) applyInstalledEvidence(p *plan) []string {
 	var digests []string
 	seen := map[string]bool{}
+	hostKindDisabled := r.hostKindDisabled()
 	for _, leaf := range p.leaves {
 		for _, c := range leaf.declared {
-			if r.hostDisabled(c.tuple) {
+			if hostKindDisabled {
 				c.eliminated = ReasonSessionHostDisabled
+				continue
+			}
+			if factID, disabled := r.providerDisabled(c.tuple); disabled {
+				c.eliminated = ReasonProviderDisabled
+				c.providerFactID = factID
 				continue
 			}
 			verdict := r.opts.Support.Supported(c.tuple)
@@ -222,20 +294,47 @@ func (r *Resolver) applyInstalledEvidence(p *plan) []string {
 	return digests
 }
 
-// hostDisabled reports whether the tuple's session-host declaration is
-// marked disabled.
+// hostKindDisabled reports whether the deduced host's kind is switched off
+// in `session_hosts.kinds`.
 //
-// This is installed policy, not a live assertion that the host can be
-// reached (§7.1). `enabled: false` disables; anything else — including the
-// field's absence — leaves the host enabled, because a declaration that
-// says nothing about being enabled is not a declaration that it is off.
-func (r *Resolver) hostDisabled(t Tuple) bool {
-	decl, ok := r.doc.SessionHosts[t.IntegrationInstanceID]
-	if !ok {
+// It is installed policy, not a live assertion that the host can be reached
+// (§7.1). `enabled: false` disables; anything else — an absent flag, or no
+// stanza for the kind at all — leaves the kind enabled, because a
+// declaration that says nothing about being enabled is not a declaration
+// that it is off.
+//
+// The check is per-resolution rather than per-candidate: v3 deduces exactly
+// one host, so either every join is on a disabled kind or none is. It can
+// only fire at all when a rung that bypasses policy produced the host — an
+// explicit --host, since the policy-default rung already skips disabled
+// kinds — which is exactly the
+// contracts/fixtures/duo-external-v1/session-launch-explicit-host.json case.
+func (r *Resolver) hostKindDisabled() bool {
+	k, ok := r.doc.SessionHosts.Kinds[r.host.Kind]
+	if !ok || k.Enabled == nil {
 		return false
 	}
-	enabled, ok := decl["enabled"].(bool)
-	return ok && !enabled
+	return !*k.Enabled
+}
+
+// providerDisabled asks M2's snapshot whether this tuple's provider is
+// standing-disabled, and returns the fact ID that disabled it.
+//
+// An untagged variant (Provider == "") is never affected: provider state is
+// keyed by name, and a variant that names no provider names nothing a
+// `duo provider disable` could have switched off. The fact ID is carried
+// onto the candidate so the record and the exhaustion row can cite the
+// exact fact rather than re-deriving it from a read model that may have
+// moved on.
+func (r *Resolver) providerDisabled(t Tuple) (string, bool) {
+	if t.Provider == "" {
+		return "", false
+	}
+	factID, disabled := r.bundle.ProviderDisabled(t.Provider)
+	if !disabled {
+		return "", false
+	}
+	return string(factID), true
 }
 
 // applyRequire is §6.7 step 4: non-relenting exact-equality narrowing.
@@ -506,6 +605,7 @@ func (r *Resolver) buildRecord(
 				EliminationReason:   c.eliminated,
 				Restored:            c.restored,
 				SupportRecordDigest: c.supportDigest,
+				ProviderFactID:      c.providerFactID,
 			})
 		}
 		rec.Leaves = append(rec.Leaves, rl)
