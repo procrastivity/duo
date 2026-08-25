@@ -363,12 +363,12 @@ func (h *Host) settledBirth(ctx context.Context, paneID string, baseline host.Pr
 		if err != nil {
 			return baseline
 		}
-		switch {
-		case birth.PID == baseline.PID:
+		switch birth.PID {
+		case baseline.PID:
 			// The foreground fell back to the shell; whatever the last
 			// poll saw was transient.
 			candidate = host.ProcessBirthEvidence{}
-		case birth.PID == candidate.PID:
+		case candidate.PID:
 			return birth
 		default:
 			candidate = birth

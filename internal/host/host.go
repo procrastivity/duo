@@ -77,8 +77,6 @@ type HostCandidate struct {
 	DetectedAt time.Time
 }
 
-// ResolvedLaunchTuple is the launch resolver's finished output: one
-// concrete, already-validated assignment the composer hands to
 // LaunchTarget names where in the session host's containment model a
 // launched execution's container is created. Empty means the host's own
 // built-in default. PROVISIONAL (dogfood, 2026-08-24): this field is a
@@ -95,6 +93,8 @@ const (
 	LaunchTargetPane LaunchTarget = "pane"
 )
 
+// ResolvedLaunchTuple is the launch resolver's finished output: one
+// concrete, already-validated assignment the composer hands to
 // HostLauncher.PrepareLaunch. §5.2: "A launch resolver completes launch
 // resolution and records the launch-resolution record before any
 // HostLauncher.PrepareLaunch call. PrepareLaunch receives the
