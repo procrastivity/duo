@@ -1,17 +1,16 @@
 // session.go is the composition root for the `duo session` verb family:
 // internal/registry's session.list, session.inspect, session.enroll,
-// session.detach, session.reattach, and session.launch operations. It
-// wires the CLI directly against internal/domain's Authority kernel (Step
-// 14) and internal/launch's resolver (Step 15) — nothing here re-derives a
-// rule the kernel or the resolver already owns.
+// session.detach, session.reattach, session.launch, session.reconcile,
+// session.archive, and session.remove
+// operations. It wires the CLI directly against internal/domain's Authority
+// kernel (Step 14) and internal/launch's resolver (Step 15) — nothing here
+// re-derives a rule the kernel or the resolver already owns.
 //
-// Recovery has no dedicated verb: decision-01 §5.1 makes "recovering" a
-// derived view, not a durable state, so `session list` and `session show`
-// surface it the same way they surface every other view
-// (domain.Authority.View), and the ordinary detach/reattach verbs are how
-// an operator acts on a recovering session. See docs/registry/decisions.md
-// and notes/30 for why no separate "session recover" operation is
-// registered.
+// "Recovering" remains a derived view (decision-01 §5.1), not a durable
+// state: `session list` and `session show` stay read-only and surface it
+// via domain.Authority.View. `session reconcile` is the explicit write
+// verb that probes host attachments and calls Authority.ResolveRecovery
+// once per recovering instance (notes/48 §2).
 
 package cli
 
@@ -39,7 +38,7 @@ import (
 func sessionCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session",
-		Short: "list, inspect, enroll, launch, detach, and reattach duo sessions",
+		Short: "list, inspect, enroll, launch, detach, reattach, reconcile, archive, and remove duo sessions",
 	}
 
 	cmd.AddCommand(sessionListCommand(streams))
@@ -48,6 +47,9 @@ func sessionCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd.AddCommand(sessionLaunchCommand(streams))
 	cmd.AddCommand(sessionDetachCommand(streams))
 	cmd.AddCommand(sessionReattachCommand(streams))
+	cmd.AddCommand(sessionReconcileCommand(streams))
+	cmd.AddCommand(sessionArchiveCommand(streams))
+	cmd.AddCommand(sessionRemoveCommand(streams))
 	return cmd
 }
 

@@ -174,11 +174,15 @@ func (f *fakeHerdr) handle(conn net.Conn) {
 }
 
 func (f *fakeHerdr) serveSubscription(conn net.Conn, id string) {
-	f.respond(conn, id, map[string]any{"type": "subscription_started"})
+	// Register before the ack. subscribe() returns as soon as it reads
+	// subscription_started; emitEvent after that return must already see
+	// this conn, or the event is dropped and stream.next() blocks until
+	// the suite timeout (TestSubscribeStreamsOnOneConnection).
 	f.mu.Lock()
 	backfill := append([]string(nil), f.backfill...)
 	f.subscribers = append(f.subscribers, conn)
 	f.mu.Unlock()
+	f.respond(conn, id, map[string]any{"type": "subscription_started"})
 
 	// Partial, indistinguishable-from-real backfill, exactly as 0.8.2
 	// replays it: only API-created panes of this server run, never a
@@ -222,12 +226,14 @@ func (f *fakeHerdr) dispatch(method string, params json.RawMessage) (any, *wireE
 		if !ok {
 			return nil, &wireError{Code: CodePaneNotFound, Message: "pane " + p.PaneID + " not found"}
 		}
+		fg := []map[string]any{}
+		if pane.fgPID > 0 {
+			fg = append(fg, map[string]any{"pid": pane.fgPID, "name": "fake"})
+		}
 		return map[string]any{"type": "pane_process_info", "process_info": map[string]any{
-			"pane_id":   pane.paneID,
-			"shell_pid": pane.shellPID,
-			"foreground_processes": []map[string]any{
-				{"pid": pane.fgPID, "name": "fake"},
-			},
+			"pane_id":              pane.paneID,
+			"shell_pid":            pane.shellPID,
+			"foreground_processes": fg,
 		}}, nil
 	case "workspace.create":
 		var p workspaceCreateParams

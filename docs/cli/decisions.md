@@ -130,15 +130,16 @@ ever calls `domain.Authority.ResolveRecovery` — that verb needs real host
 evidence (a live Herdr probe proving the same process birth), which is
 Step 22 and the host-adapter (17) seam's job, not Step 21's (14, 15).
 
-Net effect for the dogfood checkpoint: today, `duo session list` will show
+Net effect for the dogfood checkpoint at Step 21: `duo session list` showed
 a session an operator just launched or enrolled as `recovering` on every
-subsequent command, never `attached`, until something wires a
-`ResolveRecovery` call against live Herdr evidence. This is flagged here
-for Step 22 (which owns `ResolveRecovery`'s real caller) and Step 23 (the
-re-targeted Stage 1 exit gate) to pick up explicitly — it is not a bug in
-this step's CLI wiring, but it is a real gap between "the CLI surfaces
-recovery" (done) and "recovery resolves back to normal use" (not yet
-reachable from any verb this step registers).
+subsequent command, never `attached`, until something wired a
+`ResolveRecovery` call against live Herdr evidence. This was flagged here
+for Step 22 (which owned `ResolveRecovery`'s real caller) and Step 23 (the
+re-targeted Stage 1 exit gate). **Closed 2026-08-25 (duo-dogfood-recovery):**
+`duo session reconcile` is that caller; see the recovery lock and
+"Implemented 2026-08-25" note below. The one-shot CLI still derives
+`recovering` on every open until reconcile clears it — that behavior is
+unchanged; only the explicit verb to clear it was missing at Step 21.
 
 ## `session enroll` is flag-driven, not Discover-driven
 
@@ -318,6 +319,10 @@ here would find out only when detach refuses.
   on. Making that per-leaf is a kernel change to how a session points at
   its attachments, not a CLI one
   (`TestEveryLeafOfOneLaunchIsAttached` pins today's behaviour).
+  **Narrowed 2026-08-25 (duo-dogfood-recovery):** `session show` and
+  `session reconcile` walk the full attachment collection. Detach and
+  reattach still act on `Session.Attachment` (last leaf). See the
+  recovery lock below.
 - **Reattach's fingerprint is not readable from any verb.** `duo session
   show` reports lifecycle, view, and instance state, not the attachment's
   epoch, container, or process birth, so an operator cannot look up the
@@ -326,3 +331,82 @@ here would find out only when detach refuses.
   evidence knows. Surfacing them on `session show` is the obvious next
   step, and it is a projection-contract question this entry does not
   settle.
+  **Closed 2026-08-25 (duo-dogfood-recovery):** `session show` prints each
+  attachment's fingerprint and a pasteable reattach command when the
+  rebuilt claim is held. See the recovery lock below.
+
+## Recovery, reattach fingerprints, and prune (2026-08-25)
+
+Locked by wip matter `duo-dogfood-recovery` step 01 against the airgapped
+dogfood findings. Planning record:
+`terminal-multiplexers/notes/48-dogfood-recovery-semantics.md`. Later
+implementation steps do not reopen these choices without a finding.
+
+This is the composition-root caller that the "one-shot CLI recovering
+view" gap above assigned to Step 22. The domain kernel already has
+`ResolveRecovery`; this matter wires it.
+
+**Data shape.** `HostAttachment` carries `Process ProcessBirth`. Old
+facts without the field load as zero (unknown). Instance-scoped
+`process.birth` correlations remain written but are not a pairing key;
+never pair them to attachments by creation order. `session.inspect` JSON
+gains `attachments` (an array, one object per current attachment). There
+is no singular `attachment` field — none exists to keep compatible.
+`Session.Attachment` stays the last-bound pointer for detach/reattach.
+
+**Show.** For each attachment: id, state, integration instance, epoch
+(kind/value/scope), container, process PID and millisecond UTC start
+when known, whether this session holds the rebuilt claim, and a one-line
+`reattach with:` command only when that claim is verified. Process flags
+only when they belong to the claim. Degraded enrolled records omit
+process flags and may still print a valid command. Old multi-leaf
+records whose births cannot be paired print known fields, omit the
+command, and mark continuity unverified.
+
+**Reconcile is explicit.** `duo session reconcile [<session-id>…]` is the
+first lifecycle path. No IDs means every recovering instance; IDs select
+recovering instances of those sessions. List and show stay read-only.
+List hints when recovering is non-empty; doctor reports the count. A
+missing Herdr socket is `RecoveryUnreachable`, not exited. Agent-side
+exit hooks are not the primary path. Automatic reconciliation on read
+verbs is out of scope.
+
+**Per-attachment mapping.** Unreachable host → unreachable. Pane absent →
+exited. Terminal identity changed → replaced. Same terminal, same proven
+process birth → same-live. Same terminal, different or unproven live
+birth → replaced. A surviving pane with no claimed agent (idle shell, or
+Herdr's `pidFor` falling back to `ShellPID`, or PID ≤ 0) is **replaced,
+never exited**. Exit requires pane absence. Herdr does not currently
+prove "no foreground process" as a distinct state; if the adapter later
+distinguishes it, that outcome still maps to replaced.
+
+**Multi-leaf instance table.** Probe every attachment, then one
+`ResolveRecovery` call: any unreachable → `RecoveryUnreachable`; else
+all same-live → `RecoverySameLive`; else all pane-absent →
+`RecoveryExited`; else mixed / replaced / process-mismatch →
+`RecoveryReplaced`. Do not retain the old live identity on mixed
+evidence.
+
+**Prune.** `duo session archive <id>` requires inactive and no live
+instance. `duo session remove <id>` requires archived. Removed sessions
+are showable tombstones and hidden from list by default. No bulk flag.
+
+### Implemented 2026-08-25
+
+The recovery lock above is wired in the CLI on the `go` branch:
+
+- **`duo session reconcile`** — composition-root caller for
+  `Authority.ResolveRecovery` (closes the gap that assigned "Step 22 owns
+  `ResolveRecovery`'s real caller" in the "Recovery has no dedicated verb"
+  section above; **closed 2026-08-25**, caller is `duo session reconcile`).
+- **`duo session archive`** / **`duo session remove`** — prune ladder on
+  the write authority.
+- **`duo session show`** — `attachments[]` in JSON; text mode prints one
+  block per attachment and a pasteable `reattach with:` line when the
+  claim is held.
+- **`duo session list`** — omits removed sessions; prints a one-line hint
+  when `Recovering()` is non-empty.
+- **`duo doctor`** — `recovering_instances` count.
+
+List and show remain read-only. Reconcile is explicit; there is no
+automatic reconciliation on read verbs.

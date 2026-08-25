@@ -13,7 +13,7 @@ because the configuration and installation contracts sanction them there.
 | File | Contract point |
 |---|---|
 | `session-list.json` | Opaque identity, current condition summary, and support links. |
-| `session-inspect.json` | Runtime-instance identity, condition, and operation support. |
+| `session-inspect.json` | Runtime-instance identity, condition, operation support, and per-attachment show records (`attachments[]` with optional `process_birth` and pasteable `reattach_command`). |
 | `conversation-page.json` | Completed content blocks, page token, and stream barrier. |
 | `condition-stream-item.json` | View revision and resume position remain separate. |
 | `prompt-queued.json` | Queueing does not claim delivery, activity, or acknowledgment. |

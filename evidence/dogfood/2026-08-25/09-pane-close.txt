@@ -1,0 +1,3 @@
+$ herdr pane close w3:p2
+{"id":"cli:pane:close","result":{"type":"ok"}}
+exit=0

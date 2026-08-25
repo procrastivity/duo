@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/buildinfo"
@@ -63,7 +64,7 @@ func sessionDescriptor(t *testing.T, verb ...string) registry.Descriptor {
 // the same discipline TestDoctorCommand_CLIPathMatchesRegistry uses.
 func TestSessionCLIPathsMatchRegistry(t *testing.T) {
 	for _, verb := range [][]string{
-		{"list"}, {"show"}, {"enroll"}, {"detach"}, {"reattach"}, {"launch"},
+		{"list"}, {"show"}, {"enroll"}, {"detach"}, {"reattach"}, {"launch"}, {"reconcile"}, {"archive"}, {"remove"},
 	} {
 		d := sessionDescriptor(t, verb...)
 		root := NewRootCommand(iostreams.System(), buildinfo.Info{})
@@ -177,6 +178,84 @@ func enrollFixtureArgs(root string) []string {
 	}
 }
 
+func enrollDegradedFixtureArgs(root string) []string {
+	return []string{
+		"session", "enroll", "--output", "json",
+		"--root-path", root,
+		"--integration-instance", "test-herdr",
+		"--epoch-kind", "herdr.terminal_id",
+		"--epoch-value", "term-degraded",
+		"--epoch-scope", "pane",
+		"--container", "pane-degraded",
+	}
+}
+
+func TestSessionEnroll_DegradedShowReattachWithoutProcessFlags(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	root := t.TempDir()
+
+	code, out, errOut := runSession(t, enrollDegradedFixtureArgs(root)...)
+	if code != exitcode.Success {
+		t.Fatalf("enroll: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var enrolled enrollEnvelope
+	if err := json.Unmarshal([]byte(out), &enrolled); err != nil {
+		t.Fatalf("enroll output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	sessionID := enrolled.Result.SessionID
+
+	code, out, errOut = runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var shown struct {
+		Result sessionInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show output is not valid JSON: %v", err)
+	}
+	if len(shown.Result.Attachments) != 1 {
+		t.Fatalf("attachments = %d, want 1", len(shown.Result.Attachments))
+	}
+	att := shown.Result.Attachments[0]
+	if att.ProcessBirth != nil {
+		t.Errorf("process_birth = %+v, want omitted for degraded enrollment", att.ProcessBirth)
+	}
+	if att.ReattachCommand == "" {
+		t.Fatal("reattach_command empty, want a pasteable command without process flags")
+	}
+	if strings.Contains(att.ReattachCommand, "--process-pid") {
+		t.Errorf("reattach_command must not contain --process-pid: %q", att.ReattachCommand)
+	}
+	if !att.ClaimHeld && att.ReattachCommand != "" {
+		t.Errorf("claim_held=false but reattach_command=%q", att.ReattachCommand)
+	}
+
+	code, out, errOut = runSession(t, "session", "detach", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("detach: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+
+	reattachArgs := append(reattachArgsFromPrintedCommand(t, att.ReattachCommand), "--output", "json")
+	code, out, errOut = runSession(t, reattachArgs...)
+	if code != exitcode.Success {
+		t.Fatalf("reattach: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var reattached struct {
+		Result sessionAttachmentResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &reattached); err != nil {
+		t.Fatalf("reattach output is not valid JSON: %v", err)
+	}
+	if reattached.Result.AttachmentState != "attached" {
+		t.Errorf("reattach: attachment_state = %q, want attached", reattached.Result.AttachmentState)
+	}
+}
+
 func TestSessionEnroll_ThenListShowDetachReattach(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	root := t.TempDir()
@@ -272,6 +351,18 @@ func TestSessionEnroll_ThenListShowDetachReattach(t *testing.T) {
 	if shown.Result.View != "recovering" {
 		t.Errorf("show: view = %q, want recovering", shown.Result.View)
 	}
+	if len(shown.Result.Attachments) != 1 {
+		t.Fatalf("show: attachments = %d, want 1", len(shown.Result.Attachments))
+	}
+	if !shown.Result.Attachments[0].ClaimHeld {
+		t.Error("show: claim_held = false, want true")
+	}
+	if shown.Result.Attachments[0].ReattachCommand == "" {
+		t.Error("show: reattach_command empty after enroll with process birth")
+	}
+	if !strings.Contains(shown.Result.Attachments[0].ReattachCommand, "--process-pid 4242") {
+		t.Errorf("show: reattach_command = %q, want process-pid 4242", shown.Result.Attachments[0].ReattachCommand)
+	}
 
 	// show, human mode: a stable, non-empty rendering.
 	code, out, errOut = runSession(t, "session", "show", sessionID)
@@ -281,6 +372,9 @@ func TestSessionEnroll_ThenListShowDetachReattach(t *testing.T) {
 	wantPrefix := fmt.Sprintf("session:            %s\n", sessionID)
 	if len(out) < len(wantPrefix) || out[:len(wantPrefix)] != wantPrefix {
 		t.Errorf("show text = %q, want it to start with %q", out, wantPrefix)
+	}
+	if !strings.Contains(out, "reattach with: "+shown.Result.Attachments[0].ReattachCommand) {
+		t.Errorf("show text missing reattach with: line matching JSON:\n%s", out)
 	}
 
 	// detach.

@@ -236,6 +236,30 @@ var table = []Descriptor{
 
 	// --- Contract-attested v1 surface beyond the milestone (data rows) ---
 	{
+		Name:           "session.reconcile",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"session.manage"},
+		Idempotency:    IdempotencyRequired,
+		Audit:          AuditPrivilegedWrite,
+		CLI:            []string{"session", "reconcile"},
+		MCPTool:        "",
+		Route:          nil,
+	},
+	{
+		Name:           "session.archive",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"session.manage"},
+		Idempotency:    IdempotencyRequired,
+		Audit:          AuditPrivilegedWrite,
+		CLI:            []string{"session", "archive"},
+		MCPTool:        "", // MCP omits session archival (projection contract §3.1)
+		Route:          nil,
+	},
+	{
 		Name:           "session.remove",
 		Projectability: LocalAdmin,
 		RequestSchema:  externalV1,

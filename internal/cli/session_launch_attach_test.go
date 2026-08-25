@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -143,6 +142,18 @@ func (l *recordingLauncher) Start(ctx context.Context, prepared host.PreparedHos
 	return evidence, err
 }
 
+// reattachArgsFromPrintedCommand splits a show-projected `duo session reattach …`
+// line into argv after the leading "duo" token. strings.Fields is safe here
+// because reattach flag values never contain spaces.
+func reattachArgsFromPrintedCommand(t *testing.T, printed string) []string {
+	t.Helper()
+	fields := strings.Fields(printed)
+	if len(fields) < 2 || fields[0] != "duo" {
+		t.Fatalf("reattach_command = %q, want it to start with duo", printed)
+	}
+	return fields[1:]
+}
+
 // attachmentOf returns the host attachment a session currently holds.
 func attachmentOf(t *testing.T, a *domain.Authority, id string) (domain.HostAttachment, bool) {
 	t.Helper()
@@ -200,6 +211,78 @@ func TestLaunchRecordsTheHostAttachmentFromItsOwnSpawn(t *testing.T) {
 	}
 	if string(claim.Session) != report.SessionID {
 		t.Errorf("the live-runtime claim is held by %s, want the launched session %s", claim.Session, report.SessionID)
+	}
+}
+
+// TestShowPrintsReattachCommandAfterLaunch is the step-05 smoke: after a
+// launched bind, session show JSON carries attachments[] with a pasteable
+// reattach_command built from the stored fingerprint — no manual flag
+// discovery. Full detach→printed-command reattach acceptance is step 06.
+func TestShowPrintsReattachCommandAfterLaunch(t *testing.T) {
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	hosts := newRecordingHosts()
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	if len(hosts.seen) != 1 {
+		t.Fatalf("the launch spawned %d leaves, want 1", len(hosts.seen))
+	}
+	sessionID := report.SessionID
+	evidence := hosts.seen[0]
+	wantStarted := evidence.ProcessBirth.StartTime.UTC().Format(materialize.CaptureTimeLayout)
+	wantCommand := reattachCommand(sessionID, liveRuntimeFingerprint(herdr.AdapterID, evidence))
+	h.close()
+
+	code, out, errOut := runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var shown struct {
+		Result sessionInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show output is not valid JSON: %v", err)
+	}
+	if len(shown.Result.Attachments) != 1 {
+		t.Fatalf("attachments = %d, want 1", len(shown.Result.Attachments))
+	}
+	att := shown.Result.Attachments[0]
+	if !att.ClaimHeld {
+		t.Error("claim_held = false, want true for the launched session's own claim")
+	}
+	if att.ProcessBirth == nil {
+		t.Fatal("process_birth omitted, want the spawn's PID and start time")
+	}
+	if att.ProcessBirth.PID != evidence.ProcessBirth.PID || att.ProcessBirth.StartedAt != wantStarted {
+		t.Errorf("process_birth = %+v, want pid %d started %s",
+			att.ProcessBirth, evidence.ProcessBirth.PID, wantStarted)
+	}
+	if att.ReattachCommand != wantCommand {
+		t.Errorf("reattach_command = %q\nwant %q", att.ReattachCommand, wantCommand)
+	}
+	if strings.Contains(att.ReattachCommand, "--process-host") ||
+		strings.Contains(att.ReattachCommand, "--process-executable") {
+		t.Errorf("reattach_command must not emit host/executable flags: %q", att.ReattachCommand)
+	}
+	if !strings.Contains(att.ReattachCommand, "--process-pid") ||
+		!strings.Contains(att.ReattachCommand, "--process-started-at") {
+		t.Errorf("reattach_command missing process flags: %q", att.ReattachCommand)
+	}
+
+	code, out, errOut = runSession(t, "session", "show", sessionID)
+	if code != exitcode.Success {
+		t.Fatalf("show text: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	wantLine := "reattach with: " + wantCommand + "\n"
+	if !strings.Contains(out, wantLine) {
+		t.Errorf("show text missing one-line reattach with:\n%s", out)
+	}
+	if strings.Count(out, "reattach with:") != 1 {
+		t.Errorf("want exactly one reattach with: line, got:\n%s", out)
 	}
 }
 
@@ -299,6 +382,40 @@ func TestEveryLeafOfOneLaunchIsAttached(t *testing.T) {
 		}
 	}
 
+	h.close()
+	code, out, errOut := runSession(t, "session", "show", report.SessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var shown struct {
+		Result sessionInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show output is not valid JSON: %v", err)
+	}
+	if len(shown.Result.Attachments) != 2 {
+		t.Fatalf("attachments = %d, want 2 (one per spawned leaf)", len(shown.Result.Attachments))
+	}
+	paneSet := map[string]bool{hosts.seen[0].PaneID: true, hosts.seen[1].PaneID: true}
+	for _, att := range shown.Result.Attachments {
+		if !paneSet[att.Container] {
+			t.Errorf("attachment container = %q, want one of the spawned panes", att.Container)
+		}
+		if att.ProcessBirth == nil {
+			t.Errorf("attachment %s: process_birth omitted, want spawn PID and start time", att.AttachmentID)
+		}
+		if att.ReattachCommand == "" {
+			t.Errorf("attachment %s: reattach_command empty, want a pasteable command", att.AttachmentID)
+		}
+		if !att.ClaimHeld && att.ReattachCommand != "" {
+			t.Errorf("attachment %s: claim_held=false but reattach_command=%q", att.AttachmentID, att.ReattachCommand)
+		}
+		if att.ClaimHeld && !strings.Contains(att.ReattachCommand, "--process-pid") {
+			t.Errorf("attachment %s: reattach_command missing process flags: %q", att.AttachmentID, att.ReattachCommand)
+		}
+	}
+
 	attachment, ok := attachmentOf(t, h.authority, report.SessionID)
 	if !ok {
 		t.Fatal("a two-leaf launch recorded no attachment at all")
@@ -367,7 +484,35 @@ func TestDetachAndReattachSucceedOnALaunchedSession(t *testing.T) {
 	// process in real use.
 	h.close()
 
-	code, out, errOut := runSession(t, "session", "detach", sessionID, "--output", "json")
+	code, out, errOut := runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var shown struct {
+		Result sessionInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show output is not valid JSON: %v", err)
+	}
+	if len(shown.Result.Attachments) != 1 {
+		t.Fatalf("attachments = %d, want 1", len(shown.Result.Attachments))
+	}
+	reattachCmd := shown.Result.Attachments[0].ReattachCommand
+	if reattachCmd == "" {
+		t.Fatal("reattach_command empty before detach, want the pasteable success path")
+	}
+
+	code, out, errOut = runSession(t, "session", "show", sessionID)
+	if code != exitcode.Success {
+		t.Fatalf("show text: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
+	}
+	wantLine := "reattach with: " + reattachCmd + "\n"
+	if !strings.Contains(out, wantLine) {
+		t.Errorf("show text missing one-line reattach with matching JSON:\n%s", out)
+	}
+
+	code, out, errOut = runSession(t, "session", "detach", sessionID, "--output", "json")
 	if code != exitcode.Success {
 		t.Fatalf("detach: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
 	}
@@ -382,19 +527,8 @@ func TestDetachAndReattachSucceedOnALaunchedSession(t *testing.T) {
 		t.Errorf("detach: attachment_state = %q, want detached", detached.Result.AttachmentState)
 	}
 
-	// Reattach revalidates the same live runtime. The flags are the spawn's
-	// own evidence, spelled the way `duo session enroll` documents them:
-	// the epoch value is the terminal_id, the container is the pane_id.
-	evidence := hosts.seen[0]
-	code, out, errOut = runSession(t, "session", "reattach", sessionID, "--output", "json",
-		"--integration-instance", evidence.IntegrationInstanceID,
-		"--epoch-kind", herdrEpochKind,
-		"--epoch-value", evidence.HostContainerID,
-		"--epoch-scope", string(domain.EpochScopePane),
-		"--container", evidence.PaneID,
-		"--process-pid", strconv.Itoa(evidence.ProcessBirth.PID),
-		"--process-started-at", evidence.ProcessBirth.StartTime.UTC().Format(materialize.CaptureTimeLayout),
-	)
+	reattachArgs := append(reattachArgsFromPrintedCommand(t, reattachCmd), "--output", "json")
+	code, out, errOut = runSession(t, reattachArgs...)
 	if code != exitcode.Success {
 		t.Fatalf("reattach: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
 	}
@@ -411,6 +545,7 @@ func TestDetachAndReattachSucceedOnALaunchedSession(t *testing.T) {
 
 	// A pane that now holds a different execution is a new runtime instance,
 	// not a reattach: the revalidation is real, not a formality.
+	evidence := hosts.seen[0]
 	code, _, errOut = runSession(t, "session", "detach", sessionID)
 	if code != exitcode.Success {
 		t.Fatalf("second detach: exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)

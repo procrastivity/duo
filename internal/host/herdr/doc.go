@@ -55,12 +55,15 @@
 //	                         pane shell when the pane is idle) plus a kernel
 //	                         start time read from procfs.
 //
-// ValidateAttachment reports SameProcess only when the live terminal_id
-// still matches the claim *and* both sides carry proven process birth
-// (PID plus a kernel start time from the same source). Herdr's
-// process_info returns no start time, so an unproven birth is reported as
-// SameProcess false — "cannot prove" resolves to "new runtime instance",
-// never to a silent merge.
+// ValidateAttachment reports a typed ContinuityClass (and SameProcess
+// only for ContinuitySameLive) when the live terminal_id still matches
+// the claim *and* both sides carry proven process birth (PID plus a
+// kernel start time from the same source). Herdr's process_info returns
+// no start time, so an unproven birth is ContinuityUnproven —
+// "cannot prove" resolves to "new runtime instance", never to a silent
+// merge. Dial, timeout, and missing-socket failures are host.ErrUnreachable,
+// not a class and not pane absence. Empty foreground is not a class:
+// pidFor falls back to ShellPID.
 //
 // # No writer presence, no composer lease
 //

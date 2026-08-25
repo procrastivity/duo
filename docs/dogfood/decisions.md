@@ -26,3 +26,18 @@ Friction routing: an implementation-repo decision goes to the owning
 the locked planning set becomes a ledger contradiction record in the
 planning repo per the handoff-22 change control. Nothing routes through
 chat.
+
+## 2026-08-25 — Recovery and prune verbs (duo-dogfood-recovery)
+
+Checkpoint verbs now include **`reconcile`**, **`archive`**, and
+**`remove`** in addition to launch, list, show, detach, and reattach.
+
+Fingerprints for the detach→reattach drill come from **`duo session show`**
+(copy the `reattach with:` line), not from `herdr pane list`. Process birth
+on launched sessions is part of the claim.
+
+Operator procedure: `docs/dogfood/procedure.md`. Evidence convention is
+unchanged — one directory per day under `evidence/dogfood/<YYYY-MM-DD>/`.
+Recovery fixture traces live under `evidence/traces/recovery/`.
+
+Reconcile is explicit; list and show do not write recovery facts.

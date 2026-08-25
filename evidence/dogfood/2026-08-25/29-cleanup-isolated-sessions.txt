@@ -1,0 +1,32 @@
+$ herdr pane close w3:p3
+{"id":"cli:pane:close","result":{"type":"ok"}}
+exit=0
+
+$ herdr pane close w3:p4
+{"id":"cli:pane:close","result":{"type":"ok"}}
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session reconcile ses_35919b6c780306ac4e7e12d652a499c0 ses_09a40a00b809347b6c2fae7978a3efdd
+ses_35919b6c780306ac4e7e12d652a499c0 ri_0141c2b2fd3f02363740cb3fa55a1967 -> exited ([1] pane absent; [2] pane absent)
+ses_09a40a00b809347b6c2fae7978a3efdd ri_d39a992d12c988c2773a78eb1143884a -> replaced (no attachments to probe)
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session archive ses_35919b6c780306ac4e7e12d652a499c0 --reason dogfood-recovery-gate
+session ses_35919b6c780306ac4e7e12d652a499c0: archived
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session remove ses_35919b6c780306ac4e7e12d652a499c0 --reason dogfood-recovery-gate
+session ses_35919b6c780306ac4e7e12d652a499c0: removed
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session archive ses_09a40a00b809347b6c2fae7978a3efdd --reason dogfood-recovery-gate
+session ses_09a40a00b809347b6c2fae7978a3efdd: archived
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session remove ses_09a40a00b809347b6c2fae7978a3efdd --reason dogfood-recovery-gate
+session ses_09a40a00b809347b6c2fae7978a3efdd: removed
+exit=0
+
+$ /home/dev/Code/duo-vnext/bin/duo session list
+no duo sessions
+exit=0

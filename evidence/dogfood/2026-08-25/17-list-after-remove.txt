@@ -1,0 +1,5 @@
+$ /home/dev/Code/duo-vnext/bin/duo session list
+SESSION                               WORKSPACE                            LIFECYCLE  VIEW        RUNTIME INSTANCE
+ses_09a40a00b809347b6c2fae7978a3efdd  ws_1c4441065b8be479ed8fc1619d735da6  active     recovering  ri_d39a992d12c988c2773a78eb1143884a
+1 session await reconciliation; run duo session reconcile
+exit=0

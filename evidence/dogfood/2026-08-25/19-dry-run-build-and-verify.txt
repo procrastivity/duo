@@ -1,0 +1,9 @@
+$ /home/dev/Code/duo-vnext/bin/duo session launch build_and_verify --dry-run --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --target tab --close-on-exit
+preview only: no session, no durable record, no spawn
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=explicit-flag)
+  outranked workspace-correlation: herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+selection: ordered
+  builder: claude / sonnet-5 (open) -> selected
+  verifier: pi / gpt-5.6-terra (open) -> selected
+exit=0

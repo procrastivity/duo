@@ -1,0 +1,10 @@
+$ /home/dev/Code/duo-vnext/bin/duo session launch build_and_verify --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --target tab --close-on-exit
+session:  ses_35919b6c780306ac4e7e12d652a499c0
+record:   lrr_0ca9ae9dc260d47a8a7cb4dedeee3b03
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=explicit-flag)
+  outranked workspace-correlation: herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+selection: ordered
+  builder: claude / sonnet-5 (open) -> selected
+  verifier: pi / gpt-5.6-terra (open) -> selected
+exit=0

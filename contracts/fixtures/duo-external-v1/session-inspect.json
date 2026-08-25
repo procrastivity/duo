@@ -6,6 +6,7 @@
     "session_id": "ses_fixture_1",
     "workspace_id": "wsp_fixture_1",
     "lifecycle": "active",
+    "view": "attached",
     "runtime_instance_id": "run_fixture_1",
     "condition": {
       "value": "idle",
@@ -18,6 +19,25 @@
       "determining_observations": ["obs_fixture_1"],
       "reasons": []
     },
+    "attachments": [
+      {
+        "attachment_id": "att_fixture_1",
+        "state": "attached",
+        "integration_instance": "herdr:fixture",
+        "epoch": {
+          "kind": "herdr.terminal_id",
+          "value": "term_fixture_1",
+          "scope": "pane"
+        },
+        "container": "w3:p2",
+        "process_birth": {
+          "pid": 41210,
+          "started_at": "2026-08-24T18:31:07.412Z"
+        },
+        "claim_held": true,
+        "reattach_command": "duo session reattach ses_fixture_1 --integration-instance herdr:fixture --epoch-kind herdr.terminal_id --epoch-value term_fixture_1 --epoch-scope pane --container w3:p2 --process-pid 41210 --process-started-at 2026-08-24T18:31:07.412Z"
+      }
+    ],
     "operations": [
       {
         "operation": "prompt.deliver",

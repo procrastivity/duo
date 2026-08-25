@@ -1,0 +1,8 @@
+$ /home/dev/Code/duo-vnext/bin/duo session launch orchestrator --host herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --target tab --close-on-exit
+session:  ses_523b6770420b0270b2823665dbe864d8
+record:   lrr_73727e251329f171bbc45c48ccf814a3
+host:      herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (host_source=explicit-flag)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+selection: ordered
+  main: claude / fable-5 (determined) -> selected
+exit=0

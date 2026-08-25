@@ -1,0 +1,82 @@
+== before: list + show ==
+$ /home/dev/Code/duo-vnext/bin/duo session list
+SESSION                               WORKSPACE                            LIFECYCLE  VIEW        RUNTIME INSTANCE
+ses_09a40a00b809347b6c2fae7978a3efdd  ws_1c4441065b8be479ed8fc1619d735da6  active     recovering  ri_d39a992d12c988c2773a78eb1143884a
+ses_35919b6c780306ac4e7e12d652a499c0  ws_1c4441065b8be479ed8fc1619d735da6  active     recovering  ri_0141c2b2fd3f02363740cb3fa55a1967
+2 sessions await reconciliation; run duo session reconcile
+
+$ /home/dev/Code/duo-vnext/bin/duo session show ses_35919b6c780306ac4e7e12d652a499c0
+session:            ses_35919b6c780306ac4e7e12d652a499c0
+workspace:          ws_1c4441065b8be479ed8fc1619d735da6
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_0141c2b2fd3f02363740cb3fa55a1967
+instance state:     starting
+owner:              cli
+quarantined:        false
+
+attachment:         att_367979b55e0bae5a4e35335e439fc749
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55dda1a4711 (pane)
+container:          w3:p3
+process birth:      pid 4080192 started 2026-08-25T20:58:36.620Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55dda1a4711 --epoch-scope pane --container w3:p3 --process-pid 4080192 --process-started-at 2026-08-25T20:58:36.620Z
+
+attachment:         att_e1b4a1f218e66c0131585642a5ae38d4
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55de20db112 (pane)
+container:          w3:p4
+process birth:      pid 4080438 started 2026-08-25T20:58:37.190Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55de20db112 --epoch-scope pane --container w3:p4 --process-pid 4080438 --process-started-at 2026-08-25T20:58:37.190Z
+
+== hide socket ==
+$ mv /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock.dogfood-gate-bak
+sock exists? no
+bak exists? yes
+
+$ /home/dev/Code/duo-vnext/bin/duo session reconcile ses_35919b6c780306ac4e7e12d652a499c0
+ses_35919b6c780306ac4e7e12d652a499c0 ri_0141c2b2fd3f02363740cb3fa55a1967 -> unreachable ([1] host unreachable: host unreachable: stat /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock: no such file or directory; [2] host unreachable: host unreachable: stat /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock: no such file or directory)
+exit=0
+
+== after unreachable: list + show ==
+$ /home/dev/Code/duo-vnext/bin/duo session list
+SESSION                               WORKSPACE                            LIFECYCLE  VIEW        RUNTIME INSTANCE
+ses_09a40a00b809347b6c2fae7978a3efdd  ws_1c4441065b8be479ed8fc1619d735da6  active     recovering  ri_d39a992d12c988c2773a78eb1143884a
+ses_35919b6c780306ac4e7e12d652a499c0  ws_1c4441065b8be479ed8fc1619d735da6  active     recovering  ri_0141c2b2fd3f02363740cb3fa55a1967
+2 sessions await reconciliation; run duo session reconcile
+
+$ /home/dev/Code/duo-vnext/bin/duo session show ses_35919b6c780306ac4e7e12d652a499c0
+session:            ses_35919b6c780306ac4e7e12d652a499c0
+workspace:          ws_1c4441065b8be479ed8fc1619d735da6
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_0141c2b2fd3f02363740cb3fa55a1967
+instance state:     starting
+owner:              cli
+quarantined:        false
+
+attachment:         att_367979b55e0bae5a4e35335e439fc749
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55dda1a4711 (pane)
+container:          w3:p3
+process birth:      pid 4080192 started 2026-08-25T20:58:36.620Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55dda1a4711 --epoch-scope pane --container w3:p3 --process-pid 4080192 --process-started-at 2026-08-25T20:58:36.620Z
+
+attachment:         att_e1b4a1f218e66c0131585642a5ae38d4
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55de20db112 (pane)
+container:          w3:p4
+process birth:      pid 4080438 started 2026-08-25T20:58:37.190Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55de20db112 --epoch-scope pane --container w3:p4 --process-pid 4080438 --process-started-at 2026-08-25T20:58:37.190Z
+
+== restore socket ==
+$ mv /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock.dogfood-gate-bak /home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+sock exists? yes

@@ -1,0 +1,3 @@
+$ /home/dev/Code/duo-vnext/bin/duo session reattach ses_523b6770420b0270b2823665dbe864d8 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e54e701e2010 --epoch-scope pane --container w3:p2 --process-pid 4074550 --process-started-at 2026-08-25T20:54:18.050Z
+session ses_523b6770420b0270b2823665dbe864d8: attachment attached
+exit=0

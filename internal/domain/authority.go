@@ -353,6 +353,20 @@ func (a *Authority) Attachment(id AttachmentID) (HostAttachment, bool) {
 	return *at, true
 }
 
+// Attachments lists every host attachment whose Session matches, in
+// attachment-ID order. Session.Attachment remains the last-bound current
+// pointer; this collection does not change that.
+func (a *Authority) Attachments(session SessionID) []HostAttachment {
+	out := make([]HostAttachment, 0)
+	for _, at := range a.attachments {
+		if at.Session == session {
+			out = append(out, *at)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
 // Actor returns one agent actor.
 func (a *Authority) Actor(id ActorID) (AgentActor, bool) {
 	ac, ok := a.actors[id]

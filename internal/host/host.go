@@ -27,6 +27,8 @@ package host
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -179,19 +181,73 @@ type HostAttachmentClaim struct {
 	LastKnownProcessBirth ProcessBirthEvidence
 }
 
+// ContinuityClass is ValidateAttachment's typed host-side verdict. The
+// composition root maps these onto domain recovery outcomes; adapters
+// never import the domain to do that mapping themselves. Unreachable is
+// not a class: it is a call error (see ErrUnreachable).
+type ContinuityClass string
+
+// Host continuity classes a successful ValidateAttachment can report.
+// A surviving pane is never ContinuityPaneAbsent — absence requires the
+// host to prove the pane is gone. Empty-foreground is not a class: Herdr
+// falls back to ShellPID, and a PID of zero is unproven birth, not a
+// proven empty pane.
+const (
+	ContinuityPaneAbsent       ContinuityClass = "pane_absent"
+	ContinuityTerminalReplaced ContinuityClass = "terminal_replaced"
+	ContinuityProcessReplaced  ContinuityClass = "process_replaced"
+	ContinuityUnproven         ContinuityClass = "unproven"
+	ContinuitySameLive         ContinuityClass = "same_live"
+)
+
+// ErrUnreachable marks a ValidateAttachment call that never completed
+// because the host could not be reached (dial failure, timeout, missing
+// socket). It is not a ContinuityClass and must not be inferred from
+// pane absence. DiscoverInstances omitting a socket is the same
+// condition, decided before this adapter is built; herdr.New does not
+// dial.
+var ErrUnreachable = errors.New("host unreachable")
+
+// Unreachable wraps a transport failure so callers can classify it with
+// errors.Is without reading the error text. A nil argument is
+// ErrUnreachable itself.
+func Unreachable(err error) error {
+	if err == nil {
+		return ErrUnreachable
+	}
+	if errors.Is(err, ErrUnreachable) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", ErrUnreachable, err)
+}
+
 // HostContinuityEvidence is ValidateAttachment's result. §5.2: a host
 // prompt path "supplies a semantic attempt result. It never changes host
 // evidence into an agent acknowledgment" — by the same principle,
 // SameProcess is a process-continuity verdict only, never a claim about
-// agent state.
+// agent state. Class is the typed reason a composition root switches on;
+// SameProcess stays true only for ContinuitySameLive so existing callers
+// keep compiling.
 //
 //nolint:revive // name is §5.2's Go code block verbatim; see package doc comment.
 type HostContinuityEvidence struct {
 	Evidence Evidence
-	// SameProcess is false when the host integration proves a different
-	// process now occupies the claimed location. decision-01 §5.3: "A new
-	// process in the same pane always needs a new runtime-instance ID."
+	Class    ContinuityClass
+	// SameProcess is true only when Class is ContinuitySameLive.
+	// decision-01 §5.3: "A new process in the same pane always needs a
+	// new runtime-instance ID."
 	SameProcess bool
+}
+
+// ContinuityEvidence builds a ValidateAttachment result. SameProcess is
+// set from Class so adapters cannot report same-live and a different
+// class at once.
+func ContinuityEvidence(class ContinuityClass, evidence Evidence) HostContinuityEvidence {
+	return HostContinuityEvidence{
+		Evidence:    evidence,
+		Class:       class,
+		SameProcess: class == ContinuitySameLive,
+	}
 }
 
 // HostObservationRequest scopes ObserveHostLifecycle to one attachment.

@@ -435,3 +435,24 @@ the resolver's, complete.
 
 This step likewise needed no store migration: the new fact rides the same
 stream log, through the `LaunchResolutionTx` boundary `launch` already used.
+
+## Process birth on HostAttachment (duo-dogfood-recovery, 2026-08-25)
+
+The kernel already stores process birth as an instance-scoped
+`process.birth` correlation. That is enough for a single-leaf claim and
+not enough to rebuild one claim per leaf: nothing links a correlation to
+its attachment, and pairing by creation order is forbidden.
+
+`HostAttachment.Process` is now the per-attachment birth. It is part of
+the attachment fact, so an old store without the field loads as zero
+("unknown") with no migration. The instance-scoped correlation remains
+written. Same-live recovery still requires a present process birth on
+the fingerprint passed to `ResolveRecovery`; the composition root builds
+that fingerprint from the attachment's stored birth, not by picking a
+correlation.
+
+`Authority.Attachments(sessionID)` lists every attachment of a session,
+in attachment-ID order. `Session.Attachment` stays the last-bound
+current pointer. Full mapping, show contract, and the multi-leaf
+recovery table live in `docs/cli/decisions.md` and the planning note
+`notes/48-dogfood-recovery-semantics.md`.

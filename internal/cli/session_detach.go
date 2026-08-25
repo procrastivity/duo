@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -140,4 +141,22 @@ func renderAttachmentResult(streams *iostreams.Streams, mode, operation string, 
 	}
 	_, err := fmt.Fprintf(streams.Out, "session %s: attachment %s\n", result.SessionID, result.AttachmentState)
 	return err
+}
+
+// reattachCommand renders one pasteable `duo session reattach` line from a
+// fingerprint. Flag names match sessionReattachCommand verbatim. Process
+// flags appear only when Process.Present(): liveRuntimeFingerprint never
+// sets host/executable, and emitting those would change ClaimRef().
+func reattachCommand(sessionID string, fp domain.Fingerprint) string {
+	cmd := "duo session reattach " + sessionID +
+		" --integration-instance " + fp.IntegrationInstance +
+		" --epoch-kind " + fp.Epoch.Kind +
+		" --epoch-value " + fp.Epoch.Value +
+		" --epoch-scope " + string(fp.Epoch.Scope) +
+		" --container " + fp.Container
+	if fp.Process.Present() {
+		cmd += " --process-pid " + strconv.Itoa(fp.Process.PID) +
+			" --process-started-at " + fp.Process.StartedAt
+	}
+	return cmd
 }

@@ -23,7 +23,8 @@ type Host struct {
 	integrationInstanceID string
 	nextPID               int
 	candidates            []host.HostCandidate
-	attachments           map[string]host.Evidence // keyed by attachmentKey
+	attachments           map[string]host.Evidence // keyed by paneKey
+	unreachable           bool
 	streams               []*observationStream
 }
 
@@ -130,7 +131,11 @@ func (h *Host) Start(_ context.Context, prepared host.PreparedHostLaunch) (host.
 	defer h.mu.Unlock()
 	pid := h.nextPID
 	h.nextPID++
-	now := time.Now().UTC()
+	// Truncate to the domain wire grain (materialize.CaptureTimeLayout /
+	// millisecond). Bind persists StartedAt at that precision; a later
+	// ValidateAttachment claim rebuilt from the attachment must Equal the
+	// live birth, so the fake must not keep sub-millisecond noise.
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	evidence := host.Evidence{
 		IntegrationInstanceID: h.integrationInstanceID,
@@ -143,42 +148,46 @@ func (h *Host) Start(_ context.Context, prepared host.PreparedHostLaunch) (host.
 		},
 		PaneID: fmt.Sprintf("fake-pane-%d", pid),
 	}
-	h.attachments[attachmentKey(host.Attachment{
-		IntegrationInstanceID: evidence.IntegrationInstanceID,
-		HostServerEpoch:       evidence.HostServerEpoch,
-		HostContainerID:       evidence.HostContainerID,
-		PaneID:                evidence.PaneID,
-	})] = evidence
+	h.attachments[paneKey(evidence.IntegrationInstanceID, evidence.PaneID)] = evidence
 
 	return host.HostLaunchEvidence{Evidence: evidence, StartedAt: now}, nil
 }
 
-// ValidateAttachment implements host.HostAttachmentValidator. It reports
-// SameProcess true only when the fake host's recorded process-birth
-// evidence for the claimed attachment still matches the caller's last
-// known evidence exactly, and the attachment is still on record (an
-// attachment the fake never Started, or one Kill removed, reports
-// SameProcess false with zero evidence).
+// ValidateAttachment implements host.HostAttachmentValidator. Lookup is
+// by pane ID (Herdr's addressing), so a replaced terminal or process is
+// distinct from a vanished pane. Disconnect makes the call fail with
+// host.ErrUnreachable without deleting the pane.
 func (h *Host) ValidateAttachment(_ context.Context, claim host.HostAttachmentClaim) (host.HostContinuityEvidence, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	evidence, ok := h.attachments[attachmentKey(claim.Attachment)]
-	if !ok {
-		return host.HostContinuityEvidence{SameProcess: false}, nil
+	if h.unreachable {
+		return host.HostContinuityEvidence{}, host.Unreachable(nil)
 	}
-	same := evidence.ProcessBirth == claim.LastKnownProcessBirth
-	return host.HostContinuityEvidence{Evidence: evidence, SameProcess: same}, nil
+	evidence, ok := h.attachments[paneKey(claim.Attachment.IntegrationInstanceID, claim.Attachment.PaneID)]
+	if !ok {
+		return host.ContinuityEvidence(host.ContinuityPaneAbsent, host.Evidence{}), nil
+	}
+	if claim.Attachment.HostContainerID != "" && claim.Attachment.HostContainerID != evidence.HostContainerID {
+		return host.ContinuityEvidence(host.ContinuityTerminalReplaced, evidence), nil
+	}
+	if !fakeBirthProven(evidence.ProcessBirth) || !fakeBirthProven(claim.LastKnownProcessBirth) {
+		return host.ContinuityEvidence(host.ContinuityUnproven, evidence), nil
+	}
+	if sameFakeBirth(evidence.ProcessBirth, claim.LastKnownProcessBirth) {
+		return host.ContinuityEvidence(host.ContinuitySameLive, evidence), nil
+	}
+	return host.ContinuityEvidence(host.ContinuityProcessReplaced, evidence), nil
 }
 
-// Kill simulates the host-side process behind an attachment exiting. It
-// removes the attachment record (so a later ValidateAttachment reports
-// SameProcess false) and, if a HostLifecycleSource stream is open for that
-// attachment, emits an exited event.
+// Kill simulates the host-side pane disappearing. It removes the
+// attachment record so a later ValidateAttachment reports
+// ContinuityPaneAbsent, and, if a HostLifecycleSource stream is open for
+// that attachment, emits an exited event.
 func (h *Host) Kill(a host.Attachment) {
 	h.mu.Lock()
-	evidence, ok := h.attachments[attachmentKey(a)]
+	evidence, ok := h.attachments[paneKey(a.IntegrationInstanceID, a.PaneID)]
 	if ok {
-		delete(h.attachments, attachmentKey(a))
+		delete(h.attachments, paneKey(a.IntegrationInstanceID, a.PaneID))
 	}
 	streams := append([]*observationStream(nil), h.streams...)
 	h.mu.Unlock()
@@ -192,10 +201,79 @@ func (h *Host) Kill(a host.Attachment) {
 		ObservedAt: time.Now().UTC(),
 	}
 	for _, s := range streams {
-		if s.attachment == a {
+		if s.matches(a) {
 			s.emit(event)
 		}
 	}
+}
+
+// ReplaceProcess keeps the pane and terminal identity but mints a new
+// process birth. A later ValidateAttachment against the old claim reports
+// ContinuityProcessReplaced, not pane absence. Zero evidence means the
+// pane was not on record.
+func (h *Host) ReplaceProcess(a host.Attachment) host.Evidence {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	key := paneKey(a.IntegrationInstanceID, a.PaneID)
+	evidence, ok := h.attachments[key]
+	if !ok {
+		return host.Evidence{}
+	}
+	pid := h.nextPID
+	h.nextPID++
+	evidence.ProcessBirth = host.ProcessBirthEvidence{
+		PID:             pid,
+		StartTime:       time.Now().UTC().Truncate(time.Millisecond),
+		StartTimeSource: "fake-host",
+	}
+	h.attachments[key] = evidence
+	return evidence
+}
+
+// ReplaceTerminal keeps the pane ID but mints a new host-container
+// identity, the way a Herdr restart restores pane_id and always issues a
+// new terminal_id. A later ValidateAttachment against the old claim
+// reports ContinuityTerminalReplaced.
+func (h *Host) ReplaceTerminal(a host.Attachment) host.Evidence {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	key := paneKey(a.IntegrationInstanceID, a.PaneID)
+	evidence, ok := h.attachments[key]
+	if !ok {
+		return host.Evidence{}
+	}
+	n := h.nextPID
+	h.nextPID++
+	evidence.HostContainerID = fmt.Sprintf("fake-container-%d", n)
+	h.attachments[key] = evidence
+	return evidence
+}
+
+// UnproveProcess keeps the pane and terminal but drops proven process
+// birth from the live fingerprint so ValidateAttachment reports
+// ContinuityUnproven.
+func (h *Host) UnproveProcess(a host.Attachment) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	key := paneKey(a.IntegrationInstanceID, a.PaneID)
+	evidence, ok := h.attachments[key]
+	if !ok {
+		return
+	}
+	evidence.ProcessBirth = host.ProcessBirthEvidence{
+		PID:             evidence.ProcessBirth.PID,
+		StartTimeSource: "unavailable",
+	}
+	h.attachments[key] = evidence
+}
+
+// Disconnect makes later ValidateAttachment calls fail with
+// host.ErrUnreachable. Pane records stay; this is a call error, not pane
+// absence.
+func (h *Host) Disconnect() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.unreachable = true
 }
 
 // ObserveHostLifecycle implements host.HostLifecycleSource.
@@ -210,9 +288,24 @@ func (h *Host) ObserveHostLifecycle(_ context.Context, req host.HostObservationR
 	return s, nil
 }
 
-// attachmentKey collapses a HostAttachment to a comparable map key.
-func attachmentKey(a host.Attachment) string {
-	return a.IntegrationInstanceID + "|" + a.HostServerEpoch + "|" + a.HostContainerID + "|" + a.PaneID
+// paneKey addresses a pane the way Herdr does: pane_id within one
+// integration instance. Terminal identity and process birth are live
+// evidence on that pane, not part of the lookup key.
+func paneKey(instanceID, paneID string) string {
+	return instanceID + "|" + paneID
+}
+
+func fakeBirthProven(b host.ProcessBirthEvidence) bool {
+	return b.PID > 0 && !b.StartTime.IsZero()
+}
+
+func sameFakeBirth(live, claimed host.ProcessBirthEvidence) bool {
+	return live.PID == claimed.PID && live.StartTime.Equal(claimed.StartTime)
+}
+
+func (s *observationStream) matches(a host.Attachment) bool {
+	return s.attachment.IntegrationInstanceID == a.IntegrationInstanceID &&
+		s.attachment.PaneID == a.PaneID
 }
 
 // observationStream is the fake's host.HostObservationStream

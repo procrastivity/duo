@@ -1,0 +1,28 @@
+$ /home/dev/Code/duo-vnext/bin/duo session show ses_35919b6c780306ac4e7e12d652a499c0
+session:            ses_35919b6c780306ac4e7e12d652a499c0
+workspace:          ws_1c4441065b8be479ed8fc1619d735da6
+lifecycle:          active
+view:               recovering
+runtime instance:   ri_0141c2b2fd3f02363740cb3fa55a1967
+instance state:     starting
+owner:              cli
+quarantined:        false
+
+attachment:         att_367979b55e0bae5a4e35335e439fc749
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55dda1a4711 (pane)
+container:          w3:p3
+process birth:      pid 4080192 started 2026-08-25T20:58:36.620Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55dda1a4711 --epoch-scope pane --container w3:p3 --process-pid 4080192 --process-started-at 2026-08-25T20:58:36.620Z
+
+attachment:         att_e1b4a1f218e66c0131585642a5ae38d4
+state:              attached
+integration:        herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock
+epoch:              herdr.terminal_id term_659e55de20db112 (pane)
+container:          w3:p4
+process birth:      pid 4080438 started 2026-08-25T20:58:37.190Z
+claim held:         true
+reattach with: duo session reattach ses_35919b6c780306ac4e7e12d652a499c0 --integration-instance herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659e55de20db112 --epoch-scope pane --container w3:p4 --process-pid 4080438 --process-started-at 2026-08-25T20:58:37.190Z
+exit=0

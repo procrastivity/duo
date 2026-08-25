@@ -95,11 +95,32 @@ func TestSubscribeStreamsOnOneConnection(t *testing.T) {
 	f.emitEvent("pane_closed", map[string]any{
 		"type": "pane_closed", "pane_id": "w1:p1", "workspace_id": "w1",
 	})
-	ev, err := stream.next()
-	if err != nil {
-		t.Fatalf("next: %v", err)
-	}
+	ev := nextStreamEvent(t, stream)
 	if ev.Event != "pane_closed" {
 		t.Fatalf("event = %q, want pane_closed", ev.Event)
+	}
+}
+
+func nextStreamEvent(t *testing.T, stream *eventStream) eventEnvelope {
+	t.Helper()
+	type result struct {
+		ev  eventEnvelope
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		ev, err := stream.next()
+		ch <- result{ev, err}
+	}()
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			t.Fatalf("next: %v", r.err)
+		}
+		return r.ev
+	case <-time.After(3 * time.Second):
+		_ = stream.Close()
+		t.Fatal("timed out waiting for a streamed event")
+		return eventEnvelope{}
 	}
 }

@@ -36,7 +36,7 @@ type sessionListResult struct {
 func sessionListCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "list every duo session this authority knows about",
+		Short: "list duo sessions this authority knows about, omitting removed tombstones",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			mode := cliflags.FromContext(cmd.Context()).Output
@@ -49,8 +49,12 @@ func sessionListCommand(streams *iostreams.Streams) *cobra.Command {
 
 			result := sessionListResult{Items: []sessionListItem{}}
 			for _, s := range a.Sessions() {
+				if s.State == domain.SessionRemoved {
+					continue
+				}
 				result.Items = append(result.Items, listItemFor(a, s))
 			}
+			recovering := len(a.Recovering())
 
 			if mode == "json" {
 				b, err := json.Marshal(newEnvelope("session.list", result))
@@ -60,7 +64,7 @@ func sessionListCommand(streams *iostreams.Streams) *cobra.Command {
 				_, err = fmt.Fprintln(streams.Out, string(b))
 				return err
 			}
-			return renderSessionListText(streams, result)
+			return renderSessionListText(streams, result, recovering)
 		},
 	}
 	surface.Annotate(cmd, surface.Plumbing)
@@ -84,8 +88,10 @@ func listItemFor(a *domain.Authority, s domain.Session) sessionListItem {
 	return item
 }
 
-// renderSessionListText writes session.list's human-mode table.
-func renderSessionListText(streams *iostreams.Streams, result sessionListResult) error {
+// renderSessionListText writes session.list's human-mode table. When
+// recovering > 0 it prints one hint line after the table so operators know
+// to run `duo session reconcile` (notes/48 §2). JSON item shape is unchanged.
+func renderSessionListText(streams *iostreams.Streams, result sessionListResult, recovering int) error {
 	if len(result.Items) == 0 {
 		_, err := fmt.Fprintln(streams.Out, "no duo sessions")
 		return err
@@ -103,5 +109,16 @@ func renderSessionListText(streams *iostreams.Streams, result sessionListResult)
 			return err
 		}
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	if recovering > 0 {
+		noun := "sessions"
+		if recovering == 1 {
+			noun = "session"
+		}
+		_, err := fmt.Fprintf(streams.Out, "%d %s await reconciliation; run duo session reconcile\n", recovering, noun)
+		return err
+	}
+	return nil
 }

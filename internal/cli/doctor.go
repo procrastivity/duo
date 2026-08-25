@@ -120,11 +120,12 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 			configSection, policy := doctorConfigStatus(configPath)
 
 			report := doctorReport{
-				Report:        base,
-				HostBinding:   doctorHostBinding(a, root),
-				HostDeduction: doctorHostDeduction(cmd.Context(), a, root, policy),
-				Providers:     doctorProviders(a),
-				Config:        configSection,
+				Report:              base,
+				HostBinding:         doctorHostBinding(a, root),
+				HostDeduction:       doctorHostDeduction(cmd.Context(), a, root, policy),
+				Providers:           doctorProviders(a),
+				Config:              configSection,
+				RecoveringInstances: len(a.Recovering()),
 			}
 
 			if flags.JSON() {
@@ -184,6 +185,15 @@ func humanReport(report doctorReport) string {
 	writeProvidersSection(&b, report.Providers)
 	writeConfigSection(&b, report.Config)
 
+	if report.RecoveringInstances > 0 {
+		noun := "instances"
+		if report.RecoveringInstances == 1 {
+			noun = "instance"
+		}
+		fmt.Fprintf(&b, "  recovering: %d runtime %s await reconciliation (duo session reconcile)\n",
+			report.RecoveringInstances, noun)
+	}
+
 	return b.String()
 }
 
@@ -215,10 +225,11 @@ func humanReport(report doctorReport) string {
 // an additive top-level key, never a rename.
 type doctorReport struct {
 	doctor.Report
-	HostBinding   workspaceHostShowResult    `json:"host_binding"`
-	HostDeduction doctorHostDeductionSection `json:"host_deduction"`
-	Providers     []doctorProviderStanding   `json:"providers"`
-	Config        doctorConfigSection        `json:"config"`
+	HostBinding         workspaceHostShowResult    `json:"host_binding"`
+	HostDeduction       doctorHostDeductionSection `json:"host_deduction"`
+	Providers           []doctorProviderStanding   `json:"providers"`
+	Config              doctorConfigSection        `json:"config"`
+	RecoveringInstances int                        `json:"recovering_instances"`
 }
 
 // doctorHostDeductionSection is what M1 would deduce right now for the

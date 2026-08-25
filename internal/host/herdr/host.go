@@ -494,46 +494,70 @@ func (h *Host) startAgent(ctx context.Context, prepared preparedLaunch, paneID s
 
 // ValidateAttachment implements host.HostAttachmentValidator.
 //
-// Three checks, in order of strength:
+// Checks, in order of strength:
 //
-//  1. The pane must still exist. pane_not_found is an absence, not an
-//     error.
-//  2. The pane's terminal_id must still match the claim. A restored pane
+//  1. The host must answer. Dial, timeout, and missing-socket failures
+//     are host.ErrUnreachable, not a ContinuityClass — a surviving pane
+//     behind a down socket is not proven gone.
+//  2. The pane must still exist. pane_not_found is ContinuityPaneAbsent,
+//     not an error, and not inferred from a zero Evidence field.
+//  3. The pane's terminal_id must still match the claim. A restored pane
 //     keeps its pane_id across a server restart but always gets a new
-//     terminal_id, so this is what distinguishes an incarnation and stops
-//     a stale claim from re-enrolling onto a different terminal.
-//  3. The process birth must match. Herdr reports no start time, so this
-//     needs procfs (or another ProcessBirthResolver); when birth cannot be
-//     proven the verdict is "not the same process", never "same".
+//     terminal_id (ContinuityTerminalReplaced).
+//  4. Both sides must carry proven process birth. Unproven live or
+//     claimed birth is ContinuityUnproven, never same-live. Proven births
+//     that match are ContinuitySameLive; proven births that differ are
+//     ContinuityProcessReplaced.
+//
+// pidFor falls back to ShellPID when ForegroundProcesses is empty, so
+// this adapter cannot prove "pane present with no foreground process" as
+// a distinct class. PID ≤ 0 is unproven birth on a surviving pane.
 func (h *Host) ValidateAttachment(ctx context.Context, claim host.HostAttachmentClaim) (host.HostContinuityEvidence, error) {
 	if err := h.requireInstance(claim.Attachment.IntegrationInstanceID); err != nil {
 		return host.HostContinuityEvidence{}, err
 	}
 	live, found, err := h.pane(ctx, claim.Attachment.PaneID)
 	if err != nil {
-		return host.HostContinuityEvidence{}, err
+		return host.HostContinuityEvidence{}, markUnreachable(err)
 	}
 	if !found {
-		return host.HostContinuityEvidence{SameProcess: false}, nil
+		return host.ContinuityEvidence(host.ContinuityPaneAbsent, host.Evidence{}), nil
 	}
 	birth, err := h.processBirth(ctx, live.PaneID)
 	if err != nil {
 		if ErrorCode(err) == CodePaneNotFound {
-			return host.HostContinuityEvidence{SameProcess: false}, nil
+			return host.ContinuityEvidence(host.ContinuityPaneAbsent, host.Evidence{}), nil
 		}
-		return host.HostContinuityEvidence{}, err
+		return host.HostContinuityEvidence{}, markUnreachable(err)
 	}
 	evidence := evidenceFor(h.cfg.IntegrationInstanceID, live, birth)
 	if claim.Attachment.HostContainerID != "" && claim.Attachment.HostContainerID != live.TerminalID {
 		// A different terminal now backs this pane_id: same coordinates,
 		// new incarnation. The live evidence still goes back so the caller
 		// can enroll the new runtime instance instead of guessing at it.
-		return host.HostContinuityEvidence{Evidence: evidence, SameProcess: false}, nil
+		return host.ContinuityEvidence(host.ContinuityTerminalReplaced, evidence), nil
 	}
-	return host.HostContinuityEvidence{
-		Evidence:    evidence,
-		SameProcess: sameBirth(birth, claim.LastKnownProcessBirth),
-	}, nil
+	if !birthProven(birth) || !birthProven(claim.LastKnownProcessBirth) {
+		return host.ContinuityEvidence(host.ContinuityUnproven, evidence), nil
+	}
+	if sameBirth(birth, claim.LastKnownProcessBirth) {
+		return host.ContinuityEvidence(host.ContinuitySameLive, evidence), nil
+	}
+	return host.ContinuityEvidence(host.ContinuityProcessReplaced, evidence), nil
+}
+
+// markUnreachable wraps a non-protocol probe failure so the composition
+// root can classify dial/timeout/missing-socket with errors.Is and never
+// by reading the error text. A ProtocolError is the host answering, so
+// it stays unwrapped.
+func markUnreachable(err error) error {
+	if err == nil {
+		return nil
+	}
+	if ErrorCode(err) != "" {
+		return err
+	}
+	return host.Unreachable(err)
 }
 
 // ObserveHostLifecycle implements host.HostLifecycleSource.

@@ -1,0 +1,7 @@
+$ /home/dev/Code/duo-vnext/bin/duo session launch orchestrator --host herdr:terminal-multiplexers --target tab --dry-run
+preview only: no session, no durable record, no spawn
+host:      herdr:terminal-multiplexers (host_source=explicit-flag)
+  outranked ambient-env:           herdr:/home/dev/.config/herdr/sessions/terminal-multiplexers/herdr.sock (outranked by explicit-flag)
+selection: ordered
+  main: claude / fable-5 (determined) -> selected
+exit=0

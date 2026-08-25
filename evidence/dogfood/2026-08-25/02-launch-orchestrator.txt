@@ -1,0 +1,2 @@
+$ /home/dev/Code/duo-vnext/bin/duo session launch orchestrator --host herdr:terminal-multiplexers --target tab --close-on-exit
+exit=4

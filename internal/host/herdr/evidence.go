@@ -77,6 +77,10 @@ func AttachmentFor(e host.Evidence) host.Attachment {
 // sitting at its prompt reports the shell as its own foreground process,
 // so the two usually agree; when they do not, the foreground process is
 // the one a runtime occupies.
+//
+// An empty ForegroundProcesses list is therefore not a proven "no
+// process" state — ValidateAttachment cannot honestly expose one. PID ≤ 0
+// (no foreground and no shell) is unproven birth on a surviving pane.
 func pidFor(info processInfo) int {
 	if len(info.ForegroundProcesses) > 0 {
 		// Herdr lists the foreground process group; the last entry is the

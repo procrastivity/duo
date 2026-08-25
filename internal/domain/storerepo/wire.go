@@ -160,6 +160,10 @@ type wireAttachment struct {
 	EpochValue          string `json:"epoch_value"`
 	EpochScope          string `json:"epoch_scope"`
 	Container           string `json:"container"`
+	ProcessHost         string `json:"process_host,omitempty"`
+	ProcessPID          int    `json:"process_pid,omitempty"`
+	ProcessStartedAt    string `json:"process_started_at,omitempty"`
+	ProcessExecutable   string `json:"process_executable,omitempty"`
 	State               string `json:"state"`
 	Continuity          string `json:"continuity,omitempty"`
 	ContinuityInstance  string `json:"continuity_instance,omitempty"`
@@ -273,8 +277,13 @@ func toWire(f domain.Fact) wireFact {
 			ID: string(v.ID), Session: string(v.Session),
 			IntegrationInstance: v.IntegrationInstance,
 			EpochKind:           v.Epoch.Kind, EpochValue: v.Epoch.Value,
-			EpochScope: string(v.Epoch.Scope),
-			Container:  v.Container, State: string(v.State),
+			EpochScope:         string(v.Epoch.Scope),
+			Container:          v.Container,
+			ProcessHost:        v.Process.Host,
+			ProcessPID:         v.Process.PID,
+			ProcessStartedAt:   v.Process.StartedAt,
+			ProcessExecutable:  v.Process.Executable,
+			State:              string(v.State),
 			Continuity:         string(v.Continuity),
 			ContinuityInstance: string(v.ContinuityInstance),
 		}
@@ -369,6 +378,12 @@ func fromWire(w wireFact) domain.Fact {
 				Scope: domain.EpochScope(v.EpochScope),
 			},
 			Container: v.Container, State: domain.AttachmentState(v.State),
+			Process: domain.ProcessBirth{
+				Host:       v.ProcessHost,
+				PID:        v.ProcessPID,
+				StartedAt:  v.ProcessStartedAt,
+				Executable: v.ProcessExecutable,
+			},
 			Continuity:         domain.ContinuityState(v.Continuity),
 			ContinuityInstance: domain.InstanceID(v.ContinuityInstance),
 		}

@@ -90,6 +90,10 @@
               "operations": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/support_view"}
+              },
+              "attachments": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/session_attachment_inspect"}
               }
             }
           }
@@ -660,6 +664,42 @@
         "quality": {"$ref": "#/$defs/quality"},
         "realization": {"$ref": "#/$defs/realization"},
         "terminal_fidelity": {"$ref": "#/$defs/terminal_fidelity"}
+      }
+    },
+    "session_attachment_inspect": {
+      "type": "object",
+      "required": [
+        "attachment_id",
+        "state",
+        "integration_instance",
+        "epoch",
+        "container",
+        "claim_held"
+      ],
+      "properties": {
+        "attachment_id": {"$ref": "#/$defs/opaque_id"},
+        "state": {"type": "string", "minLength": 1},
+        "integration_instance": {"type": "string", "minLength": 1},
+        "epoch": {
+          "type": "object",
+          "required": ["kind", "value", "scope"],
+          "properties": {
+            "kind": {"type": "string", "minLength": 1},
+            "value": {"type": "string", "minLength": 1},
+            "scope": {"type": "string", "minLength": 1}
+          }
+        },
+        "container": {"type": "string", "minLength": 1},
+        "process_birth": {
+          "type": "object",
+          "required": ["pid", "started_at"],
+          "properties": {
+            "pid": {"type": "integer"},
+            "started_at": {"$ref": "#/$defs/timestamp"}
+          }
+        },
+        "claim_held": {"type": "boolean"},
+        "reattach_command": {"type": "string", "minLength": 1}
       }
     },
     "retry": {

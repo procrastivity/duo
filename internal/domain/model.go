@@ -163,7 +163,12 @@ type HostAttachment struct {
 	IntegrationInstance string
 	Epoch               HostEpoch
 	Container           string
-	State               AttachmentState
+	// Process is the process-birth identity recorded when this attachment
+	// was bound. Zero means unknown: an old fact, or a host that reported
+	// no birth. It is never inferred from instance-scoped process.birth
+	// correlations.
+	Process ProcessBirth
+	State   AttachmentState
 	// Continuity records whether the attachment's link to a live execution
 	// is still proven. Empty means verified: it is the state every
 	// attachment is created in, and only a failed or impossible continuity

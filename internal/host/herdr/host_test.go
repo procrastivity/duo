@@ -2,6 +2,8 @@ package herdr
 
 import (
 	"context"
+	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -335,6 +337,9 @@ func TestStartWaitsForTheShellToHandOverTheTerminal(t *testing.T) {
 	if !got.SameProcess {
 		t.Fatal("the attachment a launch just produced did not validate")
 	}
+	if got.Class != host.ContinuitySameLive {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuitySameLive)
+	}
 }
 
 // A handover that never happens is weaker evidence, not a failure: the
@@ -468,12 +473,18 @@ func TestValidateAttachmentReportsSameProcess(t *testing.T) {
 	if first.SameProcess {
 		t.Fatal("an empty last-known birth was accepted as proof of continuity")
 	}
+	if first.Class != host.ContinuityUnproven {
+		t.Fatalf("Class = %q, want %q for an empty last-known birth", first.Class, host.ContinuityUnproven)
+	}
 	again, err := h.ValidateAttachment(ctx, claimFor(pane, first.Evidence.ProcessBirth))
 	if err != nil {
 		t.Fatalf("ValidateAttachment: %v", err)
 	}
 	if !again.SameProcess {
 		t.Fatalf("SameProcess = false for unchanged evidence %+v", again.Evidence.ProcessBirth)
+	}
+	if again.Class != host.ContinuitySameLive {
+		t.Fatalf("Class = %q, want %q", again.Class, host.ContinuitySameLive)
 	}
 }
 
@@ -501,6 +512,9 @@ func TestValidateAttachmentRejectsANewTerminalOnTheSamePaneID(t *testing.T) {
 	if got.SameProcess {
 		t.Fatal("SameProcess = true across a terminal_id change; pane coordinates are not continuity")
 	}
+	if got.Class != host.ContinuityTerminalReplaced {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityTerminalReplaced)
+	}
 	if got.Evidence.HostContainerID != "term_restarted" {
 		t.Fatalf("evidence for the new incarnation = %q", got.Evidence.HostContainerID)
 	}
@@ -519,6 +533,12 @@ func TestValidateAttachmentReportsAVanishedPane(t *testing.T) {
 	}
 	if got.SameProcess {
 		t.Fatal("SameProcess = true for a pane that no longer exists")
+	}
+	if got.Class != host.ContinuityPaneAbsent {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityPaneAbsent)
+	}
+	if got.Evidence.PaneID != "" {
+		t.Fatalf("pane-absent evidence must not carry a live pane: %+v", got.Evidence)
 	}
 }
 
@@ -540,6 +560,131 @@ func TestValidateAttachmentWithoutProvenBirthIsNotSameProcess(t *testing.T) {
 	}
 	if got.SameProcess {
 		t.Fatal("SameProcess = true on PID equality alone")
+	}
+	if got.Class != host.ContinuityUnproven {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityUnproven)
+	}
+	if got.Evidence.PaneID != pane.paneID {
+		t.Fatalf("unproven live birth still has a pane; PaneID = %q", got.Evidence.PaneID)
+	}
+}
+
+func TestValidateAttachmentReportsAReplacedProcess(t *testing.T) {
+	f := newFakeHerdr(t)
+	pane := f.addPane("w1")
+	h := testHost(t, f)
+	ctx := context.Background()
+
+	baseline, err := h.ValidateAttachment(ctx, claimFor(pane, host.ProcessBirthEvidence{}))
+	if err != nil {
+		t.Fatalf("ValidateAttachment: %v", err)
+	}
+	claim := claimFor(pane, baseline.Evidence.ProcessBirth)
+	f.mutatePane(pane.paneID, func(p *fakePaneState) { p.fgPID = 8888 })
+
+	got, err := h.ValidateAttachment(ctx, claim)
+	if err != nil {
+		t.Fatalf("ValidateAttachment: %v", err)
+	}
+	if got.SameProcess {
+		t.Fatal("SameProcess = true after the foreground PID changed")
+	}
+	if got.Class != host.ContinuityProcessReplaced {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityProcessReplaced)
+	}
+	if got.Evidence.ProcessBirth.PID != 8888 {
+		t.Fatalf("live PID = %d, want 8888", got.Evidence.ProcessBirth.PID)
+	}
+	if got.Evidence.PaneID != pane.paneID {
+		t.Fatalf("replaced process must keep the pane; PaneID = %q", got.Evidence.PaneID)
+	}
+}
+
+func TestValidateAttachmentDialErrorIsUnreachable(t *testing.T) {
+	h, err := New(Config{
+		IntegrationInstanceID: testInstanceID,
+		SocketPath:            filepath.Join(shortTempDir(t), "absent.sock"),
+		CallTimeout:           200 * time.Millisecond,
+		ResolveProcessBirth:   fakeBirth,
+		ResolvePaneEnviron:    cleanPaneEnviron,
+	})
+	if err != nil {
+		t.Fatalf("New dials; it must not: %v", err)
+	}
+	_, err = h.ValidateAttachment(context.Background(), host.HostAttachmentClaim{
+		Attachment: host.Attachment{IntegrationInstanceID: testInstanceID, PaneID: "w1:p1"},
+	})
+	if err == nil {
+		t.Fatal("ValidateAttachment succeeded against a missing socket")
+	}
+	if !errors.Is(err, host.ErrUnreachable) {
+		t.Fatalf("error = %v, want host.ErrUnreachable", err)
+	}
+	if ErrorCode(err) != "" {
+		t.Fatalf("a dial failure must not look like a protocol error; ErrorCode = %q", ErrorCode(err))
+	}
+}
+
+// An idle pane reports the shell, not "no process". Empty foreground
+// therefore cannot be a distinct class: pidFor falls back to ShellPID,
+// and that birth classifies as process-replaced when it is not the claim.
+func TestValidateAttachmentEmptyForegroundFallsBackToShell(t *testing.T) {
+	f := newFakeHerdr(t)
+	pane := f.addPane("w1")
+	f.mutatePane(pane.paneID, func(p *fakePaneState) { p.fgPID = 7777 })
+	h := testHost(t, f)
+	ctx := context.Background()
+
+	baseline, err := h.ValidateAttachment(ctx, claimFor(pane, host.ProcessBirthEvidence{}))
+	if err != nil {
+		t.Fatalf("ValidateAttachment: %v", err)
+	}
+	if baseline.Evidence.ProcessBirth.PID != 7777 {
+		t.Fatalf("PID = %d, want the foreground 7777", baseline.Evidence.ProcessBirth.PID)
+	}
+	f.mutatePane(pane.paneID, func(p *fakePaneState) { p.fgPID = 0 })
+
+	got, err := h.ValidateAttachment(ctx, claimFor(pane, baseline.Evidence.ProcessBirth))
+	if err != nil {
+		t.Fatalf("ValidateAttachment: %v", err)
+	}
+	if got.Class != host.ContinuityProcessReplaced {
+		t.Fatalf("Class = %q, want %q (shell is a different process, not pane absence)",
+			got.Class, host.ContinuityProcessReplaced)
+	}
+	if got.Evidence.ProcessBirth.PID != pane.shellPID {
+		t.Fatalf("fallback PID = %d, want shell %d", got.Evidence.ProcessBirth.PID, pane.shellPID)
+	}
+}
+
+// PID ≤ 0 (no foreground and no shell) is unproven birth on a surviving
+// pane, not ContinuityPaneAbsent and not a fake empty-foreground class.
+func TestValidateAttachmentZeroPIDOnALivePaneIsUnproven(t *testing.T) {
+	f := newFakeHerdr(t)
+	pane := f.addPane("w1")
+	f.mutatePane(pane.paneID, func(p *fakePaneState) {
+		p.fgPID = 0
+		p.shellPID = 0
+	})
+	h := testHost(t, f)
+	ctx := context.Background()
+
+	got, err := h.ValidateAttachment(ctx, claimFor(pane, host.ProcessBirthEvidence{
+		PID:             41210,
+		StartTime:       time.Unix(1_700_000_000, 0).UTC(),
+		StartTimeSource: StartTimeSourceProcfs,
+	}))
+	if err != nil {
+		t.Fatalf("ValidateAttachment: %v", err)
+	}
+	if got.Class != host.ContinuityUnproven {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityUnproven)
+	}
+	if got.Evidence.PaneID != pane.paneID {
+		t.Fatalf("a pane with no PIDs is still present; PaneID = %q", got.Evidence.PaneID)
+	}
+	if got.SameProcess {
+		t.Fatal("SameProcess = true for a zero-PID live birth")
 	}
 }
 
@@ -588,6 +733,9 @@ func TestAttachmentForRoundTripsLaunchEvidence(t *testing.T) {
 	}
 	if !got.SameProcess {
 		t.Fatal("a freshly launched attachment did not validate")
+	}
+	if got.Class != host.ContinuitySameLive {
+		t.Fatalf("Class = %q, want %q", got.Class, host.ContinuitySameLive)
 	}
 }
 

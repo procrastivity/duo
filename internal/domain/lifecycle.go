@@ -225,7 +225,8 @@ func (a *Authority) Bind(ctx context.Context, req BindRequest) error {
 			att := HostAttachment{
 				ID: attachmentID, Session: session.ID,
 				IntegrationInstance: fp.IntegrationInstance,
-				Epoch:               fp.Epoch, Container: fp.Container, State: Attached,
+				Epoch:               fp.Epoch, Container: fp.Container,
+				Process: fp.Process, State: Attached,
 			}
 			b.fact(FactAttachmentCreated, Fact{Attachment: &att, SessionID: session.ID})
 			a.correlateHost(b, attachmentID, *fp, req.ValidUntil, string(req.Attestation.Source))

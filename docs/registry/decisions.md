@@ -145,11 +145,17 @@ Full descriptors — the dogfood milestone set (2026-08-23 handoff 20):
 These are what Stage 0/1 wiring consumes.
 
 Data rows — contract-attested v1 surface beyond the milestone, recorded
-ahead of their implementation: `session.remove` (attested by the
-`manifest.json` fixture), `conversation.list`, `conversation.subscribe`,
+ahead of their implementation: `conversation.list`, `conversation.subscribe`,
 `runtime_configuration.subscribe`, `prompt.deliver`, `command.inspect`,
 `prompt.lease.acquire`, `terminal.read` (all attested by fixtures and/or
 `projection-cases.json`). The `Milestone` field is the boundary marker.
+
+**Implemented 2026-08-25:** `session.reconcile`, `session.archive`, and
+`session.remove` are wired in the CLI (`internal/registry/table.go` rows
+with CLI paths `session reconcile` / `session archive` / `session remove`).
+`session.remove` was previously a data-only row attested by `manifest.json`
+with no cobra command; archive and reconcile were added in the same matter.
+None of the three carry MCP tool names (`local_admin` lifecycle writes).
 
 ## A view exists only where the consumer needs a shape the row is not
 

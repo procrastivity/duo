@@ -1,0 +1,3 @@
+$ /home/dev/Code/duo-vnext/bin/duo session detach ses_35919b6c780306ac4e7e12d652a499c0
+session ses_35919b6c780306ac4e7e12d652a499c0: attachment detached
+exit=0

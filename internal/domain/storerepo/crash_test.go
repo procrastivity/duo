@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/domain"
@@ -350,6 +351,9 @@ func TestFactRoundTrip(t *testing.T) {
 			ID: "att_1", Session: "ses_1", IntegrationInstance: "herdr@sock",
 			Epoch:     domain.HostEpoch{Kind: "herdr.terminal_id", Value: "term_a", Scope: domain.EpochScopePane},
 			Container: "w1:p1", State: domain.Attached,
+			Process: domain.ProcessBirth{
+				Host: "boot-1", PID: 41210, StartedAt: "2026-08-24T18:31:07.412Z", Executable: "/usr/bin/claude",
+			},
 			Continuity: domain.ContinuityUnverified, ContinuityInstance: "ri_1",
 		},
 		LaunchResolution: &domain.LaunchResolution{
@@ -389,6 +393,46 @@ func TestFactRoundTrip(t *testing.T) {
 	}
 	if diff := compareFacts(original, got); diff != "" {
 		t.Fatalf("round trip lost %s", diff)
+	}
+}
+
+// TestOldAttachmentJSONLoadsZeroProcess is the pre-process-birth durable
+// shape: JSON without process_* keys unmarshals to a zero ProcessBirth.
+func TestOldAttachmentJSONLoadsZeroProcess(t *testing.T) {
+	payload := `{
+		"id":"fact_1","kind":"attachment.created","at":"2026-08-23T10:00:00.000Z",
+		"attachment":{
+			"id":"att_1","session":"ses_1","integration_instance":"herdr@sock",
+			"epoch_kind":"herdr.terminal_id","epoch_value":"term_a","epoch_scope":"pane",
+			"container":"w1:p1","state":"attached"
+		}
+	}`
+	got, err := decodeFact(payload)
+	if err != nil {
+		t.Fatalf("decodeFact: %v", err)
+	}
+	if got.Attachment == nil {
+		t.Fatal("decoded fact lost the attachment")
+	}
+	if got.Attachment.Process != (domain.ProcessBirth{}) {
+		t.Fatalf("old JSON loaded Process %+v, want zero", got.Attachment.Process)
+	}
+
+	encoded, err := encodeFact(domain.Fact{
+		ID: "fact_2", Kind: domain.FactAttachmentCreated, At: "t",
+		Attachment: &domain.HostAttachment{
+			ID: "att_2", Session: "ses_1", IntegrationInstance: "herdr@sock",
+			Epoch:     domain.HostEpoch{Kind: "herdr.terminal_id", Value: "term_a", Scope: domain.EpochScopePane},
+			Container: "w1:p1", State: domain.Attached,
+		},
+	})
+	if err != nil {
+		t.Fatalf("encodeFact: %v", err)
+	}
+	for _, key := range []string{"process_host", "process_pid", "process_started_at", "process_executable"} {
+		if strings.Contains(encoded, key) {
+			t.Fatalf("zero Process encoded %q, want the key omitted", key)
+		}
 	}
 }
 

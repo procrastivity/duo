@@ -122,6 +122,9 @@ func TestLiveHerdr(t *testing.T) {
 		if !got.SameProcess {
 			t.Fatalf("live attachment did not validate: %+v", got)
 		}
+		if got.Class != host.ContinuitySameLive {
+			t.Fatalf("Class = %q, want %q", got.Class, host.ContinuitySameLive)
+		}
 
 		// A restart restores pane_id but always mints a new terminal_id;
 		// this is that claim, without restarting the server.
@@ -133,6 +136,9 @@ func TestLiveHerdr(t *testing.T) {
 		}
 		if got.SameProcess {
 			t.Fatal("a stale terminal_id validated; pane coordinates are not continuity")
+		}
+		if got.Class != host.ContinuityTerminalReplaced {
+			t.Fatalf("Class = %q, want %q", got.Class, host.ContinuityTerminalReplaced)
 		}
 	})
 

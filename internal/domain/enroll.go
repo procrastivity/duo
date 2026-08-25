@@ -211,6 +211,7 @@ func (a *Authority) createEnrollment(
 		IntegrationInstance: fp.IntegrationInstance,
 		Epoch:               fp.Epoch,
 		Container:           fp.Container,
+		Process:             fp.Process,
 		State:               Attached,
 	}
 
@@ -524,6 +525,62 @@ func processBirthValue(p ProcessBirth) string {
 		parts = append(parts, "exe="+p.Executable)
 	}
 	return strings.Join(parts, " ")
+}
+
+// parseProcessBirthValue reconstructs a process-birth tuple from a
+// process.birth correlation value written by processBirthValue. Empty or
+// unparseable strings are unknown: a zero ProcessBirth, never a guess. Do
+// not use this to pair N correlations to N attachments by order or time.
+func parseProcessBirthValue(s string) ProcessBirth {
+	if s == "" {
+		return ProcessBirth{}
+	}
+	if !strings.HasPrefix(s, "pid=") {
+		return ProcessBirth{}
+	}
+	s = s[len("pid="):]
+	pidPart, rest, ok := strings.Cut(s, " ")
+	if !ok {
+		return ProcessBirth{}
+	}
+	pid, err := strconv.Atoi(pidPart)
+	if err != nil {
+		return ProcessBirth{}
+	}
+	if !strings.HasPrefix(rest, "started=") {
+		return ProcessBirth{}
+	}
+	rest = rest[len("started="):]
+
+	hostIdx := strings.Index(rest, " host=")
+	exeIdx := strings.Index(rest, " exe=")
+	startedEnd := len(rest)
+	switch {
+	case hostIdx >= 0 && (exeIdx < 0 || hostIdx < exeIdx):
+		startedEnd = hostIdx
+	case exeIdx >= 0:
+		startedEnd = exeIdx
+	}
+	startedAt := rest[:startedEnd]
+	rest = rest[startedEnd:]
+
+	var host, exe string
+	if strings.HasPrefix(rest, " host=") {
+		rest = rest[len(" host="):]
+		if i := strings.Index(rest, " exe="); i >= 0 {
+			host = rest[:i]
+			rest = rest[i:]
+		} else {
+			host = rest
+			rest = ""
+		}
+	}
+	if strings.HasPrefix(rest, " exe=") {
+		exe = rest[len(" exe="):]
+	} else if rest != "" {
+		return ProcessBirth{}
+	}
+	return ProcessBirth{Host: host, PID: pid, StartedAt: startedAt, Executable: exe}
 }
 
 // describeFingerprint renders a fingerprint as fact evidence. It names the

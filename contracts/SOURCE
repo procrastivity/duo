@@ -1,6 +1,6 @@
 # contracts/SOURCE — written by contrib/sync-contracts; do not edit.
-source-sha: 27de9c174ca47de19931420dd422f0a7c6f3d75f
-f082c12eef619ffe55f3e627fc1eadd37268b0d7608cdcc149826f37bd72e539  fixtures/duo-external-v1/README.md
+source-sha: fd5224ac4f12472fddf1f1f068fe8a64bac9c09e
+cc1e166c7d7ef6a40abeb1fed086cd747ed72962d3e12802a30024c5ddb24956  fixtures/duo-external-v1/README.md
 562e3625dde7a2fc19b83e0c94fc037c109ef8937aae02d3dfd4780ad439b9f0  fixtures/duo-external-v1/command-inspect.json
 57afbee93eaf6c3e0e16ca795b0eb85fdcb4f678e2e90804c0069d34aeb37f7d  fixtures/duo-external-v1/command-result-stream-item.json
 91ca8a7db0eab863b4ee7d9fed89618ac45dcd5c1e0097fc56e28177603f5b71  fixtures/duo-external-v1/condition-stream-item.json
@@ -17,7 +17,7 @@ e065b47eb2f76d364ce5df068f28c038d4ec63449af665549263c9000f47acba  fixtures/duo-e
 c3ee5cdf85829c7beb0206f8d722041c8abc50dbc4df9d1f50f553977758b4b9  fixtures/duo-external-v1/runtime-configuration-selected.json
 a577ce2217dc49471e5ffa4db31413b83511e55748d2953b36a33a0162af184a  fixtures/duo-external-v1/session-enroll-conflict.json
 e16707b75e06fa3fdc2705aedacbba2fcf3f315aad22e3cab27e28df409a412e  fixtures/duo-external-v1/session-enroll.json
-93b5e51afb3297966cdb34d0c92db89afea4e0bb166929fcbbbc6e3b0368617b  fixtures/duo-external-v1/session-inspect.json
+9ac84c654d52cf73d8bbff071c0abe2d80f41f8ccf1e6c1a0b572eb611329dfd  fixtures/duo-external-v1/session-inspect.json
 a454952ec804147df05a004ea65dcc5830be9c0dbb86506ea633278b1f418c61  fixtures/duo-external-v1/session-launch-distinct-model-family.json
 ed91eded479dae7b1a09622666c31ae311a3cb8bd990463df4a70fc95ba7adf2  fixtures/duo-external-v1/session-launch-distinct-model-line.json
 b8cb5c174a88422e856bb6e18825e9b516b90d343bd66764f6d14413b311f765  fixtures/duo-external-v1/session-launch-exhausted.json
@@ -40,7 +40,7 @@ b93d2aa95138b1896ddc9d56d63ea890f5ba1a72bc275d63a1530bfc19214674  fixtures/duo-e
 eb0894e6eb15b8972da2fbcb5608c07e60daf4508d43aa3bee770bcb432e1977  schemas/duo-config-v1.schema.json
 2c6b98a2769c11e2876fe56275beeca1e0440d10555c037965be2c7dbc3e2c82  schemas/duo-config-v2.schema.json
 a7311aec4b38f0a089623dc4816e2b6a095077199de0b9353bf64d6c8b0f2794  schemas/duo-config-v3.schema.json
-ab512440a2d745558c998141c4740b9d2d28258ad35142906fa85ccbd50fa274  schemas/duo-external-v1.schema.json
+d33ba4cc00d6e198b01a4557c7597b4a1fda14edf48e06948bb44c2a1fa197e2  schemas/duo-external-v1.schema.json
 0e580adec7e8ad7e75b8c103ab8eebbc27beff934f6747cc9bda983ab90cb73f  schemas/duo-manifest-v1.schema.json
 388e3918e7b1421e341317c81f2c1754bd06d594b946d045a3a68e18adaf6acb  schemas/duo-projection-conformance-v1.schema.json
 c91e691f42302c78f95efb5d2e36004d33f08935495cc044351438c33aced85f  schemas/duo-projection-stamp-v1.schema.json
