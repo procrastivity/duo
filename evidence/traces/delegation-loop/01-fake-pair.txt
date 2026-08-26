@@ -1,0 +1,22 @@
+# fake-pair and cross-composition tests
+HEAD=3ebaf6a
+2026-08-26T15:22:45Z
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestPromptSendAndShow_FakePairQueuedThenInspect
+--- PASS: TestPromptSendAndShow_FakePairQueuedThenInspect (0.15s)
+=== RUN   TestPromptSend_DeliveredFakePair
+--- PASS: TestPromptSend_DeliveredFakePair (0.18s)
+=== RUN   TestPromptSend_IdempotencyConflict
+--- PASS: TestPromptSend_IdempotencyConflict (0.21s)
+=== RUN   TestPromptSend_ReplaySameDigest
+--- PASS: TestPromptSend_ReplaySameDigest (0.17s)
+=== RUN   TestSessionInspectAndConversationList_FakePair
+--- PASS: TestSessionInspectAndConversationList_FakePair (0.19s)
+PASS
+ok  	github.com/procrastivity/duo/internal/cli	0.915s
+--- fake adapters ---
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/host/fake	0.003s
+ok  	github.com/procrastivity/duo/internal/runtime/fake	0.002s
+ok  	github.com/procrastivity/duo/internal/conformance	0.009s
+EXIT:0

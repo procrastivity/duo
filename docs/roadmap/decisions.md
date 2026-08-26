@@ -44,3 +44,26 @@ authors `model_family` by hand — migration reports `manual` and infers
 nothing. Carried forward from the gate run: the no-ambient-variables
 visibility caveat on wrong bindings (step 14 finding), and the
 fingerprint-flag requirement on `duo workspace host rebind`.
+
+## 2026-08-26 — Delegation-loop milestone (§3b) exit gate: PASS at named scope
+
+Evidence: `evidence/traces/delegation-loop/` (gate.md maps every workplan
+step-17 bullet to a command transcript or test name). Binary `3ebaf6a`.
+Live set: herdr 0.8.2, claude 2.1.246, pi 0.84.3, one disposable server
+(`ddl17`), isolated XDG homes, no live user session touched.
+
+This is the §3b exit, not Stage 2 and not Stage 3. Launch reports
+`target` / `target_source`; close-on-exit artifacts ship with the
+harness dir; Claude post-launch `prompt send` delivered (pane showed
+`pong`) with same-key replay and `command.idempotency_conflict` on a
+changed request. Doctor sweep reaped an orphan harness dir and kept
+live ones; scrub-gate was silent on the clean server. `make check`
+green; `contracts/SOURCE` at terminal-multiplexers `3c9c2ba`.
+
+Limits recorded at gate time, not folded into a Stage 2/3 claim:
+launch writes no `agent.session` correlation (condition and
+`conversation.list` stay unwired live; Claude used Herdr `agent.prompt`
+rather than the messaging socket); Pi `agent.prompt` returned
+`no_effect` while Herdr listed `launch_pending`; draft-hold is
+test-only on Herdr; D1's nested Duo-launched orchestrator was not
+stood up. tmux + Codex remain deferred.

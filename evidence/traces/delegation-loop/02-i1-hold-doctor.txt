@@ -1,0 +1,62 @@
+# I-1 record-before-spawn + human-priority / auto-release + doctor
+HEAD=3ebaf6a
+2026-08-26T15:22:53Z
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestRecordCommitsBeforePrepareLaunch
+--- PASS: TestRecordCommitsBeforePrepareLaunch (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/launch	0.003s
+=== RUN   TestRecordCommitsBeforePrepareLaunch
+--- PASS: TestRecordCommitsBeforePrepareLaunch (0.10s)
+PASS
+ok  	github.com/procrastivity/duo/internal/launchrecord	0.103s
+--- delivery ---
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestDuoCreatedSettledIdleSelectsRuntimePath
+--- PASS: TestDuoCreatedSettledIdleSelectsRuntimePath (0.14s)
+=== RUN   TestAttachedPaneHolds
+--- PASS: TestAttachedPaneHolds (0.12s)
+=== RUN   TestUnknownOriginPaneHolds
+--- PASS: TestUnknownOriginPaneHolds (0.10s)
+=== RUN   TestDraftHoldsEvenOnRuntimePath
+--- PASS: TestDraftHoldsEvenOnRuntimePath (0.12s)
+=== RUN   TestPiSelectsHostPath
+--- PASS: TestPiSelectsHostPath (0.13s)
+=== RUN   TestWorkingHolds
+--- PASS: TestWorkingHolds (0.12s)
+=== RUN   TestUnknownSettledDuoCreatedAutoReleases
+--- PASS: TestUnknownSettledDuoCreatedAutoReleases (0.13s)
+=== RUN   TestAttributedQuietPeriodHolds
+--- PASS: TestAttributedQuietPeriodHolds (0.12s)
+=== RUN   TestHerdrQuietPeriodDoesNotFireWithoutAttribution
+--- PASS: TestHerdrQuietPeriodDoesNotFireWithoutAttribution (0.13s)
+=== RUN   TestCommandDoesNotRebind
+--- PASS: TestCommandDoesNotRebind (0.14s)
+=== RUN   TestHostNoEffectRequeues
+--- PASS: TestHostNoEffectRequeues (0.12s)
+=== RUN   TestDuoCreatedStampIsLaunchPlan
+--- PASS: TestDuoCreatedStampIsLaunchPlan (0.13s)
+PASS
+ok  	github.com/procrastivity/duo/internal/delivery	1.499s
+--- doctor scrub-gate + sweep ---
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestDoctorReapsRefusedLaunchHarnessDir
+--- PASS: TestDoctorReapsRefusedLaunchHarnessDir (0.00s)
+=== RUN   TestDoctorReapsTerminalSessionHarnessDir
+--- PASS: TestDoctorReapsTerminalSessionHarnessDir (0.12s)
+=== RUN   TestDoctorVisibility_ScrubGateWarnsWhenSurvivors
+--- PASS: TestDoctorVisibility_ScrubGateWarnsWhenSurvivors (0.17s)
+=== RUN   TestDoctorVisibility_ScrubGateSilentWhenClean
+--- PASS: TestDoctorVisibility_ScrubGateSilentWhenClean (0.17s)
+PASS
+ok  	github.com/procrastivity/duo/internal/cli	0.464s
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+=== RUN   TestSweepHarnessDirsMissingRootIsNoop
+--- PASS: TestSweepHarnessDirsMissingRootIsNoop (0.00s)
+=== RUN   TestSweepHarnessDirsReapsUnkeptAndLeavesKept
+--- PASS: TestSweepHarnessDirsReapsUnkeptAndLeavesKept (0.00s)
+=== RUN   TestSweepHarnessDirsNilKeepReapsAll
+--- PASS: TestSweepHarnessDirsNilKeepReapsAll (0.00s)
+PASS
+ok  	github.com/procrastivity/duo/internal/doctor	0.006s
+EXIT:0

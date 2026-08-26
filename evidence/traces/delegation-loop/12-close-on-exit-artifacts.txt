@@ -1,0 +1,12 @@
+/tmp/duo-ddl17/xdg-data/duo/harness/lrr_157c28d54008a004de7c7d605116ae90/main/:
+total 8
+drwx------ 1 dev dev   92 Aug 26 15:24 .
+drwx------ 1 dev dev    8 Aug 26 15:24 ..
+-rw------- 1 dev dev  269 Aug 26 15:24 close-on-exit-settings.json
+-rwx------ 1 dev dev 4070 Aug 26 15:24 session-end-hook.sh
+
+/tmp/duo-ddl17/xdg-data/duo/harness/lrr_fe70f8db5dc6099636a8182749dd49c8/main/:
+total 8
+drwx------ 1 dev dev   40 Aug 26 15:24 .
+drwx------ 1 dev dev    8 Aug 26 15:24 ..
+-rw------- 1 dev dev 5382 Aug 26 15:24 duo-close-on-exit.ts

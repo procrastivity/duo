@@ -1,0 +1,31 @@
+# duo doctor on gate workspace
+2026-08-26T15:27:32Z
+
+$ duo doctor --workspace /tmp/duo-ddl17/ws --output json
+{"store":{"path":"/tmp/duo-ddl17/xdg-data/duo/duo.db","present":true,"healthy":true,"schemaVersion":1,"writer":{"active":false}},"adapters":{"registered":[{"name":"fake-host","kind":"session_host","version":"stage0","conformanceDigest":"fake-host-v0","status":"supported"},{"name":"fake-runtime","kind":"agent_runtime","version":"stage0","conformanceDigest":"fake-runtime-v0","status":"supported"}]},"host_binding":{"workspace_root":"/tmp/duo-ddl17/ws","workspace_id":"ws_04a4cff6089749ad26c16d253f5b84be","bound":true,"host":{"kind":"herdr","instance_label":"/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","host_source":"explicit-flag","fingerprint":{"pane_id":"w1:p1","terminal_id":"term_659f4cfc2afcf1","process_pid":763564,"process_started_at":"2026-08-26T15:24:11.970Z"}},"provenance":{"fact_id":"fact_cf7b92db75f0874f450babaf47db7755","fact_kind":"workspace.host_bound","at":"2026-08-26T15:24:14.525Z","actor":"cli","reason":"cold-start host correlation from launch deduction","evidence":"host deduced by explicit-flag and proven by a successful spawn (launch-resolution record lrr_157c28d54008a004de7c7d605116ae90)"}},"host_deduction":{"host":{"kind":"herdr","instance_label":"/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","host_source":"workspace-correlation"},"host_source":"workspace-correlation","ranking":["explicit-flag","workspace-correlation","cwd-correlation","ambient-env","policy-default"],"outranked_evidence":[{"source":"cwd-correlation","kind":"herdr","instance_label":"/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","detail":"outranked by workspace-correlation"}]},"providers":[],"config":{"path":"/tmp/duo-ddl17/xdg-config/duo/duo.config.yaml","schema":"duo.config/v3"},"recovering_instances":2,"harness_sweep":{"reaped":0,"kept":2}}
+exit=0
+
+$ duo doctor --workspace /tmp/duo-ddl17/ws
+duo doctor
+  store: /tmp/duo-ddl17/xdg-data/duo/duo.db
+    status: healthy
+    schema version: 1
+    writer: none active
+  adapters: 2 registered
+    fake-host (session_host): supported
+    fake-runtime (agent_runtime): supported
+  workspace:       /tmp/duo-ddl17/ws
+    workspace id:  ws_04a4cff6089749ad26c16d253f5b84be
+    host binding:  herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock (host_source=explicit-flag, fact=fact_cf7b92db75f0874f450babaf47db7755)
+      fingerprint: session=- pane_id=w1:p1 terminal_id=term_659f4cfc2afcf1
+  host deduction (what M1 would deduce now):
+    ranking: explicit-flag > workspace-correlation > cwd-correlation > ambient-env > policy-default
+    winner:  workspace-correlation (herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock)
+    outranked:
+      cwd-correlation: outranked by workspace-correlation
+  providers:
+    (no standing provider facts; every provider a variant names is enabled by default)
+  config:          /tmp/duo-ddl17/xdg-config/duo/duo.config.yaml
+    schema:        duo.config/v3
+  recovering: 2 runtime instances await reconciliation (duo session reconcile)
+exit=0

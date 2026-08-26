@@ -1,0 +1,9 @@
+# live Herdr+Claude launch (builder --require agent_runtime=claude)
+duo=duo version 3ebaf6a (commit 3ebaf6a, built 2026-08-26T15:22:18Z)
+2026-08-26T15:24:12Z
+
+$ duo session launch builder --require agent_runtime=claude --host herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock --workspace /tmp/duo-ddl17/ws --output json
+duo: host bound: workspace ws_04a4cff6089749ad26c16d253f5b84be -> herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock (host_source=explicit-flag, fact fact_cf7b92db75f0874f450babaf47db7755)
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock --evidence "<what you checked>"
+{"schema":"duo.external/v1","request_id":"req_aa083091512b044a","operation":"session.launch","result":{"session_id":"ses_dab265abbb7e3c48ffb1814157b2f392","launch_resolution_id":"lrr_157c28d54008a004de7c7d605116ae90","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","composition":{"name":"claude_sonnet@herdr","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","host_source":"explicit-flag","outranked_evidence":[]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0

@@ -1,0 +1,5 @@
+HEAD=3ebaf6a
+EXIT:0
+SOURCE:
+# contracts/SOURCE — written by contrib/sync-contracts; do not edit.
+source-sha: 3c9c2ba444c423ae64e2eed8852f16cb570d4f71

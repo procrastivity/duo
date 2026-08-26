@@ -1,0 +1,71 @@
+# pane read + pi retry continuation
+2026-08-26T15:27:31Z
+
+## claude pane w1:p1
+
+ ▐▛███▛█   Claude Code v2.1.246
+▝▜██████▀  Sonnet 5 with high effort · Claude Max
+  ▝▝ ▝▝    /tmp/duo-ddl17/ws
+
+
+❯ Reply with exactly the word pong and nothing else.
+
+● pong
+
+✻ Sautéed for 1s · done 3:26 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────────
+  󰚩 Sonnet  52k 5%                                                                      /rc
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent
+
+## pi pane w1:p2
+$ pi --provider openai-codex --model gpt-5.6-luna -e /tmp/duo-ddl17/xdg-data/duo/harness/lrr_f
+e70f8db5dc6099636a8182749dd49c8/main/duo-close-on-exit.ts
+
+ pi v0.84.3
+ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  ~/.pi/agent/AGENTS.md
+
+[Skills]
+  ste9-check, ste9-lookup, ste9-write, wip
+
+[Extensions]
+  duo-close-on-exit.ts, herdr-agent-state.ts, moshi-hooks.ts, pi-effort
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+/tmp/duo-ddl17/ws
+$0.000 (sub) 0.0%/272k (auto)                               (openai-codex) gpt-5.6-luna • high
+think:high

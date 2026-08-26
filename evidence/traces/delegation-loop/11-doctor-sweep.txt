@@ -1,0 +1,49 @@
+# doctor sweep of an orphan harness dir
+2026-08-26T15:28:05Z
+before: lrr_157c28d54008a004de7c7d605116ae90
+lrr_fe70f8db5dc6099636a8182749dd49c8
+lrr_orphan_ddl17
+
+$ duo doctor --workspace /tmp/duo-ddl17/ws --output json  | jq .result.harness_sweep
+{
+  "harness_sweep": {
+    "reaped": 1,
+    "kept": 2,
+    "ids": [
+      "lrr_orphan_ddl17"
+    ]
+  },
+  "scrub_gate": null,
+  "adapters": {
+    "registered": [
+      {
+        "name": "fake-host",
+        "kind": "session_host",
+        "version": "stage0",
+        "conformanceDigest": "fake-host-v0",
+        "status": "supported"
+      },
+      {
+        "name": "fake-runtime",
+        "kind": "agent_runtime",
+        "version": "stage0",
+        "conformanceDigest": "fake-runtime-v0",
+        "status": "supported"
+      }
+    ]
+  }
+}
+--- scrub_gate ---
+null
+--- harness_sweep ---
+{
+  "reaped": 1,
+  "kept": 2,
+  "ids": [
+    "lrr_orphan_ddl17"
+  ]
+}
+
+after: lrr_157c28d54008a004de7c7d605116ae90
+lrr_fe70f8db5dc6099636a8182749dd49c8
+orphan exists? no

@@ -1,0 +1,35 @@
+# post-launch prompt send (auto-release after settle), replay, conflict
+duo=duo version 3ebaf6a (commit 3ebaf6a, built 2026-08-26T15:22:18Z)
+2026-08-26T15:26:29Z
+
+## herdr agent.list (via pane list agent names)
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"b14e043b-eb67-4e6e-9b43-7a8a098a3552"},"agent_status":"idle","cwd":"/tmp/duo-ddl17/ws","focused":true,"foreground_cwd":"/tmp/duo-ddl17/ws","interactive_ready":true,"name":"duo-main-lrr_157c28d54008a004de7","pane_id":"w1:p1","revision":1,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_659f4cfc2afcf1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},{"agent":"pi","agent_session":{"agent":"pi","kind":"path","source":"herdr:pi","value":"/home/dev/.pi/agent/sessions/--tmp-duo-ddl17-ws--/2026-08-26T15-24-24-447Z_01a03eac-25ff-7325-b0e7-bb033a1e90b7.jsonl"},"agent_status":"idle","cwd":"/tmp/duo-ddl17/ws","focused":false,"foreground_cwd":"/tmp/duo-ddl17/ws","launch_pending":true,"name":"duo-main-lrr_fe70f8db5dc6099636a","pane_id":"w1:p2","revision":1,"screen_detection_skipped":true,"state_change_seq":2,"tab_id":"w1:t2","terminal_id":"term_659f4d06f5cc02","terminal_title":"π - ws","terminal_title_stripped":"π - ws","workspace_id":"w1"}],"type":"agent_list"}}
+
+
+## Claude send
+$ duo prompt send ses_dab265abbb7e3c48ffb1814157b2f392 --text "Reply with exactly the word pong and nothing else." --idempotency-key ddl17-claude-1 --output json
+{"schema":"duo.external/v1","request_id":"req_fe38b80aea7a9187","operation":"prompt.deliver","result":{"command_id":"cmd_e27c46de912ca6ac3ca5920651eecf8e","revision":"3","target":{"session_id":"ses_dab265abbb7e3c48ffb1814157b2f392","runtime_instance_id":"ri_e1e48492765761123bf5af2044bc2f42"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-26T15:41:29.183Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+## Claude replay same text
+$ duo prompt send ses_dab265abbb7e3c48ffb1814157b2f392 --text "Reply with exactly the word pong and nothing else." --idempotency-key ddl17-claude-1 --output json
+{"schema":"duo.external/v1","request_id":"req_6c4b18348c3b7644","operation":"prompt.deliver","result":{"command_id":"cmd_e27c46de912ca6ac3ca5920651eecf8e","revision":"3","target":{"session_id":"ses_dab265abbb7e3c48ffb1814157b2f392","runtime_instance_id":"ri_e1e48492765761123bf5af2044bc2f42"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-26T15:41:29.183Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+## Claude conflict (same key, different text)
+$ duo prompt send ses_dab265abbb7e3c48ffb1814157b2f392 --text "different text" --idempotency-key ddl17-claude-1 --output json
+{"schema":"duo.external/v1","request_id":"req_ad66d2d810dd8de9","operation":"prompt.deliver","error":{"class":"conflict","code":"command.idempotency_conflict","message":"The idempotency key already binds a different canonical request.","target":{"id":"cmd_e27c46de912ca6ac3ca5920651eecf8e","kind":"prompt_command"},"retry":{"safe":false,"action":"use_new_idempotency_key"},"effect":"no_effect","details":{"existing_digest":"sha256:f93effcc25ba3e78d6aee8b3d59105daf53a5ec4ed39f466f6b0d67d13ef1cf5","idempotency_key":"ddl17-claude-1","request_digest":"sha256:28f2e705ba0f870b3070ab6cbddcb33ad774cbdcaa8f74cced1776e271d7a3c3"}}}
+exit=1
+
+## Pi send
+$ duo prompt send ses_89225e61b306020b2de98dd482a1a6de --text "Reply with exactly the word pong and nothing else." --idempotency-key ddl17-pi-1 --output json
+{"schema":"duo.external/v1","request_id":"req_59bcc859cc9bba5a","operation":"prompt.deliver","result":{"command_id":"cmd_df3a22a105cc529c33a4e2fd09e1f713","revision":"3","target":{"session_id":"ses_89225e61b306020b2de98dd482a1a6de","runtime_instance_id":"ri_7d54c0f865b26f838cf93b433f4a7cee"},"responsibility_state":"queued","queue_policy":"queue_until_safe","expires_at":"2026-08-26T15:41:29.354Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+## Pi replay
+{"schema":"duo.external/v1","request_id":"req_a8eaf8df8b246ea0","operation":"prompt.deliver","result":{"command_id":"cmd_df3a22a105cc529c33a4e2fd09e1f713","revision":"5","target":{"session_id":"ses_89225e61b306020b2de98dd482a1a6de","runtime_instance_id":"ri_7d54c0f865b26f838cf93b433f4a7cee"},"responsibility_state":"queued","queue_policy":"queue_until_safe","expires_at":"2026-08-26T15:41:29.354Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+## Pi conflict
+{"schema":"duo.external/v1","request_id":"req_9e47120514ec6a38","operation":"prompt.deliver","error":{"class":"conflict","code":"command.idempotency_conflict","message":"The idempotency key already binds a different canonical request.","target":{"id":"cmd_df3a22a105cc529c33a4e2fd09e1f713","kind":"prompt_command"},"retry":{"safe":false,"action":"use_new_idempotency_key"},"effect":"no_effect","details":{"existing_digest":"sha256:f93effcc25ba3e78d6aee8b3d59105daf53a5ec4ed39f466f6b0d67d13ef1cf5","idempotency_key":"ddl17-pi-1","request_digest":"sha256:28f2e705ba0f870b3070ab6cbddcb33ad774cbdcaa8f74cced1776e271d7a3c3"}}}
+exit=1

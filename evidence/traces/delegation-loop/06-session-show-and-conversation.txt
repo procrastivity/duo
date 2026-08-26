@@ -1,0 +1,17 @@
+# session show + conversation list after launch-settle (~12s)
+duo=duo version 3ebaf6a (commit 3ebaf6a, built 2026-08-26T15:22:18Z)
+2026-08-26T15:24:51Z
+
+$ duo session show ses_dab265abbb7e3c48ffb1814157b2f392 --output json
+{"schema":"duo.external/v1","request_id":"req_637dd088d3b2aad5","operation":"session.inspect","result":{"session_id":"ses_dab265abbb7e3c48ffb1814157b2f392","workspace_id":"ws_04a4cff6089749ad26c16d253f5b84be","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_e1e48492765761123bf5af2044bc2f42","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"unsupported"},{"operation":"conversation.list","availability":"unsupported"}],"attachments":[{"attachment_id":"att_6d86aea86dc16acfdf2e9d318afa0db6","state":"attached","integration_instance":"herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f4cfc2afcf1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":763564,"started_at":"2026-08-26T15:24:11.970Z"},"claim_held":true,"reattach_command":"duo session reattach ses_dab265abbb7e3c48ffb1814157b2f392 --integration-instance herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f4cfc2afcf1 --epoch-scope pane --container w1:p1 --process-pid 763564 --process-started-at 2026-08-26T15:24:11.970Z"}]},"warnings":[],"features":[]}
+
+$ duo conversation list ses_dab265abbb7e3c48ffb1814157b2f392 --output json
+{"error":{"code":"object.not_found","message":"No bound agent transcript is known for session \"ses_dab265abbb7e3c48ffb1814157b2f392\"."}}
+exit=1
+
+$ duo session show ses_89225e61b306020b2de98dd482a1a6de --output json
+{"schema":"duo.external/v1","request_id":"req_0904bf6776ad5da1","operation":"session.inspect","result":{"session_id":"ses_89225e61b306020b2de98dd482a1a6de","workspace_id":"ws_04a4cff6089749ad26c16d253f5b84be","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_7d54c0f865b26f838cf93b433f4a7cee","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"unsupported"},{"operation":"conversation.list","availability":"unsupported"}],"attachments":[{"attachment_id":"att_7d0f41d9f8f6e082ebd8165a276612dc","state":"attached","integration_instance":"herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f4d06f5cc02","scope":"pane"},"container":"w1:p2","process_birth":{"pid":764638,"started_at":"2026-08-26T15:24:23.290Z"},"claim_held":true,"reattach_command":"duo session reattach ses_89225e61b306020b2de98dd482a1a6de --integration-instance herdr:/tmp/duo-ddl17/xdg-config/herdr/sessions/ddl17/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f4d06f5cc02 --epoch-scope pane --container w1:p2 --process-pid 764638 --process-started-at 2026-08-26T15:24:23.290Z"}]},"warnings":[],"features":[]}
+
+$ duo conversation list ses_89225e61b306020b2de98dd482a1a6de --output json
+{"error":{"code":"object.not_found","message":"No bound agent transcript is known for session \"ses_89225e61b306020b2de98dd482a1a6de\"."}}
+exit=1
