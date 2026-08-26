@@ -159,7 +159,11 @@ func commitIdentityBind(
 	if state.Session == nil || state.Session.Value == "" {
 		return identityBindOutcome{}
 	}
-	claim, ref := claimFromHostIdentity(runtimeID, *state.Session)
+	workingDirectory := ""
+	if ws, ok := a.Workspace(sess.Workspace); ok {
+		workingDirectory = ws.RootPath
+	}
+	claim, ref := claimFromHostIdentity(runtimeID, *state.Session, workingDirectory)
 	transcript := ""
 	if rt, err := openAgentRuntime(runtimeID); err == nil {
 		if correlator, ok := rt.(runtime.RuntimeCorrelator); ok {
@@ -209,7 +213,10 @@ func commitIdentityBind(
 // and domain.AgentSessionRef. Path-shaped identity is still an
 // agent-session correlation; the value is the id/path. Correlate gets
 // TranscriptPath when kind is path so it does not scan a directory (I-6).
-func claimFromHostIdentity(runtimeID string, ident host.AgentSessionIdentity) (runtime.RuntimeClaim, domain.AgentSessionRef) {
+// WorkingDirectory is the launched session's workspace root
+// (Authority.Workspace(sess.Workspace).RootPath) so Claude can derive the
+// project-slug JSONL path from a host-named id (not a path).
+func claimFromHostIdentity(runtimeID string, ident host.AgentSessionIdentity, workingDirectory string) (runtime.RuntimeClaim, domain.AgentSessionRef) {
 	ref := domain.AgentSessionRef{
 		IntegrationInstance: runtimeID,
 		SessionID:           ident.Value,
@@ -217,6 +224,7 @@ func claimFromHostIdentity(runtimeID string, ident host.AgentSessionIdentity) (r
 	claim := runtime.RuntimeClaim{
 		IntegrationInstanceID:  runtimeID,
 		ExternalAgentSessionID: ident.Value,
+		WorkingDirectory:       workingDirectory,
 	}
 	if ident.Kind == host.AgentSessionKindPath {
 		claim.TranscriptPath = ident.Value

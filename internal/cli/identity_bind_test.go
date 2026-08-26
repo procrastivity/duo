@@ -2,12 +2,15 @@ package cli
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/host"
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/runtime/claude"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 )
 
@@ -193,23 +196,80 @@ func TestLaunchPendingDoesNotMarkLive(t *testing.T) {
 }
 
 func TestClaimFromHostIdentityMapsKind(t *testing.T) {
+	cwd := "/tmp/duo-ws"
 	id := host.AgentSessionIdentity{Kind: host.AgentSessionKindID, Value: "uuid-1"}
-	claim, ref := claimFromHostIdentity("claude-code", id)
+	claim, ref := claimFromHostIdentity("claude-code", id, cwd)
 	if ref.SessionID != "uuid-1" || claim.ExternalAgentSessionID != "uuid-1" {
 		t.Fatalf("id mapping: claim=%+v ref=%+v", claim, ref)
 	}
 	if claim.TranscriptPath != "" {
 		t.Errorf("id kind set TranscriptPath = %q", claim.TranscriptPath)
 	}
+	if claim.WorkingDirectory != cwd {
+		t.Errorf("id kind WorkingDirectory = %q, want workspace root", claim.WorkingDirectory)
+	}
 
 	path := "/tmp/pi/2026-08-26_sess.jsonl"
 	p := host.AgentSessionIdentity{Kind: host.AgentSessionKindPath, Value: path}
-	claim, ref = claimFromHostIdentity("pi", p)
+	claim, ref = claimFromHostIdentity("pi", p, cwd)
 	if ref.SessionID != path || claim.ExternalAgentSessionID != path {
 		t.Fatalf("path mapping: claim=%+v ref=%+v", claim, ref)
 	}
 	if claim.TranscriptPath != path {
 		t.Errorf("path kind TranscriptPath = %q, want the named path", claim.TranscriptPath)
+	}
+	if claim.WorkingDirectory != cwd {
+		t.Errorf("path kind WorkingDirectory = %q, want workspace root", claim.WorkingDirectory)
+	}
+}
+
+func TestLaunchIDIdentityStoresSlugTranscript(t *testing.T) {
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	claudeDir := t.TempDir()
+	rt, err := claude.New("claude-code", "", claudeDir)
+	if err != nil {
+		t.Fatalf("claude.New: %v", err)
+	}
+	RegisterAgentRuntime("claude-code", rt)
+	t.Cleanup(func() { UnregisterAgentRuntime("claude-code") })
+
+	ident := host.AgentSessionIdentity{
+		Source: "herdr:claude",
+		Agent:  "claude",
+		Kind:   host.AgentSessionKindID,
+		Value:  "sess-slug-1",
+	}
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:          &ident,
+		LaunchPending:    false,
+		InteractiveReady: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok {
+		t.Fatal("agentBindingsFor failed after id-kind launch bind")
+	}
+	if bindings.ExternalAgentSessionID != ident.Value {
+		t.Errorf("external agent session = %q, want %q", bindings.ExternalAgentSessionID, ident.Value)
+	}
+	slug := strings.Map(func(r rune) rune {
+		if r == '/' || r == '.' {
+			return '-'
+		}
+		return r
+	}, h.root)
+	want := filepath.Join(claudeDir, "projects", slug, ident.Value+".jsonl")
+	if bindings.TranscriptID != want {
+		t.Errorf("transcript = %q, want slug path %q", bindings.TranscriptID, want)
 	}
 }
 

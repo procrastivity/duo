@@ -174,3 +174,51 @@ func TestCorrelateResolvesTranscriptIDFromWorkingDirectory(t *testing.T) {
 		t.Fatalf("TranscriptID = %q, want %q (slug: / and . become -)", evidence.TranscriptID, want)
 	}
 }
+
+func TestCorrelateHostNamedIDWithWorkingDirectoryBindsInferred(t *testing.T) {
+	r := newTestRuntime(t, "duo-reporter-secret")
+	ctx := context.Background()
+
+	evidence, err := r.Correlate(ctx, runtime.RuntimeClaim{
+		IntegrationInstanceID:  testIntegrationInstanceID,
+		ExternalAgentSessionID: "host-named-session",
+		WorkingDirectory:       "/tmp/duo-dlb09-ws",
+	})
+	if err != nil {
+		t.Fatalf("Correlate: %v", err)
+	}
+	if !evidence.Bound {
+		t.Fatal("expected Bound true: host-named id plus working directory is inferred even when the registry misses")
+	}
+	if evidence.Confidence != claude.ConfidenceInferred {
+		t.Fatalf("Confidence = %q, want %q", evidence.Confidence, claude.ConfidenceInferred)
+	}
+	want := filepath.Join("testdata", "projects", "-tmp-duo-dlb09-ws", "host-named-session.jsonl")
+	if evidence.TranscriptID != want {
+		t.Fatalf("TranscriptID = %q, want slug path %q", evidence.TranscriptID, want)
+	}
+}
+
+func TestCorrelateHostNamedIDWithTranscriptPathBindsInferred(t *testing.T) {
+	r := newTestRuntime(t, "duo-reporter-secret")
+	ctx := context.Background()
+
+	path := "/tmp/pi/2026-08-26_sess.jsonl"
+	evidence, err := r.Correlate(ctx, runtime.RuntimeClaim{
+		IntegrationInstanceID:  testIntegrationInstanceID,
+		ExternalAgentSessionID: "host-named-session",
+		TranscriptPath:         path,
+	})
+	if err != nil {
+		t.Fatalf("Correlate: %v", err)
+	}
+	if !evidence.Bound {
+		t.Fatal("expected Bound true: host-named id plus TranscriptPath is inferred even when the registry misses")
+	}
+	if evidence.Confidence != claude.ConfidenceInferred {
+		t.Fatalf("Confidence = %q, want %q", evidence.Confidence, claude.ConfidenceInferred)
+	}
+	if evidence.TranscriptID != path {
+		t.Fatalf("TranscriptID = %q, want the named path", evidence.TranscriptID)
+	}
+}

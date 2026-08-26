@@ -30,19 +30,26 @@ const (
 // with no ExternalAgentSessionID never binds, no matter what
 // TranscriptPath or WorkingDirectory it carries.
 //
-// Above that floor, two independent evidence channels can bind a claim
-// that does carry an ExternalAgentSessionID:
+// Above that floor, three evidence channels can bind a claim that does
+// carry an ExternalAgentSessionID:
 //
 //  1. A claim whose ReporterCredential matches this instance's own
 //     (notes/16 §10: only a generated hook belonging to this exact
 //     instance ever carries it, via launch-env passthrough) binds at
 //     ConfidenceAuthoritative — hooks and transcripts are the
-//     authoritative channel per the close report.
+//     authoritative channel per the close report. Credential is the
+//     only upgrade to authoritative.
 //  2. Absent that, a claim whose ExternalAgentSessionID appears in the
 //     optional `~/.claude/sessions/<pid>.json` registry
 //     (notes/16 §6: undocumented, version-fragile, present only for a
-//     live interactive or -p process) binds at ConfidenceInferred and
-//     never higher.
+//     live interactive or -p process) binds at ConfidenceInferred.
+//  3. Also inferred: a host-named ExternalAgentSessionID plus a
+//     WorkingDirectory or TranscriptPath, even when the registry has
+//     not listed the id. Post-launch bind fills WorkingDirectory from
+//     the workspace root so conversation.list can open the slug path
+//     `~/.claude/projects/<slug>/<id>.jsonl` without waiting on the
+//     registry or installing reporter hooks. Registry and locator are
+//     the same inferred grade; neither outranks the other.
 //
 // A ReporterCredential that is present but wrong is not "insufficient
 // evidence" — it is a definite claim about a different runtime instance,
@@ -80,7 +87,8 @@ func (r *Runtime) Correlate(_ context.Context, claim runtime.RuntimeClaim) (runt
 	// optional, best-effort source, since a registry read failure is not
 	// the same claim as "no registry evidence exists."
 	found, _ := r.registryHasSession(claim.ExternalAgentSessionID)
-	if !found {
+	locator := claim.WorkingDirectory != "" || claim.TranscriptPath != ""
+	if !found && !locator {
 		return runtime.RuntimeCorrelationEvidence{Bound: false}, nil
 	}
 
