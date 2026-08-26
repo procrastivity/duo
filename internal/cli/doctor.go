@@ -60,6 +60,11 @@ func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 // docs/doctor/decisions.md records what a later step still owes
 // (generated-artifact drift, harness trust, live socket checks).
 //
+// The visibility rail is a diagnostic read. The harness-directory sweep
+// (notes/51 9a) is the one filesystem write: it deletes orphan close-on-exit
+// dirs whose launch-resolution id is not live. It does not write the
+// authority store and does not dial a socket (I-3).
+//
 // Step 15 (config-v3) adds the visibility rail: the cwd workspace's (or
 // --workspace's) current host correlation, what M1 would deduce right now
 // with its host_source and outranked evidence, the standing provider
@@ -122,6 +127,14 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 			configSection, policy := doctorConfigStatus(configPath)
 
 			deduction := doctorHostDeduction(cmd.Context(), a, root, policy)
+			harnessRoot, err := doctor.DefaultHarnessRoot()
+			if err != nil {
+				return duoerr.New("internal.doctor_harness_path_unresolved", fmt.Sprintf("resolving the harness directory: %v", err))
+			}
+			sweep, err := doctor.SweepHarnessDirs(harnessRoot, keepLiveHarness(a))
+			if err != nil {
+				return duoerr.New("internal.doctor_harness_sweep_failed", fmt.Sprintf("reaping orphan harness directories: %v", err))
+			}
 			report := doctorReport{
 				Report:              base,
 				HostBinding:         doctorHostBinding(a, root),
@@ -130,6 +143,7 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 				Config:              configSection,
 				RecoveringInstances: len(a.Recovering()),
 				ScrubGate:           doctorScrubGate(deduction),
+				HarnessSweep:        sweep,
 			}
 
 			if flags.JSON() {
@@ -199,6 +213,14 @@ func humanReport(report doctorReport) string {
 			report.RecoveringInstances, noun)
 	}
 
+	if report.HarnessSweep.Reaped > 0 {
+		noun := "directories"
+		if report.HarnessSweep.Reaped == 1 {
+			noun = "directory"
+		}
+		fmt.Fprintf(&b, "  harness: reaped %d orphan %s\n", report.HarnessSweep.Reaped, noun)
+	}
+
 	return b.String()
 }
 
@@ -240,6 +262,11 @@ type doctorReport struct {
 	// no host was deduced / the listener environ could not be observed.
 	// Doctor warns; launch still refuses.
 	ScrubGate *doctorScrubGateWarning `json:"scrub_gate,omitempty"`
+	// HarnessSweep is the notes/51 9a reaper: directories under
+	// $XDG_DATA_HOME/duo/harness/<lrr>/ whose launch-resolution id has no
+	// matching live (non-terminal) runtime instance, including dirs whose
+	// launch never committed a record. Filesystem-only; no socket dial.
+	HarnessSweep doctor.HarnessSweep `json:"harness_sweep"`
 }
 
 // doctorHostDeductionSection is what M1 would deduce right now for the
@@ -566,6 +593,26 @@ func doctorScrubGate(d doctorHostDeductionSection) *doctorScrubGateWarning {
 	return &doctorScrubGateWarning{
 		Host:      d.Host.Kind + ":" + d.Host.InstanceLabel,
 		Survivors: survivors,
+	}
+}
+
+// keepLiveHarness is the doctor sweep's keep predicate: a harness directory
+// named for a launch-resolution id stays only when that id still has a
+// committed record whose minted runtime instance is not terminal. No record
+// (a refused launch, or any dir whose launch never committed) is reaped.
+// Terminal is InstanceState.Terminal — exited — not the recovering view
+// Open() derives on every load, which would otherwise reap every live
+// session the moment doctor opened the store. Session.Current is not
+// consulted: a restart mints a new instance that the original harness
+// directory does not belong to.
+func keepLiveHarness(a *domain.Authority) doctor.KeepHarnessDir {
+	return func(id string) bool {
+		_, instanceID, ok := a.LaunchResolutionBinding(domain.LaunchResolutionID(id))
+		if !ok {
+			return false
+		}
+		inst, found := a.Instance(instanceID)
+		return found && !inst.State.Terminal()
 	}
 }
 

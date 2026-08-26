@@ -78,6 +78,22 @@ func (a *Authority) LaunchResolution(id LaunchResolutionID) (LaunchResolution, b
 	return entry.record.clone(), true
 }
 
+// LaunchResolutionBinding returns the session and runtime instance minted
+// in the same transaction as the launch-resolution record. ok is false when
+// no such record was committed — a refused launch, or an ID that never
+// reached the kernel.
+//
+// The instance here is the one the record created, not Session.Current: a
+// later restart mints a new instance that the original harness directory
+// does not belong to. Doctor's harness sweep keys on this binding.
+func (a *Authority) LaunchResolutionBinding(id LaunchResolutionID) (session SessionID, instance InstanceID, ok bool) {
+	entry, ok := a.launchResolutions[id]
+	if !ok {
+		return "", "", false
+	}
+	return entry.session, entry.instance, true
+}
+
 // SessionLaunchResolution returns the launch-resolution record that explains
 // one session, when the launch that created it committed one. An enrolled
 // session has none: nothing resolved it.

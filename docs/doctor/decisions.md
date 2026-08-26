@@ -24,7 +24,9 @@ later stage's work:
 - **Harness trust / re-trust reporting.** No harness projection exists yet.
 - **Live socket / control-plane checks.** No local service exists yet
   (`internal/host` is a later step, and out of this step's boundary
-  regardless).
+  regardless). Doctor still does not dial a socket (I-3). The harness
+  sweep (2026-08-26, below) is a directory listing plus deletes, not a
+  live probe.
 - **Conformance-record digests, external adapter versions.** These require
   real session-host and agent-runtime registration
   (`internal/host`/`internal/runtime`), which this step does not touch.
@@ -135,3 +137,25 @@ host's panes would trip the Stage-1 scrub gate.
   and a human warning that names them. Doctor does not refuse; launch
   still does. An unreadable or absent listener is silence (no survivors
   to name), not a proxy refusal.
+
+## 2026-08-26 — harness-directory sweep (notes/51 9a)
+
+Delegation-loop step 06. Close-on-exit default-on materializes
+`$XDG_DATA_HOME/duo/harness/<lrr>/<leaf>/` on every launch, including
+launches that never commit a record. `session.archive` / `session.remove`
+exist as session-state verbs but do not reap those directories, so
+`duo doctor` is the primary reaper in this milestone.
+
+- **Keep.** A directory named for a launch-resolution id stays when
+  `Authority.LaunchResolutionBinding` finds the instance minted with that
+  record and that instance is not terminal (`InstanceState.Terminal`,
+  `exited`). `Session.Current` is the wrong key after a restart. The
+  recovering view `Open()` derives is not a reap signal (I-3: no live
+  dial to resolve it).
+- **Reap.** Directories with no matching live instance, including those
+  whose launch never committed a record (refused / orphan). The sweep
+  does not touch panes and does not write `container_closed` facts.
+- **Follow-on.** A hook on `session.archive` / `session.remove` (and
+  `LaunchFailed` on a spawn-gate refusal after commit) can reap
+  immediately once those verbs own teardown. Until then, doctor is the
+  sweep.

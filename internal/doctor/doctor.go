@@ -100,13 +100,11 @@ func FromDescriptor(d adapter.Descriptor, compatibility adapter.CompatibilitySta
 	}
 }
 
-// DefaultStorePath resolves the authority store's default path:
-// $XDG_DATA_HOME/duo/duo.db, falling back to ~/.local/share/duo/duo.db when
-// XDG_DATA_HOME is unset — the XDG base-directory convention, mirroring
-// internal/asset's XDG_CONFIG_HOME handling for config. No document in the
-// planning set normatively fixes this path yet; docs/doctor/decisions.md
-// records the call.
-func DefaultStorePath() (string, error) {
+// xdgDataHome resolves the XDG data root: $XDG_DATA_HOME, falling back to
+// ~/.local/share when unset. Shared by DefaultStorePath and
+// DefaultHarnessRoot so the authority store and the generated harness tree
+// stay under one duo data directory.
+func xdgDataHome() (string, error) {
 	base := os.Getenv("XDG_DATA_HOME")
 	if base == "" {
 		home, err := os.UserHomeDir()
@@ -114,6 +112,20 @@ func DefaultStorePath() (string, error) {
 			return "", fmt.Errorf("doctor: resolving XDG_DATA_HOME fallback: %w", err)
 		}
 		base = filepath.Join(home, ".local", "share")
+	}
+	return base, nil
+}
+
+// DefaultStorePath resolves the authority store's default path:
+// $XDG_DATA_HOME/duo/duo.db, falling back to ~/.local/share/duo/duo.db when
+// XDG_DATA_HOME is unset — the XDG base-directory convention, mirroring
+// internal/asset's XDG_CONFIG_HOME handling for config. No document in the
+// planning set normatively fixes this path yet; docs/doctor/decisions.md
+// records the call.
+func DefaultStorePath() (string, error) {
+	base, err := xdgDataHome()
+	if err != nil {
+		return "", err
 	}
 	return filepath.Join(base, "duo", "duo.db"), nil
 }
