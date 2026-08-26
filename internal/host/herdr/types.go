@@ -125,3 +125,24 @@ type agentStartParams struct {
 type paneTargetParams struct {
 	PaneID string `json:"pane_id"`
 }
+
+// agentPromptParams is agent.prompt's wire shape: {target, text, wait}.
+// wait is omitted on the delivery call — Herdr wait is condition
+// evidence, not acknowledgment (notes/19 §3), and this adapter reports
+// admission, not a quiet-gate.
+type agentPromptParams struct {
+	Target string `json:"target"`
+	Text   string `json:"text"`
+}
+
+// agentInfo is the decoded subset of a Herdr agent record used to resolve
+// agent.prompt's target from a pane_id. revision is deliberately absent:
+// at 0.8.2 it is not a change detector (TestNoRevisionDependence).
+type agentInfo struct {
+	Name   string `json:"name"`
+	PaneID string `json:"pane_id"`
+}
+
+type agentListResult struct {
+	Agents []agentInfo `json:"agents"`
+}

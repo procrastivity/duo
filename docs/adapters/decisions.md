@@ -31,20 +31,24 @@ test needed a fourth, neutral home:
 `internal/adapter` holds both. Nothing else in the "do not touch" list
 claims this name, and it imports neither `host` nor `runtime`.
 
-## Host is scoped to four of six §5.2 interfaces; runtime to two of seven
+## Host is scoped to five of six §5.2 interfaces; runtime to four of seven
 
-The spec is explicit that the runtime surface stops at `RuntimeCorrelator`
-and `ConversationProvider` — "nothing beyond those two ... leaving them out
-is the boundary, record it, do not scaffold them." The host list
-(`HostDiscovery`, `HostLauncher`, `HostAttachmentValidator`,
-`HostLifecycleSource`) reads the same way once you count it: §5.2 defines
-six host interfaces, and the spec names four. `HostTerminalProvider` and
-`HostPromptProvider` are absent from `internal/host/host.go` by the same
-discipline as the runtime cut — no empty interface, no placeholder type,
-because a placeholder signature would commit a later step to field shapes
-(a `TerminalReadCandidate`, a `PromptPathCandidate`) nobody has designed
-yet. Both cuts are stated in the package doc comment, not just here, so a
+Stage 1's runtime surface stopped at `RuntimeCorrelator` and
+`ConversationProvider` — "nothing beyond those two ... leaving them out
+is the boundary, record it, do not scaffold them." The delegation-loop
+slice then brought in `ConditionProvider` (steps 07–08) and
+`RuntimePromptProvider` (steps 10 and 12). The host list started
+the same way: Stage 1 shipped four of six (`HostDiscovery`, `HostLauncher`,
+`HostAttachmentValidator`, `HostLifecycleSource`). Delegation-loop step 10
+named `HostPromptProvider` and `PromptPathCandidate` on `internal/host`;
+step 11 fills the interface (Herdr `agent.prompt`, plus the fake host).
+`HostTerminalProvider` stays absent — no empty interface, no placeholder
+type. Both cuts are stated in the package doc comment, not just here, so a
 reader of the code sees the boundary without having to find this file.
+
+(2026-08-26 amendment, delegation-loop step 11: the stale "four of six"
+cut is superseded for `HostPromptProvider` only. `HostTerminalProvider`
+remains out of scope.)
 
 ## Struct fields the architecture doc leaves unspecified
 
@@ -686,9 +690,10 @@ leave it at zero; only agent-linked transitions bump it). Rather than write
 field, and `TestNoRevisionDependence` parses this package's own AST to fail
 the build if any identifier or string literal here mentions it. The
 writer-presence and prompt/terminal-scope guards work the same way
-(`TestNoWriterPresenceSurface`, `TestNoPromptOrTerminalSurface`): writer
+(`TestNoWriterPresenceSurface`, `TestNoTerminalSynthesisSurface`): writer
 presence is refuted and final for 0.8.x, so the absence of that surface is
-enforced mechanically rather than trusted to review.
+enforced mechanically rather than trusted to review. The prompt path is
+no longer in that guard: `HostPromptProvider` is implemented (below).
 
 ### `PrepareLaunch` mutates nothing; `Start` waits for the handover
 
@@ -779,6 +784,48 @@ environment that cannot be read refuses too — `Config.ResolvePaneEnviron` is
 a seam for a different source, not an off switch. The full reasoning, the
 alternatives weighed, the known exec-time limit of `/proc/<pid>/environ`,
 and the test list are in `docs/scrub/decisions.md`'s 2026-08-23 section.
+
+### HostPromptProvider: `agent.prompt` (delegation-loop step 11, 2026-08-26)
+
+Architecture §5.2 only names `PromptPath`. The seal tests need actual
+`agent.prompt` I/O and an effect-certainty mapping, so delivery lives on
+the same interface as `DeliverPrompt` rather than a companion. Splitting
+would force every caller to type-assert a second interface this milestone
+always implements together. Attempt-result types stay in `internal/host`
+so adapters never import `internal/domain`.
+
+The offer is exact / native / `ComposerSafe: false`. Exact is the path
+grade (native complete-turn API, so a min-exact selector still has a host
+fallback for Pi). It is not a claim that a success result is effect-
+certain. notes/19 §2 verified the collision: `agent.prompt` appends into a
+live composer draft and submits the merge with `agent_prompted`. This
+adapter does not merge into a human draft and then claim composer-safety;
+Herdr has none. Quiet-gate stays a later step.
+
+`DeliverPrompt` sends `{target, text}` with no `wait` object and no retry
+loop. Herdr wait is condition evidence, not acknowledgment (notes/19 §3);
+a success result alone does not set `Acknowledged`. False success is
+verified: until-matching can return while the text sits as an unsubmitted
+composer draft.
+
+Effect mapping (notes/19 §2–§3, conformance mapping at notes/19:397-402):
+
+| Host condition | Outcome |
+|---|---|
+| Dial / pre-write transport failure | `no_effect` |
+| `agent_not_ready`, `agent_blocked`, `empty_agent_prompt` | `no_effect` |
+| `agent_not_running`, `agent_kind_mismatch`, `agent_not_found` (same pre-delivery family) | `no_effect` |
+| No named agent on the pane (lookup, `agent.prompt` not called) | `no_effect` (`agent_not_ready`) |
+| `agent_pane_busy` on **agent.start** | pre-delivery refusal, retried in `Start` (existing) |
+| `agent_pane_busy` / stall / timeout on **agent.prompt** | `unknown_effect` (a write may already have happened) |
+| `agent_prompt_stalled` | `unknown_effect`, never retried (decision-03 §7.1) |
+| Transport failure after the request line was written | `unknown_effect` |
+| `agent_prompted` | `delivered`, `acknowledged: false` |
+
+`agent.list` is a name lookup for `target`, not an inventory: `Discover`
+still enumerates panes from `session.snapshot`. The fake host scripts
+`no_effect` / `delivered` (and treats `Disconnect` as `no_effect`) so the
+step-14 fake pair can drive both outcomes.
 
 ## ConditionProvider (delegation-loop step 07, 2026-08-26)
 

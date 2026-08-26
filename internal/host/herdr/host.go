@@ -25,6 +25,7 @@ var (
 	_ host.HostLauncher            = (*Host)(nil)
 	_ host.HostAttachmentValidator = (*Host)(nil)
 	_ host.HostLifecycleSource     = (*Host)(nil)
+	_ host.HostPromptProvider      = (*Host)(nil)
 )
 
 // Config is everything a Host needs to reach and interpret one Herdr

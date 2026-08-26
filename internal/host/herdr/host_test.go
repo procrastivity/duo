@@ -24,6 +24,9 @@ func TestHostImplementsScopedInterfaces(t *testing.T) {
 	if _, ok := h.(host.HostLifecycleSource); !ok {
 		t.Error("Host does not implement HostLifecycleSource")
 	}
+	if _, ok := h.(host.HostPromptProvider); !ok {
+		t.Error("Host does not implement HostPromptProvider")
+	}
 }
 
 // The identity mapping from notes/19 §5: no server epoch exists, so

@@ -21,7 +21,9 @@ const (
 	// that is gone. It is an absence, not a failure.
 	CodePaneNotFound = "pane_not_found"
 	// CodeAgentPaneBusy means the target pane's shell is not at its
-	// interactive prompt yet. Proven no-effect: retry.
+	// interactive prompt yet. On agent.start it is a pre-delivery
+	// refusal (proven no-effect, retried). On agent.prompt a write may
+	// already have happened, so DeliverPrompt maps it to unknown_effect.
 	CodeAgentPaneBusy = "agent_pane_busy"
 	// CodeAgentNotFound answers agent lookups for a pane whose agent
 	// registration dropped — including the spontaneous durable
@@ -32,6 +34,26 @@ const (
 	CodeInvalidRequest = "invalid_request"
 	// CodeTimeout is the typed timeout result of a blocking wait.
 	CodeTimeout = "timeout"
+	// CodeAgentNotReady is a pre-delivery agent.prompt refusal: the named
+	// agent is not interactive yet, or is no longer the pane foreground.
+	// Proven no-effect at 0.8.2 (notes/19 §3).
+	CodeAgentNotReady = "agent_not_ready"
+	// CodeAgentBlocked is a pre-delivery refusal: a prompt to an already
+	// blocked agent is rejected before any input is sent (notes/19 §3).
+	CodeAgentBlocked = "agent_blocked"
+	// CodeEmptyAgentPrompt is a pre-delivery refusal for empty text.
+	CodeEmptyAgentPrompt = "empty_agent_prompt"
+	// CodeAgentNotRunning and CodeAgentKindMismatch complete the 0.8.2
+	// pre-delivery refusal family notes/19 lists as safe to retry.
+	CodeAgentNotRunning   = "agent_not_running"
+	CodeAgentKindMismatch = "agent_kind_mismatch"
+	// CodeAgentPromptStalled means Herdr accepted the submission and then
+	// saw no lifecycle change. unknown_effect; never auto-retried
+	// (notes/19 §3, decision-03 §7.1).
+	CodeAgentPromptStalled = "agent_prompt_stalled"
+	// CodeAgentPrompted is agent.prompt's success discriminator. It is
+	// not effect certainty and is not an acknowledgment (notes/19 §2–§3).
+	CodeAgentPrompted = "agent_prompted"
 )
 
 // maxResponseBytes caps one NDJSON line. A session.snapshot on a large
@@ -114,6 +136,15 @@ type responseEnvelope struct {
 // call performs one request/response round trip on its own connection and
 // decodes result into out (which may be nil to discard it).
 func (c *client) call(ctx context.Context, method string, params any, out any) error {
+	_, err := c.callAdmit(ctx, method, params, out)
+	return err
+}
+
+// callAdmit is call plus whether a request line may have reached the
+// server. Dial and pre-write failures report written=false (proven
+// no-effect). A failed write after dial reports written=true: the server
+// may have read a partial or complete request.
+func (c *client) callAdmit(ctx context.Context, method string, params any, out any) (written bool, err error) {
 	deadline := time.Now().Add(c.timeout)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
@@ -123,30 +154,30 @@ func (c *client) call(ctx context.Context, method string, params any, out any) e
 
 	conn, err := c.dial(dialCtx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() { _ = conn.Close() }()
 	if err := conn.SetDeadline(deadline); err != nil {
-		return fmt.Errorf("herdr %s: set deadline: %w", method, err)
+		return false, fmt.Errorf("herdr %s: set deadline: %w", method, err)
 	}
 
 	if err := writeRequest(conn, requestEnvelope{ID: c.nextID(), Method: method, Params: orEmptyParams(params)}); err != nil {
-		return fmt.Errorf("herdr %s: %w", method, err)
+		return true, fmt.Errorf("herdr %s: %w", method, err)
 	}
 	resp, err := readResponse(conn)
 	if err != nil {
-		return fmt.Errorf("herdr %s: %w", method, err)
+		return true, fmt.Errorf("herdr %s: %w", method, err)
 	}
 	if resp.Error != nil {
-		return &ProtocolError{Method: method, Code: resp.Error.Code, Message: resp.Error.Message}
+		return true, &ProtocolError{Method: method, Code: resp.Error.Code, Message: resp.Error.Message}
 	}
 	if out == nil {
-		return nil
+		return true, nil
 	}
 	if err := json.Unmarshal(resp.Result, out); err != nil {
-		return fmt.Errorf("herdr %s: decode result: %w", method, err)
+		return true, fmt.Errorf("herdr %s: decode result: %w", method, err)
 	}
-	return nil
+	return true, nil
 }
 
 // orEmptyParams keeps the params field present and object-shaped. The

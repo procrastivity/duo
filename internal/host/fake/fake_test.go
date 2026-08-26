@@ -140,6 +140,50 @@ func TestLaunchAttachAndKill(t *testing.T) {
 	}
 }
 
+func TestFakeHostImplementsPromptProvider(t *testing.T) {
+	ctx := context.Background()
+	h := hostfake.New("integration-1")
+	attachment, _ := startFake(t, h)
+
+	path, err := h.PromptPath(ctx, attachment)
+	if err != nil {
+		t.Fatalf("PromptPath: %v", err)
+	}
+	if path.Quality != "exact" || path.Realization != "native" {
+		t.Fatalf("path = %+v, want exact/native", path)
+	}
+
+	delivered, err := h.DeliverPrompt(ctx, host.PromptRequest{Attachment: attachment, Text: "hello"})
+	if err != nil {
+		t.Fatalf("DeliverPrompt: %v", err)
+	}
+	if delivered.Outcome != host.PromptOutcomeDelivered {
+		t.Fatalf("default Outcome = %q, want delivered", delivered.Outcome)
+	}
+	if delivered.Acknowledged {
+		t.Fatal("fake delivered result must not claim acknowledgment")
+	}
+
+	h.ScriptPromptOutcome(host.PromptOutcomeNoEffect)
+	none, err := h.DeliverPrompt(ctx, host.PromptRequest{Attachment: attachment, Text: "hello"})
+	if err != nil {
+		t.Fatalf("DeliverPrompt scripted no_effect: %v", err)
+	}
+	if none.Outcome != host.PromptOutcomeNoEffect {
+		t.Fatalf("scripted Outcome = %q, want no_effect", none.Outcome)
+	}
+
+	h.ScriptPromptOutcome("")
+	h.Disconnect()
+	lost, err := h.DeliverPrompt(ctx, host.PromptRequest{Attachment: attachment, Text: "hello"})
+	if err != nil {
+		t.Fatalf("DeliverPrompt after Disconnect: %v", err)
+	}
+	if lost.Outcome != host.PromptOutcomeNoEffect {
+		t.Fatalf("unreachable Outcome = %q, want no_effect", lost.Outcome)
+	}
+}
+
 func TestValidateAttachmentClasses(t *testing.T) {
 	ctx := context.Background()
 

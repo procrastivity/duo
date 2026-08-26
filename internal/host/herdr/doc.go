@@ -1,7 +1,7 @@
-// Package herdr is the Stage-1 session-host adapter for Herdr: the four
-// §5.2 host interfaces this project scoped (HostDiscovery, HostLauncher,
-// HostAttachmentValidator, HostLifecycleSource) plus the §5.1 factory
-// envelope, spoken over Herdr's NDJSON socket API.
+// Package herdr is the session-host adapter for Herdr: the five §5.2 host
+// interfaces this project scoped (HostDiscovery, HostLauncher,
+// HostAttachmentValidator, HostLifecycleSource, HostPromptProvider) plus
+// the §5.1 factory envelope, spoken over Herdr's NDJSON socket API.
 //
 // Everything below that reads like a rule is probe evidence, not a
 // preference: it comes from the 2026-08-23 P7 probe session against the
@@ -80,9 +80,8 @@
 // At 0.8.2 pane.revision stopped tracking screen content: visible screen
 // changes leave it at zero, and only agent-linked transitions bump it.
 // Nothing in this package decodes or keys on `revision`, enforced by
-// TestNoRevisionDependence. Terminal reads are out of Stage-1 scope
-// anyway; HostTerminalProvider is deliberately not implemented (same
-// boundary discipline as internal/host's own four-of-six cut).
+// TestNoRevisionDependence. Terminal reads stay out of scope;
+// HostTerminalProvider is deliberately not implemented.
 //
 // # Lifecycle observation is snapshot-diff, never backfill
 //
@@ -168,15 +167,36 @@
 // readiness lives in agent.wait and interactive_ready, which Stage 1 does
 // not implement.
 //
+// # HostPromptProvider: agent.prompt, not composer-safe, not effect-certain
+//
+// The path is Herdr's native `agent.prompt`. PromptPath reports it as
+// exact/native and ComposerSafe false. DeliverPrompt sends one request
+// with no wait object and no retry loop.
+//
+// Effect mapping follows notes/19 §2–§3 (conformance mapping at
+// notes/19:397-402):
+//
+//   - Transport or admission failure that proves the pane accepted no
+//     input is no_effect. So are the pre-delivery refusal codes
+//     agent_not_ready, agent_blocked, empty_agent_prompt, plus the rest of
+//     that family (agent_not_running, agent_kind_mismatch, agent_not_found).
+//   - agent_pane_busy on agent.start is a pre-delivery refusal and is
+//     retried there. On agent.prompt a write may already have happened, so
+//     busy, stall, and timeout map to unknown_effect. agent_prompt_stalled
+//     is never retried (decision-03 §7.1).
+//   - agent_prompted success is delivered with Acknowledged false. Herdr
+//     wait is condition evidence, not acknowledgment. False success is
+//     verified: until-matching can return while the text sits as an
+//     unsubmitted composer draft. This adapter does not wait, and does not
+//     claim composer-safety or merge into a human draft.
+//
+// Quiet-gate remains a later step; this adapter reports what the host did.
+//
 // # Not implemented, deliberately
 //
-// No HostTerminalProvider (Stage-1 scope, plus the revision finding
-// above) and no HostPromptProvider. The prompt path carries the sharpest
-// unresolved hazards at 0.8.2 — agent.prompt merges into and submits a
-// human's half-typed composer draft with no signal, and a success result
-// does not prove submission or execution (verified false success) — and
-// none of that is Stage-1 work. Leaving the interface out is the boundary;
-// a stub would imply a design nobody has made.
+// No HostTerminalProvider. Terminal reads are snapshot-only at 0.8.2, and
+// revision is not a change detector (above). Leaving that interface out is
+// the boundary; a stub would imply a design nobody has made.
 //
 // This package must never import internal/runtime; internal/adapter's
 // TestRoleSeparation enforces that mechanically.

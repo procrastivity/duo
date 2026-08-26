@@ -120,19 +120,17 @@ func TestNoRevisionDependence(t *testing.T) {
 	}
 }
 
-// Stage 1 stops at four of §5.2's six host interfaces. The two left out —
-// terminal reads and the prompt path — are boundaries, not oversights, and
-// a stub for either would imply a design nobody has made. The prompt path
-// in particular carries 0.8.2's sharpest unresolved hazards (a prompt
-// merges into and submits a human's half-typed draft; success does not
-// prove submission).
-func TestNoPromptOrTerminalSurface(t *testing.T) {
-	forbidden := []string{"Prompt", "SendInput", "SendKeys", "SendText", "ReadTerminal", "Repaint"}
+// HostTerminalProvider stays out of scope: terminal reads are snapshot-only
+// at 0.8.2 and revision is not a change detector. HostPromptProvider is in
+// scope for the delegation-loop slice (agent.prompt). This guard therefore
+// forbids terminal synthesis and raw send-keys, not the prompt path.
+func TestNoTerminalSynthesisSurface(t *testing.T) {
+	forbidden := []string{"SendInput", "SendKeys", "SendText", "ReadTerminal", "Repaint"}
 	fset, files := packageFiles(t)
 	for _, ident := range declaredNames(t, fset, files) {
 		for _, bad := range forbidden {
 			if strings.Contains(ident.Name, bad) {
-				t.Errorf("%s: declared name %q reaches outside the Stage-1 host scope",
+				t.Errorf("%s: declared name %q reaches a terminal-synthesis surface this adapter does not own",
 					fset.Position(ident.Pos()), ident.Name)
 			}
 		}

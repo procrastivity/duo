@@ -4,9 +4,9 @@
 //
 // This package implements HostDiscovery, HostLauncher,
 // HostAttachmentValidator, HostLifecycleSource, and HostPromptProvider.
-// HostPromptProvider is named here (delegation-loop step 10) and filled by
-// Herdr in step 11; this package does not invoke it. HostTerminalProvider
-// stays out of scope — no empty interface, no TODO type. See
+// HostPromptProvider is named here (delegation-loop step 10) and implemented
+// by Herdr (step 11) over `agent.prompt`; this package does not invoke it.
+// HostTerminalProvider stays out of scope — no empty interface, no TODO type. See
 // docs/adapters/decisions.md.
 //
 // The interface names and the types they reference in method signatures

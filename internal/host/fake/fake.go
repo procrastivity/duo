@@ -26,6 +26,7 @@ type Host struct {
 	attachments           map[string]host.Evidence // keyed by paneKey
 	unreachable           bool
 	streams               []*observationStream
+	promptOutcome         host.PromptOutcome
 }
 
 var (
@@ -33,6 +34,7 @@ var (
 	_ host.HostLauncher            = (*Host)(nil)
 	_ host.HostAttachmentValidator = (*Host)(nil)
 	_ host.HostLifecycleSource     = (*Host)(nil)
+	_ host.HostPromptProvider      = (*Host)(nil)
 	_ adapter.Factory[*Host]       = Factory{}
 )
 
@@ -286,6 +288,59 @@ func (h *Host) ObserveHostLifecycle(_ context.Context, req host.HostObservationR
 	h.streams = append(h.streams, s)
 	h.mu.Unlock()
 	return s, nil
+}
+
+// ScriptPromptOutcome sets what DeliverPrompt returns. Empty restores the
+// default: delivered, acknowledged false. The fake can prove no_effect and
+// delivered under test control so the step-14 fake pair works without a
+// live host.
+func (h *Host) ScriptPromptOutcome(outcome host.PromptOutcome) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.promptOutcome = outcome
+}
+
+// PromptPath implements host.HostPromptProvider. The fake has no TUI
+// composer to clobber, so ComposerSafe is true; quality and realization
+// match the native complete-turn offer a real host reports.
+func (h *Host) PromptPath(_ context.Context, attachment host.Attachment) (host.PromptPathCandidate, error) {
+	if attachment.IntegrationInstanceID != "" && attachment.IntegrationInstanceID != h.integrationInstanceID {
+		return host.PromptPathCandidate{}, fmt.Errorf(
+			"fake host %s: request for integration instance %s",
+			h.integrationInstanceID, attachment.IntegrationInstanceID)
+	}
+	return host.PromptPathCandidate{
+		Quality:      "exact",
+		Realization:  "native",
+		ComposerSafe: true,
+	}, nil
+}
+
+// DeliverPrompt implements host.HostPromptProvider. Disconnect proves
+// no_effect (the pane accepted no input). A scripted outcome otherwise
+// wins; the default is delivered with Acknowledged false.
+func (h *Host) DeliverPrompt(_ context.Context, req host.PromptRequest) (host.PromptAttemptResult, error) {
+	if req.Attachment.IntegrationInstanceID != "" && req.Attachment.IntegrationInstanceID != h.integrationInstanceID {
+		return host.PromptAttemptResult{}, fmt.Errorf(
+			"fake host %s: request for integration instance %s",
+			h.integrationInstanceID, req.Attachment.IntegrationInstanceID)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.unreachable {
+		return host.PromptAttemptResult{Outcome: host.PromptOutcomeNoEffect}, nil
+	}
+	switch h.promptOutcome {
+	case host.PromptOutcomeNoEffect:
+		return host.PromptAttemptResult{Outcome: host.PromptOutcomeNoEffect}, nil
+	case host.PromptOutcomeUnknownEffect:
+		return host.PromptAttemptResult{Outcome: host.PromptOutcomeUnknownEffect}, nil
+	default:
+		return host.PromptAttemptResult{
+			Outcome:      host.PromptOutcomeDelivered,
+			Acknowledged: false,
+		}, nil
+	}
 }
 
 // paneKey addresses a pane the way Herdr does: pane_id within one

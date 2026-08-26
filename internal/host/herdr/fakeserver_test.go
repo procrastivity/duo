@@ -24,30 +24,34 @@ type fakeHerdr struct {
 	path string
 	ln   net.Listener
 
-	mu             sync.Mutex
-	version        string
-	protocol       int
-	panes          []fakePaneState
-	workspaces     []string
-	focusedPane    string
-	nextPane       int
-	nextTerminal   int
-	agentStartBusy int
-	agentStartPID  int
-	agentStartErr  *wireError
-	paneCloseErr   *wireError
-	connections    int
-	calls          []string
-	lastRequestID  string
-	lastEnv        map[string]string
-	lastSplit      paneSplitParams
-	lastTab        tabCreateParams
-	tabCloseErr    *wireError
-	nextTab        int
-	lastAgentStart agentStartParams
-	backfill       []string
-	subscribers    []net.Conn
-	stopped        bool
+	mu              sync.Mutex
+	version         string
+	protocol        int
+	panes           []fakePaneState
+	workspaces      []string
+	focusedPane     string
+	nextPane        int
+	nextTerminal    int
+	agentStartBusy  int
+	agentStartPID   int
+	agentStartErr   *wireError
+	paneCloseErr    *wireError
+	connections     int
+	calls           []string
+	lastRequestID   string
+	lastEnv         map[string]string
+	lastSplit       paneSplitParams
+	lastTab         tabCreateParams
+	tabCloseErr     *wireError
+	nextTab         int
+	lastAgentStart  agentStartParams
+	agents          []fakeAgent
+	agentPromptErr  *wireError
+	dropPrompt      bool
+	lastAgentPrompt agentPromptParams
+	backfill        []string
+	subscribers     []net.Conn
+	stopped         bool
 }
 
 type fakePaneState struct {
@@ -57,6 +61,11 @@ type fakePaneState struct {
 	tabID       string
 	shellPID    int
 	fgPID       int
+}
+
+type fakeAgent struct {
+	name   string
+	paneID string
 }
 
 func newFakeHerdr(t *testing.T) *fakeHerdr {
@@ -160,6 +169,15 @@ func (f *fakeHerdr) handle(conn net.Conn) {
 
 	if req.Method == "events.subscribe" {
 		f.serveSubscription(conn, req.ID)
+		return
+	}
+
+	f.mu.Lock()
+	dropPrompt := req.Method == "agent.prompt" && f.dropPrompt
+	f.mu.Unlock()
+	if dropPrompt {
+		// Request reached the server; the response never comes back.
+		_ = conn.Close()
 		return
 	}
 
@@ -322,7 +340,41 @@ func (f *fakeHerdr) dispatch(method string, params json.RawMessage) (any, *wireE
 				}
 			}
 		}
+		f.agents = append(f.agents, fakeAgent{name: p.Name, paneID: p.PaneID})
 		return map[string]any{"type": "agent_started", "argv": []string{p.Kind}}, nil
+	case "agent.list":
+		agents := make([]map[string]any, 0, len(f.agents))
+		for _, a := range f.agents {
+			agents = append(agents, map[string]any{
+				"name":    a.name,
+				"pane_id": a.paneID,
+			})
+		}
+		return map[string]any{"type": "agent_list", "agents": agents}, nil
+	case "agent.prompt":
+		var p agentPromptParams
+		_ = json.Unmarshal(params, &p)
+		f.lastAgentPrompt = p
+		if f.agentPromptErr != nil {
+			return nil, f.agentPromptErr
+		}
+		if p.Text == "" {
+			return nil, &wireError{Code: CodeEmptyAgentPrompt, Message: "empty prompt"}
+		}
+		found := false
+		for _, a := range f.agents {
+			if a.name == p.Target {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, &wireError{Code: CodeAgentNotReady, Message: "not an active named agent"}
+		}
+		return map[string]any{
+			"type":  "agent_prompted",
+			"agent": map[string]any{"name": p.Target},
+		}, nil
 	default:
 		return nil, &wireError{Code: "unknown_method", Message: method}
 	}
@@ -499,7 +551,7 @@ func (f *fakeHerdr) mutatingCalls() []string {
 	var out []string
 	for _, c := range f.calls {
 		switch c {
-		case "workspace.create", "tab.create", "tab.close", "pane.split", "agent.start", "pane.send_input", "pane.send_text":
+		case "workspace.create", "tab.create", "tab.close", "pane.split", "agent.start", "agent.prompt", "pane.send_input", "pane.send_text":
 			out = append(out, c)
 		}
 	}
@@ -528,6 +580,30 @@ func (f *fakeHerdr) lastAgentStartParams() agentStartParams {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.lastAgentStart
+}
+
+func (f *fakeHerdr) addAgent(name, paneID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.agents = append(f.agents, fakeAgent{name: name, paneID: paneID})
+}
+
+func (f *fakeHerdr) setAgentPromptError(code, message string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.agentPromptErr = &wireError{Code: code, Message: message}
+}
+
+func (f *fakeHerdr) setDropPrompt(drop bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dropPrompt = drop
+}
+
+func (f *fakeHerdr) lastAgentPromptParams() agentPromptParams {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastAgentPrompt
 }
 
 func (f *fakeHerdr) lastSplitParams() paneSplitParams {
