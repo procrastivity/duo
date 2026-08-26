@@ -17,11 +17,10 @@
 // configuration a correlation-reporting hook would need — that installation
 // path is still out of scope here.
 //
-// closeonexit.go is a narrow, PROVISIONAL exception (dogfood, 2026-08-24):
-// it generates and materializes one single-purpose SessionEnd hook plus a
-// `claude --settings` document for --close-on-exit, entirely independent of
-// Correlate and the RuntimeClaim path above. See
-// host.ResolvedLaunchTuple.CloseOnExit and terminal-multiplexers notes/46.
+// closeonexit.go is a narrow exception: it generates and materializes one
+// single-purpose SessionEnd hook plus a `claude --settings` document for
+// close-on-exit, entirely independent of Correlate and the RuntimeClaim
+// path above. See host.ResolvedLaunchTuple.CloseOnExit.
 package claude
 
 import (

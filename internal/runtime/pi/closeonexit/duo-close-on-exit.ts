@@ -4,10 +4,6 @@
 // github.com/procrastivity/duo internal/runtime/pi/closeonexit and rewrites
 // it on every materialization. Local edits are lost.
 //
-// PROVISIONAL (dogfood, 2026-08-24): --close-on-exit is a dogfood-day
-// expedient ahead of change control; the ratified design is sketched in
-// terminal-multiplexers notes/46.
-//
 // Target: pi 0.83.0 (@earendil-works/pi-coding-agent). This file is not
 // installed into ~/.pi/agent/extensions/ — nothing does that for the
 // shipped reporter extension either (internal/runtime/pi's package doc
@@ -49,6 +45,9 @@ type PiAPI = { on: (event: string, handler: (event: any, ctx: any) => void) => v
 // same reasoning as duo-pi-reporter.ts's CLOSE_PANE_ON_EXIT block, nothing
 // here scrubs them. They are also HERDR_*'s and Herdr's environment to
 // keep or remove, not this asset's.
+//
+// DUO_CLOSE_PANE_ON_EXIT lasts the pane's life, so a second pi started by
+// hand in that pane also closes it on quit (notes/51 record 9c).
 const DUO_CLOSE_PANE_ON_EXIT = process.env["DUO_CLOSE_PANE_ON_EXIT"] === "1";
 const HERDR_ENV = process.env["HERDR_ENV"] === "1";
 const HERDR_PANE_ID = process.env["HERDR_PANE_ID"] ?? "";

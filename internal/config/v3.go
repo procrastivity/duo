@@ -129,11 +129,15 @@ type SessionHostPolicy struct {
 // "tab" or "pane" is the config-authored default the launcher consults.
 // It is a launcher input, never a resolution input (I-3).
 //
-// close_on_exit is accepted on the raw stanza so the synced fixture
-// decodes (KnownFields), but is not promoted here — step 04 wires it.
+// CloseOnExit is the same pointer discipline as Enabled: absent means
+// true (close-on-exit is the product default; notes/51 record 7
+// stop-gate edit). It is a launcher input, never a resolution input
+// (I-3); ResolveCloseOnExit consults it after an explicit
+// --remain-on-exit opt-out.
 type SessionHostKind struct {
 	Enabled      *bool
 	LaunchTarget *string `json:",omitempty"`
+	CloseOnExit  *bool   `json:",omitempty"`
 }
 
 // SessionHostDeduceSource is one session_hosts.deduce.<source> stanza,
@@ -239,10 +243,7 @@ type rawSessionHosts struct {
 type rawSessionHostKind struct {
 	Enabled      *bool   `yaml:"enabled"`
 	LaunchTarget *string `yaml:"launch_target"`
-	// CloseOnExit is decoded so KnownFields accepts the synced
-	// duo-external-v1 config fixture; SessionHostKind does not carry it
-	// until step 04 wires close-on-exit behavior.
-	CloseOnExit *bool `yaml:"close_on_exit"`
+	CloseOnExit  *bool   `yaml:"close_on_exit"`
 }
 
 type rawSessionHostDeduceSource struct {
@@ -389,10 +390,7 @@ func resolveSessionHosts(raw rawSessionHosts) (SessionHostPolicy, error) {
 						fmt.Sprintf("config: session_hosts.kinds.%s.launch_target %q is not tab or pane", name, *k.LaunchTarget))
 				}
 			}
-			kinds[name] = SessionHostKind{
-				Enabled:      k.Enabled,
-				LaunchTarget: k.LaunchTarget,
-			}
+			kinds[name] = SessionHostKind(k)
 		}
 	}
 

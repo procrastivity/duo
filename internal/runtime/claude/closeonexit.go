@@ -9,15 +9,11 @@ import (
 )
 
 // CloseOnExitHookScript is the embedded SessionEnd hook Duo installs when a
-// claude launch requests --close-on-exit: closeonexit/session-end.sh,
+// claude launch requests close-on-exit: closeonexit/session-end.sh,
 // embedded verbatim (no template substitution — everything load-bearing is
 // fixed in the asset itself and guarded by closeonexit_test.go), matching
 // internal/runtime/pi/extension.go's embed pattern for a generated harness
-// asset.
-//
-// PROVISIONAL (dogfood, 2026-08-24): --close-on-exit is a dogfood-day
-// expedient ahead of change control; the ratified design is sketched in
-// terminal-multiplexers notes/46. See host.ResolvedLaunchTuple.CloseOnExit.
+// asset. See host.ResolvedLaunchTuple.CloseOnExit.
 //
 //go:embed closeonexit/session-end.sh
 var CloseOnExitHookScript string
@@ -91,9 +87,8 @@ func RenderCloseOnExitSettings(hookPath string) ([]byte, error) {
 // No planning document fixes a generated-harness-tree path yet
 // (internal/manifest's HarnessTarget is scaffolding for a later renderer,
 // not a path convention: "No harness renderer exists yet"); this is this
-// feature's own call, PROVISIONAL like the rest of --close-on-exit, and it
-// is the first thing in this repository to write a generated per-session
-// file to disk at all.
+// feature's own call, and it is the first thing in this repository to write
+// a generated per-session file to disk at all.
 func DefaultHarnessDir(launchResolutionID, leaf string) (string, error) {
 	if launchResolutionID == "" {
 		return "", fmt.Errorf("claude: close-on-exit harness directory needs a launch-resolution ID")

@@ -8,17 +8,13 @@ import (
 )
 
 // CloseOnExitExtensionSource is the embedded, close-only Pi extension Duo
-// materializes when a pi launch requests --close-on-exit:
+// materializes when a pi launch requests close-on-exit:
 // closeonexit/duo-close-on-exit.ts, embedded verbatim (no template
 // substitution — everything load-bearing is fixed in the asset itself and
 // guarded by extension_test.go), deliberately separate from
 // extensionAsset (the reporter): close-on-exit must not drag the
 // reporter's credential/socket concerns into a minimal, close-only
-// extension.
-//
-// PROVISIONAL (dogfood, 2026-08-24): --close-on-exit is a dogfood-day
-// expedient ahead of change control; the ratified design is sketched in
-// terminal-multiplexers notes/46. See host.ResolvedLaunchTuple.CloseOnExit.
+// extension. See host.ResolvedLaunchTuple.CloseOnExit.
 //
 //go:embed closeonexit/duo-close-on-exit.ts
 var CloseOnExitExtensionSource string
@@ -51,7 +47,7 @@ const CloseOnExitExtensionFileName = "duo-close-on-exit.ts"
 // No planning document fixes a generated-harness-tree path yet
 // (internal/manifest's HarnessTarget is scaffolding for a later renderer,
 // not a path convention: "No harness renderer exists yet"); this is this
-// feature's own call, PROVISIONAL like the rest of --close-on-exit.
+// feature's own call.
 func DefaultHarnessDir(launchResolutionID, leaf string) (string, error) {
 	if launchResolutionID == "" {
 		return "", fmt.Errorf("pi: close-on-exit harness directory needs a launch-resolution ID")

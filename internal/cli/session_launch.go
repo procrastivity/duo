@@ -65,7 +65,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 		dryRun       bool
 		owner, actor string
 		bindActor    string
-		closeOnExit  bool
+		remainOnExit bool
 	)
 
 	cmd := &cobra.Command{
@@ -183,7 +183,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 					Request:       req,
 					WorkspacePath: mat.WorkspacePath(),
 					Target:        target,
-					CloseOnExit:   closeOnExit,
+					RemainOnExit:  remainOnExit,
 				}, mat, actor)
 				if err != nil {
 					return launchFailure(streams, mode, err)
@@ -209,8 +209,8 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 		`the session host to launch into, "<kind>" or "<kind>:<instance>": deduction rung 0, outranking the workspace correlation, the ambient environment, and the policy default`)
 	cmd.Flags().StringVar(&targetFlag, "target", "",
 		`where the launched agent's container is created in the deduced host, "tab" or "pane": an explicit placement override (defaults to session_hosts.kinds.<kind>.launch_target, then the host's built-in; Herdr built-in is tab)`)
-	cmd.Flags().BoolVar(&closeOnExit, "close-on-exit", false,
-		`close the launched agent's host-side container when the agent exits cleanly, from an agent-side SessionEnd hook -- never a watcher, send-keys, or shell injection (crashes and kills leave the container open by design; provisional pending change control, see notes/46)`)
+	cmd.Flags().BoolVar(&remainOnExit, "remain-on-exit", false,
+		`leave the launched agent's host-side container open when the agent exits cleanly (close-on-exit is the product default; this opts out for one launch — crashes and kills leave the container open by design either way)`)
 	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
 	cmd.Flags().StringArrayVar(&requireFlags, "require", nil, "a non-relenting launch constraint, axis=value (agent_runtime, model_line, or model_family); repeatable")
 	cmd.Flags().StringArrayVar(&avoidFlags, "avoid", nil, "a soft launch constraint, axis=value; repeatable")
@@ -600,7 +600,7 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 }
 
 // stage1LeafAugmenter is the CLI's launch.LeafAugmenter: the concrete,
-// adapter-aware seam --close-on-exit's two runtime legs use to contribute
+// adapter-aware seam close-on-exit's two runtime legs use to contribute
 // what each needs for a leaf's launch — claude materializes a generated
 // SessionEnd hook and settings file and appends `--settings <path>` to
 // that leaf's launch arguments; pi materializes a generated close-only
@@ -612,12 +612,12 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
 // runtime adapter); this CLI-level implementation is the one place that
-// knows what "claude" and "pi" mean and what each buys from
-// --close-on-exit. It is host-agnostic in acceptance the same way --target
-// is: nothing here refuses --close-on-exit for any deduced session-host
-// kind. The claude leg's hook itself is what guards on being inside a
-// Herdr pane (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some
-// future non-Herdr host simply gets a settings file whose hook exits 0
+// knows what "claude" and "pi" mean and what each buys from close-on-exit.
+// It is host-agnostic in acceptance the same way --target is: nothing here
+// refuses close-on-exit for any deduced session-host kind. The claude
+// leg's hook itself is what guards on being inside a Herdr pane
+// (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some future
+// non-Herdr host simply gets a settings file whose hook exits 0
 // immediately. The pi leg's materialized extension carries the identical
 // guard (closeonexit/duo-close-on-exit.ts) — a leaf on some future
 // non-Herdr host gets an extension loaded that quietly does nothing.
@@ -631,8 +631,8 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // installation gets built — nothing here assumes the reporter is absent,
 // it just does not depend on the reporter being present either.
 //
-// PROVISIONAL (dogfood, 2026-08-24): see host.ResolvedLaunchTuple.CloseOnExit
-// and terminal-multiplexers notes/46. Every agent runtime other than
+// Close-on-exit is the product default (notes/51 record 7); --remain-on-exit
+// and config close_on_exit: false opt out. Every agent runtime other than
 // "claude" and "pi" is untouched: Augment is a no-op unless closeOnExit is
 // set and t.AgentRuntime is one of those two.
 type stage1LeafAugmenter struct{}

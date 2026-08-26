@@ -81,14 +81,13 @@ type LeafAugmentation struct {
 // on), never a runtime adapter. A caller that needs to act only for one
 // agent-runtime kind switches on Tuple.AgentRuntime itself.
 //
-// PROVISIONAL (dogfood, 2026-08-24): the first and only installed
-// implementation is CLI's stage1LeafAugmenter, which contributes two
-// independent legs of --close-on-exit on the same closeOnExit request: the
-// claude-runtime leg materializes a per-session SessionEnd hook and
-// settings file and returns Args `["--settings", <path>]`; the pi-runtime
-// leg returns Env `{"DUO_CLOSE_PANE_ON_EXIT": "1"}`, which the pi
-// extension's session_shutdown handler reads from its own pane env. See
-// host.ResolvedLaunchTuple.CloseOnExit and terminal-multiplexers notes/46.
+// The first and only installed implementation is CLI's stage1LeafAugmenter,
+// which contributes two independent legs of close-on-exit on the same
+// closeOnExit request: the claude-runtime leg materializes a per-session
+// SessionEnd hook and settings file and returns Args `["--settings",
+// <path>]`; the pi-runtime leg materializes a close-only extension and
+// returns Args `["-e", <path>]` plus Env `{"DUO_CLOSE_PANE_ON_EXIT": "1"}`.
+// See host.ResolvedLaunchTuple.CloseOnExit.
 type LeafAugmenter interface {
 	Augment(ctx context.Context, launchResolutionID, leaf string, t Tuple, closeOnExit bool) (LeafAugmentation, error)
 }
@@ -164,13 +163,11 @@ type SpawnRequest struct {
 	// record and handed to PrepareLaunch is never empty for a successful
 	// Stage-1 Herdr launch.
 	Target host.LaunchTarget
-	// CloseOnExit is threaded straight through to every leaf's
-	// host.ResolvedLaunchTuple.CloseOnExit and handed to the installed
-	// LeafAugmenter, if any, exactly as Target is. See
-	// host.ResolvedLaunchTuple.CloseOnExit for what it means and does not
-	// mean. PROVISIONAL (dogfood, 2026-08-24); see terminal-multiplexers
-	// notes/46.
-	CloseOnExit bool
+	// RemainOnExit is the explicit --remain-on-exit opt-out. When true,
+	// effective close-on-exit is false. When false, the launcher consults
+	// the kind's close_on_exit (absent means true) via ResolveCloseOnExit.
+	// Launcher input like Target (I-3); the resolver never sees it.
+	RemainOnExit bool
 	// DryRun previews the resolution: same resolver, same static inputs,
 	// no durable record, no session, and no spawn (§6.10). In random mode
 	// its draw is preview-only and is not promised for a later launch.
@@ -283,6 +280,11 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 	resolved := &Resolution{Record: c.record}
 	out := &Result{Report: resolved.Report(), Record: c.record}
 
+	// Close-on-exit is a launcher input (I-3): resolve after commit, never
+	// inside the resolver. Explicit --remain-on-exit wins; else config;
+	// else product default true (notes/51 record 7).
+	closeOnExit := ResolveCloseOnExit(req.RemainOnExit, c.record.Host.Kind, l.resolver.doc.SessionHosts)
+
 	for _, assignment := range c.record.Assignment {
 		launcher, err := l.hosts.LauncherFor(assignment.Tuple)
 		if err != nil {
@@ -292,7 +294,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 		args := assignment.Tuple.Arguments
 		env := req.Env
 		if l.augmenter != nil {
-			aug, err := l.augmenter.Augment(ctx, c.record.ID, assignment.Leaf, assignment.Tuple, req.CloseOnExit)
+			aug, err := l.augmenter.Augment(ctx, c.record.ID, assignment.Leaf, assignment.Tuple, closeOnExit)
 			if err != nil {
 				return out, fmt.Errorf("launch: leaf %s: augmenting launch: %w", assignment.Leaf, err)
 			}
@@ -327,7 +329,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 				Args:                  args,
 				Env:                   env,
 				Target:                host.LaunchTarget(c.record.Target),
-				CloseOnExit:           req.CloseOnExit,
+				CloseOnExit:           closeOnExit,
 			},
 		})
 		if err != nil {

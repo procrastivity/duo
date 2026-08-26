@@ -120,9 +120,9 @@ type ResolvedLaunchTuple struct {
 	Target LaunchTarget
 	// CloseOnExit requests that the launched execution's host-side
 	// container close itself once the launched agent exits cleanly.
-	// PROVISIONAL (dogfood, 2026-08-24): this field is a dogfood-day
-	// expedient ahead of change control; the ratified design is sketched
-	// in terminal-multiplexers notes/46.
+	// Product default is true (notes/51 record 7 stop-gate edit);
+	// --remain-on-exit or config close_on_exit: false opts out. Crash
+	// paths still leave the pane (no watcher).
 	//
 	// A HostLauncher implementation carries no obligation from this field
 	// alone: the closing action Duo has verified — a Herdr pane closing

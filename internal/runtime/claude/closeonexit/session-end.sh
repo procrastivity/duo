@@ -1,12 +1,11 @@
 #!/bin/sh
 # duo close-on-exit SessionEnd hook.
 #
-# PROVISIONAL (dogfood, 2026-08-24): --close-on-exit is a dogfood-day
-# expedient ahead of change control; the ratified design is sketched in
-# terminal-multiplexers notes/46. Duo writes this exact file, embedded
-# verbatim (see closeonexit.go), into a per-launch harness directory and
-# points a generated `claude --settings <path>` document at it — it never
-# ships as part of the user's own Claude Code configuration.
+# Close-on-exit is the product default (notes/51 record 7). Duo writes this
+# exact file, embedded verbatim (see closeonexit.go), into a per-launch
+# harness directory and points a generated `claude --settings <path>`
+# document at it — it never ships as part of the user's own Claude Code
+# configuration.
 #
 # Herdr always runs the user's shell in a pane; `agent.start` types the
 # launch command into that shell, and the shell survives the agent's own

@@ -51,7 +51,7 @@ func (h *capturingHost) PrepareLaunch(ctx context.Context, req host.HostLaunchRe
 // so these tests exercise the production seam, not a reimplementation of
 // it — and a capturingHosts in place of the real Herdr-backed
 // stage1HostSet, so no test needs a live Herdr socket.
-func launchWithAugmenter(t *testing.T, h *bindHarness, closeOnExit bool) (*launch.Result, *capturingHosts) {
+func launchWithAugmenter(t *testing.T, h *bindHarness, remainOnExit bool) (*launch.Result, *capturingHosts) {
 	t.Helper()
 	m := h.materializeWith("herdr:"+bindSocket, nil)
 
@@ -78,7 +78,7 @@ func launchWithAugmenter(t *testing.T, h *bindHarness, closeOnExit bool) (*launc
 	result, err := launcher.Launch(context.Background(), launch.SpawnRequest{
 		Request:       launch.Request{Preset: "daily", RequestID: "req_test", Caller: "user:test"},
 		WorkspacePath: m.WorkspacePath(),
-		CloseOnExit:   closeOnExit,
+		RemainOnExit:  remainOnExit,
 	})
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
@@ -100,16 +100,29 @@ func findFlag(args []string, name string) (value string, present bool) {
 	return "", false
 }
 
-// TestCloseOnExitAppendsSettingsFlagForAClaudeLeaf is the flag's whole
-// point end to end at the launch-orchestration boundary: --close-on-exit
-// threads from launch.SpawnRequest.CloseOnExit through
-// stage1LeafAugmenter, and a claude leaf's final launch arguments gain
+// setCloseOnExitConfig stamps session_hosts.kinds.herdr.close_on_exit onto
+// the harness document so ResolveCloseOnExit consults it.
+func setCloseOnExitConfig(h *bindHarness, closeOnExit bool) {
+	v := closeOnExit
+	kinds := h.doc.SessionHosts.Kinds
+	if kinds == nil {
+		kinds = map[string]config.SessionHostKind{}
+	}
+	stanza := kinds["herdr"]
+	stanza.CloseOnExit = &v
+	kinds["herdr"] = stanza
+	h.doc.SessionHosts.Kinds = kinds
+}
+
+// TestCloseOnExitDefaultMaterializesSettingsForAClaudeLeaf is the product
+// default end to end: ordinary launch (no --remain-on-exit) materializes
+// close-on-exit, so a claude leaf's final launch arguments gain
 // `--settings <absolute path>`, with a real, readable settings file at
 // that path.
-func TestCloseOnExitAppendsSettingsFlagForAClaudeLeaf(t *testing.T) {
+func TestCloseOnExitDefaultMaterializesSettingsForAClaudeLeaf(t *testing.T) {
 	h := newBindHarness(t, nil)
 
-	result, hosts := launchWithAugmenter(t, h, true)
+	result, hosts := launchWithAugmenter(t, h, false)
 	if result.Report.LaunchResolutionID == "" {
 		t.Fatal("the launch was not recorded")
 	}
@@ -134,12 +147,31 @@ func TestCloseOnExitAppendsSettingsFlagForAClaudeLeaf(t *testing.T) {
 	}
 }
 
-// TestCloseOnExitLeavesArgsUnchangedWithoutTheFlag pins the other half:
-// nothing about a claude leaf's launch arguments changes when
-// --close-on-exit was never passed, so an ordinary launch is byte-for-byte
-// what it was before this feature existed.
-func TestCloseOnExitLeavesArgsUnchangedWithoutTheFlag(t *testing.T) {
+// TestRemainOnExitLeavesArgsUnchangedForAClaudeLeaf pins the opt-out:
+// --remain-on-exit leaves a claude leaf's launch arguments without
+// --settings.
+func TestRemainOnExitLeavesArgsUnchangedForAClaudeLeaf(t *testing.T) {
 	h := newBindHarness(t, nil)
+
+	_, hosts := launchWithAugmenter(t, h, true)
+
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	if req.ResolvedLaunchTuple.CloseOnExit {
+		t.Error("CloseOnExit is set on the resolved launch tuple despite --remain-on-exit")
+	}
+	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "--settings"); present {
+		t.Errorf("leaf args = %v, want no --settings flag", req.ResolvedLaunchTuple.Args)
+	}
+}
+
+// TestCloseOnExitConfigFalseBehavesAsRemainForAClaudeLeaf pins config
+// close_on_exit: false as the same opt-out as --remain-on-exit.
+func TestCloseOnExitConfigFalseBehavesAsRemainForAClaudeLeaf(t *testing.T) {
+	h := newBindHarness(t, nil)
+	setCloseOnExitConfig(h, false)
 
 	_, hosts := launchWithAugmenter(t, h, false)
 
@@ -148,7 +180,7 @@ func TestCloseOnExitLeavesArgsUnchangedWithoutTheFlag(t *testing.T) {
 		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
 	}
 	if req.ResolvedLaunchTuple.CloseOnExit {
-		t.Error("CloseOnExit is set on the resolved launch tuple despite --close-on-exit never being passed")
+		t.Error("CloseOnExit is set despite config close_on_exit: false")
 	}
 	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "--settings"); present {
 		t.Errorf("leaf args = %v, want no --settings flag", req.ResolvedLaunchTuple.Args)
@@ -217,23 +249,14 @@ func newPiBindHarness(t *testing.T) *bindHarness {
 	return h
 }
 
-// TestCloseOnExitSetsEnvVarAndExtensionFlagForAPiLeaf is the pi leg's whole
-// point end to end: --close-on-exit threads from
-// launch.SpawnRequest.CloseOnExit through stage1LeafAugmenter, and a pi
-// leaf now gains BOTH its pane-creation env — the ResolvedLaunchTuple.Env a
-// HostLauncher.PrepareLaunch receives, which the herdr adapter copies
-// verbatim into workspace.create/tab.create/pane.split
-// (internal/host/herdr/doc.go's "environment scrub duty" section) —
-// DUO_CLOSE_PANE_ON_EXIT=1 (the exact key and value both
-// internal/runtime/pi/extension/duo-pi-reporter.ts and
-// internal/runtime/pi/closeonexit/duo-close-on-exit.ts read), AND a
-// `-e <absolute path>` launch argument pointing at a real, materialized
-// close-on-exit extension file — pi's own per-launch extension-loading
-// flag (pi 0.83.0 `pi --help`: `--extension, -e <path>`).
-func TestCloseOnExitSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
+// TestCloseOnExitDefaultSetsEnvVarAndExtensionFlagForAPiLeaf is the pi
+// leg's product-default path: ordinary launch materializes both
+// DUO_CLOSE_PANE_ON_EXIT=1 and `-e <absolute path>` pointing at a real
+// close-on-exit extension file.
+func TestCloseOnExitDefaultSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
 
-	result, hosts := launchWithAugmenter(t, h, true)
+	result, hosts := launchWithAugmenter(t, h, false)
 	if result.Report.LaunchResolutionID == "" {
 		t.Fatal("the launch was not recorded")
 	}
@@ -261,13 +284,34 @@ func TestCloseOnExitSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
 	}
 }
 
-// TestCloseOnExitLeavesArgsAndEnvUnchangedForAPiLeafWithoutTheFlag pins the
-// other half: a pi leaf's pane-creation env carries no
-// DUO_CLOSE_PANE_ON_EXIT, and its launch arguments carry no -e flag, when
-// --close-on-exit was never passed, so an ordinary pi launch is unaffected
-// by this feature existing.
-func TestCloseOnExitLeavesArgsAndEnvUnchangedForAPiLeafWithoutTheFlag(t *testing.T) {
+// TestRemainOnExitLeavesArgsAndEnvUnchangedForAPiLeaf pins the opt-out for
+// pi: --remain-on-exit leaves pane-creation env and args unchanged.
+func TestRemainOnExitLeavesArgsAndEnvUnchangedForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
+
+	_, hosts := launchWithAugmenter(t, h, true)
+
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	if req.ResolvedLaunchTuple.CloseOnExit {
+		t.Error("CloseOnExit is set on the resolved launch tuple despite --remain-on-exit")
+	}
+	if _, present := req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"]; present {
+		t.Errorf("pane-creation env unexpectedly carries DUO_CLOSE_PANE_ON_EXIT = %q",
+			req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"])
+	}
+	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "-e"); present {
+		t.Errorf("leaf args = %v, want no -e flag", req.ResolvedLaunchTuple.Args)
+	}
+}
+
+// TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf pins config
+// close_on_exit: false as remain for a pi leaf.
+func TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf(t *testing.T) {
+	h := newPiBindHarness(t)
+	setCloseOnExitConfig(h, false)
 
 	_, hosts := launchWithAugmenter(t, h, false)
 
@@ -276,7 +320,7 @@ func TestCloseOnExitLeavesArgsAndEnvUnchangedForAPiLeafWithoutTheFlag(t *testing
 		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
 	}
 	if req.ResolvedLaunchTuple.CloseOnExit {
-		t.Error("CloseOnExit is set on the resolved launch tuple despite --close-on-exit never being passed")
+		t.Error("CloseOnExit is set despite config close_on_exit: false")
 	}
 	if _, present := req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"]; present {
 		t.Errorf("pane-creation env unexpectedly carries DUO_CLOSE_PANE_ON_EXIT = %q",

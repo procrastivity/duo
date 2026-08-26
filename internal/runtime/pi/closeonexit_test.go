@@ -45,6 +45,17 @@ func TestCloseOnExitExtensionReadsGuardsWithoutScrubbing(t *testing.T) {
 	}
 }
 
+// TestCloseOnExitExtensionDocumentsSecondPiEffect pins notes/51 record 9c:
+// DUO_CLOSE_PANE_ON_EXIT lasts the pane's life, so a second pi started by
+// hand in that pane also closes it on quit.
+func TestCloseOnExitExtensionDocumentsSecondPiEffect(t *testing.T) {
+	src := runtimepi.CloseOnExitExtensionSource
+	want := "DUO_CLOSE_PANE_ON_EXIT lasts the pane's life, so a second pi started by"
+	if !strings.Contains(src, want) {
+		t.Errorf("asset lost the notes/51 record 9c doc line containing %q", want)
+	}
+}
+
 // TestCloseOnExitExtensionActsOnlyOnQuit pins the terminality guard: only
 // session_shutdown reason "quit" closes the pane. /reload, /new, /resume,
 // and /fork rebind the extension runtime in-process (the same trap
