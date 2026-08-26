@@ -1,0 +1,83 @@
+schema: duo.config/v3
+
+session_hosts:
+  prefer: [herdr]
+  kinds:
+    herdr: {enabled: true}
+    tmux: {enabled: false}      # not used on this machine
+  deduce:
+    workspace: {enabled: true}
+    env: {enabled: true}
+    default: {enabled: true}
+
+agent_runtimes:
+  claude:
+    kind: claude
+    executable: claude
+    arguments: []
+  pi:
+    kind: pi
+    executable: pi
+
+launch_variants:
+  claude_fable:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: fable-5
+    append_arguments: ["--model", "fable"]
+  claude_opus:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: opus-5
+    append_arguments: ["--model", "opus"]
+  claude_sonnet:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: sonnet-5
+    append_arguments: ["--model", "sonnet"]
+  claude_haiku:
+    agent_runtime: claude
+    provider: anthropic
+    model_family: claude
+    model_line: haiku-4.5
+    append_arguments: ["--model", "haiku"]
+  pi_wyvern:
+    agent_runtime: pi
+    provider: x-es
+    model_family: qwen
+    model_line: qwen-3.6
+    append_arguments: ["--provider", "x-es", "--model", "anthropic/Wyvern"]
+
+presets:
+  orchestrator:
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_fable}
+  builder:
+    selection: ordered
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_sonnet}
+          - {variant: pi_wyvern}
+  reviewer:
+    leaves:
+      main:
+        candidates:
+          - {variant: claude_opus}
+  build_and_verify:
+    selection: ordered
+    leaves:
+      builder:
+        candidates:
+          - {variant: claude_sonnet}
+          - {variant: pi_wyvern}
+      verifier:
+        candidates:
+          - {variant: claude_sonnet}
+    relations:
+      - {kind: distinct_model_family, leaves: [builder, verifier]}

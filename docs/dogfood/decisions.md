@@ -41,3 +41,18 @@ unchanged — one directory per day under `evidence/dogfood/<YYYY-MM-DD>/`.
 Recovery fixture traces live under `evidence/traces/recovery/`.
 
 Reconcile is explicit; list and show do not write recovery facts.
+
+## 2026-08-26 — Airgapped day log imported (notes/47)
+
+The 2026-08-24 checkpoint day on BSIMENSEN1 is now under
+`evidence/dogfood/2026-08-24-airgapped/` (day log, checkpoint verdict,
+authored config, roster decisions, findings). It sits beside
+`evidence/dogfood/2026-08-24/`, which is the connected-machine session
+the same calendar day.
+
+Airgapped verdict: 9/9 after rebuild to `4ced46d`. The two OPEN findings
+from that day (show fingerprint; exit/prune) were implemented by
+duo-dogfood-recovery. The SQL export is
+`internal/domain/testdata/duo-db-export.sql`. Historical records are not
+rewritten. This import closes the notes/47 evidence debt that held
+duo-dogfood Stage F open.
