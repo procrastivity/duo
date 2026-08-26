@@ -1,6 +1,6 @@
 # contracts/SOURCE — written by contrib/sync-contracts; do not edit.
-source-sha: 8ec3aa269dae3d91b8d7192c65242ab6ba01e7d5
-7e91752b9f45e1c68c8f86791af460456068bba2f1d9bb5dfc15c85f7fd11846  fixtures/duo-external-v1/README.md
+source-sha: 3c9c2ba444c423ae64e2eed8852f16cb570d4f71
+0a6ffc37ebda41c6c541f4d3c0d77105eead888a3f0670ec472ee706fb5bcec0  fixtures/duo-external-v1/README.md
 562e3625dde7a2fc19b83e0c94fc037c109ef8937aae02d3dfd4780ad439b9f0  fixtures/duo-external-v1/command-inspect.json
 57afbee93eaf6c3e0e16ca795b0eb85fdcb4f678e2e90804c0069d34aeb37f7d  fixtures/duo-external-v1/command-result-stream-item.json
 91ca8a7db0eab863b4ee7d9fed89618ac45dcd5c1e0097fc56e28177603f5b71  fixtures/duo-external-v1/condition-stream-item.json
@@ -12,6 +12,9 @@ d4e3656a3b171063fd8beeb769f46d2019f7fef20474eb76b5ccdf8c6c5dd6d9  fixtures/duo-e
 ceb13bb2ecb962613c33204d016f8a2530827dea017f24d130a6be6305d4b3d6  fixtures/duo-external-v1/manifest.json
 caa203ca1c4a8459dfdf0234e7d90de217872c7aadd07eac36b7f592f87c5fae  fixtures/duo-external-v1/projection-cases.json
 89965d6840f6c1b527dc9902e042c9f410c0c5d28bd68e93b0ad6b8823b3fdc0  fixtures/duo-external-v1/projection-stamp.json
+4d4511922e9f5584ab49ef7fb40764f641d420d729c8bef92b142b277b6d06cc  fixtures/duo-external-v1/prompt-delivered.json
+f8cc2720eefd2022b25721400644f209ccd01c956f87add8a253b2f0139218da  fixtures/duo-external-v1/prompt-expired.json
+e2690cd86e31c8572b47107bedfee005c4bc61e52a333f74f335f4b70ad56a9e  fixtures/duo-external-v1/prompt-idempotency-conflict.json
 0363bfb8298bd60c08edc56a914c8ba54d426056c47dad03c351afe6def7d23e  fixtures/duo-external-v1/prompt-queued.json
 e065b47eb2f76d364ce5df068f28c038d4ec63449af665549263c9000f47acba  fixtures/duo-external-v1/runtime-configuration-effective.json
 c3ee5cdf85829c7beb0206f8d722041c8abc50dbc4df9d1f50f553977758b4b9  fixtures/duo-external-v1/runtime-configuration-selected.json

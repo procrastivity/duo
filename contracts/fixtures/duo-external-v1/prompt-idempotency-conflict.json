@@ -1,0 +1,18 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_prompt_idempotency",
+  "operation": "prompt.deliver",
+  "error": {
+    "class": "conflict",
+    "code": "command.idempotency_conflict",
+    "message": "The idempotency key already binds a different canonical request.",
+    "target": {"kind": "prompt_command", "id": "cmd_fixture_1"},
+    "retry": {"safe": false, "action": "use_new_idempotency_key"},
+    "effect": "no_effect",
+    "details": {
+      "idempotency_key": "fixture-prompt-1",
+      "existing_digest": "digest_fixture_a",
+      "request_digest": "digest_fixture_b"
+    }
+  }
+}

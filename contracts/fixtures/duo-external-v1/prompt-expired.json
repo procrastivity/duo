@@ -1,0 +1,19 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_prompt_expired",
+  "operation": "prompt.deliver",
+  "error": {
+    "class": "timeout",
+    "code": "command.expired",
+    "message": "The queued command passed its expires_at without an attempt.",
+    "target": {"kind": "prompt_command", "id": "cmd_fixture_2"},
+    "retry": {"safe": false, "action": "submit_new_command"},
+    "effect": "no_effect",
+    "details": {
+      "command_id": "cmd_fixture_2",
+      "responsibility_state": "expired",
+      "expires_at": "2026-08-13T12:10:00Z",
+      "queue_policy": "queue_until_safe"
+    }
+  }
+}

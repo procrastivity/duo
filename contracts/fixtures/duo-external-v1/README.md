@@ -17,6 +17,9 @@ because the configuration and installation contracts sanction them there.
 | `conversation-page.json` | Completed content blocks, page token, and stream barrier. |
 | `condition-stream-item.json` | View revision and resume position remain separate. |
 | `prompt-queued.json` | Queueing does not claim delivery, activity, or acknowledgment. |
+| `prompt-delivered.json` | `prompt.deliver` success with `responsibility_state: delivered` under `queue_until_safe`; effect omitted until an attempt records it. |
+| `prompt-idempotency-conflict.json` | Same idempotency key with a different canonical digest fails as `command.idempotency_conflict`. |
+| `prompt-expired.json` | Queued command past `expires_at` reaches terminal `expired` as timeout `command.expired`. |
 | `command-inspect.json` | Command state, attempts, and separate delivery and activity milestones. |
 | `command-result-stream-item.json` | A delivery result on the `command.results` stream. Delivered is not consumed. |
 | `lease-acquired.json` | Composer-lease record with holder, state, expiry, and verified precondition. |

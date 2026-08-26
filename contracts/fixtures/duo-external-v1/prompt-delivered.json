@@ -1,0 +1,21 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_prompt_delivered",
+  "operation": "prompt.deliver",
+  "result": {
+    "command_id": "cmd_fixture_1",
+    "revision": "4",
+    "target": {
+      "session_id": "ses_fixture_1",
+      "runtime_instance_id": "run_fixture_1"
+    },
+    "responsibility_state": "delivered",
+    "queue_policy": "queue_until_safe",
+    "expires_at": "2026-08-13T12:10:00Z",
+    "activity_observed": false,
+    "acknowledged": false,
+    "retry": {"safe": false, "action": "observe_existing_command"}
+  },
+  "warnings": [],
+  "features": []
+}
