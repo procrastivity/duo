@@ -92,6 +92,9 @@ const herdrAmbientYAML = `
 schema: duo.config/v3
 session_hosts:
   prefer: [herdr]
+  kinds:
+    herdr:
+      launch_target: tab
 agent_runtimes:
   codex_default: {kind: codex, executable: codex}
   claude_default: {kind: claude, executable: claude}
@@ -275,7 +278,7 @@ func TestOrderedResolutionMatchesLaunchFixture(t *testing.T) {
 		o.HostVersions = map[string]string{"herdr": "0.6.0"}
 	})
 
-	got := resultEnvelope(t, r, launch.Request{Preset: "review"}, "req_fixture_launch")
+	got := resultEnvelope(t, r, doc, launch.Request{Preset: "review"}, "req_fixture_launch")
 	assertResultShape(t, got, fixture(t, "session-launch.json"))
 }
 
@@ -292,7 +295,7 @@ func TestModelFamilyAvoidMatchesFixture(t *testing.T) {
 		o.HostVersions = map[string]string{"herdr": "0.6.0"}
 	})
 
-	got := resultEnvelope(t, r, launch.Request{
+	got := resultEnvelope(t, r, doc, launch.Request{
 		Preset: "verify",
 		Avoid:  []launch.Constraint{{Axis: launch.AxisModelFamily, Value: "gpt"}},
 	}, "req_fixture_launch_model_family_avoid")
@@ -311,7 +314,7 @@ func TestDistinctModelFamilyMatchesFixture(t *testing.T) {
 		o.HostVersions = map[string]string{"herdr": "0.6.0"}
 	})
 
-	got := resultEnvelope(t, r, launch.Request{Preset: "builder_and_verifier"}, "req_fixture_launch_distinct_model_family")
+	got := resultEnvelope(t, r, doc, launch.Request{Preset: "builder_and_verifier"}, "req_fixture_launch_distinct_model_family")
 	assertResultShape(t, got, fixture(t, "session-launch-distinct-model-family.json"))
 }
 
@@ -523,9 +526,15 @@ func TestErrorCodesAreRegistered(t *testing.T) {
 
 // --- envelope builders ----------------------------------------------------
 
-func resultEnvelope(t *testing.T, r *launch.Resolver, req launch.Request, requestID string) map[string]any {
+func resultEnvelope(t *testing.T, r *launch.Resolver, doc config.DocumentV3, req launch.Request, requestID string) map[string]any {
 	t.Helper()
 	res := resolveOK(t, r, req)
+	// Placement is a launcher input (I-3). The resolver never stamps
+	// target / target_source; the fixture comparison needs the pair the
+	// launcher would emit, so apply it here the same way Launcher does.
+	if err := launch.ApplyPlacement(res, "", doc.SessionHosts); err != nil {
+		t.Fatalf("applying launch placement: %v", err)
+	}
 	report := res.Report()
 	// The session ID is minted by the commit that creates the session in
 	// the same transaction as the record; the resolver never invents one.

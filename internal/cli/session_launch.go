@@ -155,7 +155,14 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 				if err != nil {
 					return launchFailure(streams, mode, err)
 				}
+				// Placement is a launcher input (I-3): stamp after Resolve.
+				targetResolved, source, err := launch.ResolvePlacement(target, mat.Host().Kind, doc.SessionHosts)
+				if err != nil {
+					return duoerr.New("invalid.request", err.Error())
+				}
 				report = resolution.Report()
+				report.Target = string(targetResolved)
+				report.TargetSource = source
 				report.LaunchResolutionID = "" // §6.10: a dry run commits no record.
 				report.Preview = true
 			} else {
@@ -201,7 +208,7 @@ func sessionLaunchCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd.Flags().StringVar(&hostFlag, "host", "",
 		`the session host to launch into, "<kind>" or "<kind>:<instance>": deduction rung 0, outranking the workspace correlation, the ambient environment, and the policy default`)
 	cmd.Flags().StringVar(&targetFlag, "target", "",
-		`where the launched agent's container is created in the deduced host, "tab" or "pane": a placement override like --host, not a constraint axis (defaults to the host's built-in placement; provisional pending change control, see notes/44)`)
+		`where the launched agent's container is created in the deduced host, "tab" or "pane": an explicit placement override (defaults to session_hosts.kinds.<kind>.launch_target, then the host's built-in; Herdr built-in is tab)`)
 	cmd.Flags().BoolVar(&closeOnExit, "close-on-exit", false,
 		`close the launched agent's host-side container when the agent exits cleanly, from an agent-side SessionEnd hook -- never a watcher, send-keys, or shell injection (crashes and kills leave the container open by design; provisional pending change control, see notes/46)`)
 	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")

@@ -78,11 +78,11 @@ type HostCandidate struct {
 }
 
 // LaunchTarget names where in the session host's containment model a
-// launched execution's container is created. Empty means the host's own
-// built-in default. PROVISIONAL (dogfood, 2026-08-24): this field is a
-// dogfood-day expedient ahead of change control; the ratified design
-// (config-authored per-kind default, recorded target_source) is sketched
-// in terminal-multiplexers notes/44.
+// launched execution's container is created. Empty on a ResolvedLaunchTuple
+// asks the host for its built-in default. The launcher resolves the
+// effective value (explicit flag, config-default, or built-in) before
+// PrepareLaunch and records it as target / target_source on the
+// launch-resolution report (notes/51 records 1–3).
 type LaunchTarget string
 
 const (

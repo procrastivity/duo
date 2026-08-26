@@ -250,9 +250,8 @@ func TestStartSplitsAnExistingPaneAndMapsCommandToKind(t *testing.T) {
 }
 
 // The built-in default placement is a background tab of the focused
-// pane's workspace, not a split — PROVISIONAL (dogfood, 2026-08-24),
-// pending the config-authored per-kind default (notes/44). An explicit
-// tab target takes the same path.
+// pane's workspace, not a split (notes/51 record 3). An explicit tab
+// target takes the same path.
 func TestStartCreatesABackgroundTabByDefault(t *testing.T) {
 	f := newFakeHerdr(t)
 	existing := f.addPane("w1")

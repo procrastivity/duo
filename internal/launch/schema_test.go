@@ -58,7 +58,7 @@ func TestLaunchPayloadsValidateAgainstTheAmendedSchema(t *testing.T) {
 			o.HostVersions = map[string]string{"herdr": "0.6.0"}
 		})
 		for _, preset := range []string{"review", "verify", "builder_and_verifier"} {
-			env := resultEnvelope(t, r, launch.Request{Preset: preset}, "req_schema_"+preset)
+			env := resultEnvelope(t, r, doc, launch.Request{Preset: preset}, "req_schema_"+preset)
 			validate(t, schema, "launch_resolution_report", env["result"])
 		}
 	})

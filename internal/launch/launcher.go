@@ -158,7 +158,11 @@ type SpawnRequest struct {
 	Env map[string]string
 	// Target is the requested container placement inside the deduced
 	// host's containment model — a placement input like WorkspacePath,
-	// never a constraint axis. Empty means the host's built-in default.
+	// never a constraint axis. Empty means "no explicit --target"; the
+	// launcher then consults the kind's launch_target, then the host's
+	// built-in (ResolvePlacement). The concrete value stamped on the
+	// record and handed to PrepareLaunch is never empty for a successful
+	// Stage-1 Herdr launch.
 	Target host.LaunchTarget
 	// CloseOnExit is threaded straight through to every leaf's
 	// host.ResolvedLaunchTuple.CloseOnExit and handed to the installed
@@ -221,6 +225,12 @@ func (l *Launcher) Launch(ctx context.Context, req SpawnRequest) (*Result, error
 		// Nothing was recorded and nothing was prepared: the pre-spawn
 		// gate is that this return happens before the commit.
 		return nil, err
+	}
+
+	// Placement is a launcher input (I-3): stamp target / target_source
+	// onto the record after Resolve and before Commit / dry-run preview.
+	if err := applyPlacement(resolution, req.Target, l.resolver.doc.SessionHosts); err != nil {
+		return nil, invalidRequest(err.Error())
 	}
 
 	if req.DryRun {
@@ -316,7 +326,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 				Command:               assignment.Tuple.Executable,
 				Args:                  args,
 				Env:                   env,
-				Target:                req.Target,
+				Target:                host.LaunchTarget(c.record.Target),
 				CloseOnExit:           req.CloseOnExit,
 			},
 		})

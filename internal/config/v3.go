@@ -123,8 +123,17 @@ type SessionHostPolicy struct {
 // stanza being absent and Enabled being absent mean enabled (schema
 // description), and a caller resolving the effective policy applies that
 // default itself — ParseV3 never collapses the distinction away.
+//
+// LaunchTarget is likewise a pointer so absent stays distinct from a set
+// value: absent means the host's built-in default (notes/51 record 1);
+// "tab" or "pane" is the config-authored default the launcher consults.
+// It is a launcher input, never a resolution input (I-3).
+//
+// close_on_exit is accepted on the raw stanza so the synced fixture
+// decodes (KnownFields), but is not promoted here — step 04 wires it.
 type SessionHostKind struct {
-	Enabled *bool
+	Enabled      *bool
+	LaunchTarget *string `json:",omitempty"`
 }
 
 // SessionHostDeduceSource is one session_hosts.deduce.<source> stanza,
@@ -228,7 +237,12 @@ type rawSessionHosts struct {
 }
 
 type rawSessionHostKind struct {
-	Enabled *bool `yaml:"enabled"`
+	Enabled      *bool   `yaml:"enabled"`
+	LaunchTarget *string `yaml:"launch_target"`
+	// CloseOnExit is decoded so KnownFields accepts the synced
+	// duo-external-v1 config fixture; SessionHostKind does not carry it
+	// until step 04 wires close-on-exit behavior.
+	CloseOnExit *bool `yaml:"close_on_exit"`
 }
 
 type rawSessionHostDeduceSource struct {
@@ -337,11 +351,16 @@ func ParseV3(data []byte) (DocumentV3, error) {
 		return DocumentV3{}, err
 	}
 
+	sessionHosts, err := resolveSessionHosts(raw.SessionHosts)
+	if err != nil {
+		return DocumentV3{}, err
+	}
+
 	return DocumentV3{
 		Schema:              raw.Schema,
 		Authority:           raw.Authority,
 		Workspaces:          raw.Workspaces,
-		SessionHosts:        resolveSessionHosts(raw.SessionHosts),
+		SessionHosts:        sessionHosts,
 		AgentRuntimes:       agentRuntimes,
 		LaunchVariants:      launchVariants,
 		Presets:             presets,
@@ -354,15 +373,26 @@ func ParseV3(data []byte) (DocumentV3, error) {
 }
 
 // resolveSessionHosts converts the strictly-decoded raw session_hosts block
-// into SessionHostPolicy. There is nothing to validate here: the thread-2
-// decision (SessionHostPolicy.Prefer's doc comment) is that Prefer entries
-// are never checked against Kinds.
-func resolveSessionHosts(raw rawSessionHosts) SessionHostPolicy {
+// into SessionHostPolicy. Prefer entries are never checked against Kinds
+// (thread-2; SessionHostPolicy.Prefer's doc comment). launch_target, when
+// set, must be tab or pane.
+func resolveSessionHosts(raw rawSessionHosts) (SessionHostPolicy, error) {
 	var kinds map[string]SessionHostKind
 	if raw.Kinds != nil {
 		kinds = make(map[string]SessionHostKind, len(raw.Kinds))
 		for name, k := range raw.Kinds {
-			kinds[name] = SessionHostKind(k)
+			if k.LaunchTarget != nil {
+				switch *k.LaunchTarget {
+				case "tab", "pane":
+				default:
+					return SessionHostPolicy{}, duoerr.New(ErrCodeDecodeFailed,
+						fmt.Sprintf("config: session_hosts.kinds.%s.launch_target %q is not tab or pane", name, *k.LaunchTarget))
+				}
+			}
+			kinds[name] = SessionHostKind{
+				Enabled:      k.Enabled,
+				LaunchTarget: k.LaunchTarget,
+			}
 		}
 	}
 
@@ -378,7 +408,7 @@ func resolveSessionHosts(raw rawSessionHosts) SessionHostPolicy {
 		Prefer: append([]string(nil), raw.Prefer...),
 		Kinds:  kinds,
 		Deduce: deduce,
-	}
+	}, nil
 }
 
 // resolveAgentRuntimes converts the strictly-decoded raw agent_runtimes

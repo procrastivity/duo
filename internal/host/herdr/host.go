@@ -250,9 +250,8 @@ func (h *Host) PrepareLaunch(ctx context.Context, req host.HostLaunchRequest) (h
 	}
 	// Placement: exactly one of CreateWorkspace, TargetWorkspace, and
 	// SplitTargetPane is set. An empty session always gets workspace.create
-	// (a workspace's first tab exists implicitly). The built-in default is
-	// a background tab — PROVISIONAL (dogfood, 2026-08-24), pending the
-	// config-authored per-kind default sketched in notes/44.
+	// (a workspace's first tab exists implicitly). The built-in default —
+	// empty Target — is a background tab (notes/51 record 3).
 	switch tuple.Target {
 	case host.LaunchTargetPane:
 		if target := splitTarget(snap); target == "" {

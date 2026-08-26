@@ -70,6 +70,9 @@ func TestParseV3_Fixture(t *testing.T) {
 	if !ok || herdrKind.Enabled == nil || !*herdrKind.Enabled {
 		t.Errorf("SessionHosts.Kinds[herdr] = %+v, want enabled true", herdrKind)
 	}
+	if herdrKind.LaunchTarget == nil || *herdrKind.LaunchTarget != "tab" {
+		t.Errorf("SessionHosts.Kinds[herdr].LaunchTarget = %v, want tab", herdrKind.LaunchTarget)
+	}
 }
 
 // TestParseV3_PreferWithoutKindsStanzaIsAccepted pins the thread-2 decision

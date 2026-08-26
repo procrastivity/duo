@@ -114,6 +114,12 @@ type Record struct {
 	Host           RecordHost              `json:"host"`
 	EvidenceBundle *materialize.WireBundle `json:"evidence_bundle,omitempty"`
 
+	// Target and TargetSource are the informational placement pair
+	// (notes/51 record 2). The resolver never sets them (I-3); the
+	// launcher stamps them after Resolve and before Commit.
+	Target       string `json:"target,omitempty"`
+	TargetSource string `json:"target_source,omitempty"`
+
 	Leaves []RecordLeaf `json:"leaves"`
 	// Relations are the cross-leaf relations the preset declared, and
 	// RelationRejections are the complete assignments they rejected. The
@@ -293,6 +299,12 @@ type Report struct {
 	// It is a pointer so a hand-built Report without one omits the key
 	// rather than asserting an empty deduction.
 	Host *WireHost `json:"host,omitempty"`
+	// Target and TargetSource are the informational placement pair
+	// (tab|pane and explicit-flag|config-default|built-in). Placement is
+	// a launcher input; the resolver never consults it (I-3, notes/51
+	// record 2).
+	Target       string `json:"target,omitempty"`
+	TargetSource string `json:"target_source,omitempty"`
 	// Relations are the preset's declared cross-leaf relations, present
 	// only when it declares any. They are a property of the declaration
 	// the caller asked for, not of any leaf, and
@@ -334,6 +346,8 @@ func (r *Resolution) Report() Report {
 		Selection:          r.Record.Selection,
 		Leaves:             make([]ReportLeaf, 0, len(r.Record.Assignment)),
 		Host:               &host,
+		Target:             r.Record.Target,
+		TargetSource:       r.Record.TargetSource,
 		Relations:          r.Record.Relations,
 	}
 	if host.Kind == "" {
