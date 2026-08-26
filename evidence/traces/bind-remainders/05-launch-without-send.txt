@@ -1,0 +1,32 @@
+# live Claude launch-without-send after 8s D3 wait
+duo=duo version dbba29d (commit dbba29d, built 2026-08-26T20:43:06Z)
+herdr=herdr 0.8.2
+2026-08-26T20:43:25Z
+isolation: /tmp/duo-dbr04 HERDR_SESSION=dbr04 env -i server; duo --host herdr:$SOCK; no HERDR_SOCKET_PATH on duo; no prompt send
+
+$ duo session launch builder --require agent_runtime=claude --host herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock --workspace /tmp/duo-dbr04/ws --output json
+launch_started_unix=1787777005.260782105
+launch_returned_unix=1787777009.304658490
+launch_duration_ms=4043
+launch_exit=0
+stdout:
+{"schema":"duo.external/v1","request_id":"req_269c9670e6042fe9","operation":"session.launch","result":{"session_id":"ses_130fbff9bea92a27336b5f54feb0c203","launch_resolution_id":"lrr_602ec605e44dca71d9091c6268c8e0f9","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","composition":{"name":"claude_sonnet@herdr","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock","host_source":"explicit-flag","outranked_evidence":[]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+stderr:
+duo: host bound: workspace ws_3d4e594b9c044ecab278595cc4187e2d -> herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock (host_source=explicit-flag, fact fact_b817818a1e0a71a72bb0f06acfe54380)
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock --evidence "<what you checked>"
+
+## session show immediately after launch (no prompt send)
+2026-08-26T20:43:29Z
+$ duo session show ses_130fbff9bea92a27336b5f54feb0c203 --output json
+{"schema":"duo.external/v1","request_id":"req_033ac4f72f9ca9b6","operation":"session.inspect","result":{"session_id":"ses_130fbff9bea92a27336b5f54feb0c203","workspace_id":"ws_3d4e594b9c044ecab278595cc4187e2d","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_44f1b868e6db7587c2adc7c0598ea792","runtime_instance_state":"live","owner":"cli","creator":"cli","condition":{"value":"unknown","confidence":"inferred","freshness":"unknown","runtime_instance_id":"ri_44f1b868e6db7587c2adc7c0598ea792","computed_at":"2026-08-26T20:43:29.381515746Z","reasons":["missing transcript"]},"operations":[{"operation":"prompt.deliver","availability":"available"},{"operation":"conversation.list","availability":"available"}],"attachments":[{"attachment_id":"att_e1002f1ba49d0bba6d71ce862ef4c115","state":"attached","integration_instance":"herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f9455731ce1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1217811,"started_at":"2026-08-26T20:43:24.510Z"},"claim_held":true,"reattach_command":"duo session reattach ses_130fbff9bea92a27336b5f54feb0c203 --integration-instance herdr:/tmp/duo-dbr04/xdg-config/herdr/sessions/dbr04/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f9455731ce1 --epoch-scope pane --container w1:p1 --process-pid 1217811 --process-started-at 2026-08-26T20:43:24.510Z"}]},"warnings":[],"features":[]}
+
+## herdr agent list (HERDR_SOCKET_PATH=dbr04 only)
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"d7c8a4a0-a23c-47e9-99be-edbead84c7dc"},"agent_status":"idle","cwd":"/tmp/duo-dbr04/ws","focused":true,"foreground_cwd":"/tmp/duo-dbr04/ws","interactive_ready":true,"name":"duo-main-lrr_602ec605e44dca71d90","pane_id":"w1:p1","revision":1,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_659f9455731ce1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"}],"type":"agent_list"}}
+
+## analysis
+duo dbba29d (8s identityBindTimeout cap). No prompt send. No MarkLive by hand.
+launch_duration_ms=4043 — returned before the 8s cap because bindStartingIdentity exits on named identity AND !launch_pending, not at timeout.
+session show immediately after launch: runtime_instance_state=live; prompt.deliver and conversation.list available.
+condition unknown / missing transcript (no turn yet; JSONL may not exist — not this check).
+herdr agent.list: launch_pending omitted, interactive_ready=true, agent_status=idle, id d7c8a4a0-…
+PASS: launch itself MarkLive'd Claude without send.
