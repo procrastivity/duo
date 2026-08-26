@@ -604,41 +604,41 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 }
 
 // stage1LeafAugmenter is the CLI's launch.LeafAugmenter: the concrete,
-// adapter-aware seam close-on-exit's two runtime legs use to contribute
-// what each needs for a leaf's launch — claude materializes a generated
-// SessionEnd hook and settings file and appends `--settings <path>` to
-// that leaf's launch arguments; pi materializes a generated close-only
-// extension (internal/runtime/pi/closeonexit.go, deliberately separate
-// from the shipped reporter extension) and appends `-e <path>` to that
-// leaf's launch arguments, alongside the same activation env var claude's
-// leg does not need but pi's extension reads to decide whether to act.
+// adapter-aware seam each supported runtime leg uses to contribute what
+// that leaf's launch needs — claude, when close-on-exit is active,
+// materializes a generated SessionEnd hook and settings file and appends
+// `--settings <path>`; pi always materializes the inject extension
+// (internal/runtime/pi/inject.go, I-14) and appends `-e <inject path>`,
+// and when close-on-exit is active appends a second `-e <close-on-exit
+// path>` plus DUO_CLOSE_PANE_ON_EXIT=1 (internal/runtime/pi/closeonexit.go,
+// deliberately separate from the shipped reporter extension).
 //
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
 // runtime adapter); this CLI-level implementation is the one place that
-// knows what "claude" and "pi" mean and what each buys from close-on-exit.
-// It is host-agnostic in acceptance the same way --target is: nothing here
-// refuses close-on-exit for any deduced session-host kind. The claude
-// leg's hook itself is what guards on being inside a Herdr pane
-// (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some future
-// non-Herdr host simply gets a settings file whose hook exits 0
-// immediately. The pi leg's materialized extension carries the identical
-// guard (closeonexit/duo-close-on-exit.ts) — a leaf on some future
-// non-Herdr host gets an extension loaded that quietly does nothing.
+// knows what "claude" and "pi" mean. It is host-agnostic in acceptance
+// the same way --target is. The claude leg's hook guards on being inside
+// a Herdr pane (HERDR_ENV, closeonexit/session-end.sh) — a leaf on some
+// future non-Herdr host simply gets a settings file whose hook exits 0
+// immediately. The pi close-on-exit extension carries the identical guard
+// (closeonexit/duo-close-on-exit.ts) — a leaf on some future non-Herdr
+// host gets an extension loaded that quietly does nothing when the env var
+// is absent. Pi inject has no such gate: every Pi launch gets `-e
+// duo-inject.ts`, including --remain-on-exit and config close_on_exit:
+// false.
 //
-// The pi leg's env var is not vestigial even though the materialized
-// extension is loaded explicitly with `-e <path>` rather than discovered:
-// DUO_CLOSE_PANE_ON_EXIT is the activation guard the extension itself
-// checks before it acts (internal/runtime/pi/closeonexit/duo-close-on-exit.ts),
-// and it also serves the shipped reporter extension's own close block
-// (duo-pi-reporter.ts, guarded the same way) for whenever reporter
-// installation gets built — nothing here assumes the reporter is absent,
-// it just does not depend on the reporter being present either.
+// DUO_CLOSE_PANE_ON_EXIT is the activation guard the close-on-exit
+// extension checks before it acts, and it also serves the shipped reporter
+// extension's own close block (duo-pi-reporter.ts, guarded the same way)
+// for whenever reporter installation gets built — nothing here assumes the
+// reporter is absent, it just does not depend on the reporter being present
+// either. Augment never sets DUO_PI_SOCK; the inject extension names its
+// socket by convention at module load.
 //
 // Close-on-exit is the product default (notes/51 record 7); --remain-on-exit
-// and config close_on_exit: false opt out. Every agent runtime other than
-// "claude" and "pi" is untouched: Augment is a no-op unless closeOnExit is
-// set and t.AgentRuntime is one of those two.
+// and config close_on_exit: false opt out of close-on-exit only. Claude
+// Augment is a no-op when closeOnExit is false. Pi Augment still materializes
+// inject. Every other agent runtime is untouched.
 type stage1LeafAugmenter struct{}
 
 // closePaneOnExitEnvVar is the exact key both
@@ -651,11 +651,11 @@ type stage1LeafAugmenter struct{}
 const closePaneOnExitEnvVar = "DUO_CLOSE_PANE_ON_EXIT"
 
 func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf string, t launch.Tuple, closeOnExit bool) (launch.LeafAugmentation, error) {
-	if !closeOnExit {
-		return launch.LeafAugmentation{}, nil
-	}
 	switch t.AgentRuntime {
 	case "claude":
+		if !closeOnExit {
+			return launch.LeafAugmentation{}, nil
+		}
 		dir, err := claude.DefaultHarnessDir(launchResolutionID, leaf)
 		if err != nil {
 			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the close-on-exit harness directory for leaf %s: %w", leaf, err)
@@ -670,14 +670,21 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf s
 		if err != nil {
 			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the close-on-exit harness directory for leaf %s: %w", leaf, err)
 		}
-		extensionPath, err := pi.MaterializeCloseOnExit(dir)
+		injectPath, err := pi.MaterializeInject(dir)
 		if err != nil {
-			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the close-on-exit harness for leaf %s: %w", leaf, err)
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the inject harness for leaf %s: %w", leaf, err)
 		}
-		return launch.LeafAugmentation{
-			Args: []string{"-e", extensionPath},
-			Env:  map[string]string{closePaneOnExitEnvVar: "1"},
-		}, nil
+		args := []string{"-e", injectPath}
+		var env map[string]string
+		if closeOnExit {
+			closePath, err := pi.MaterializeCloseOnExit(dir)
+			if err != nil {
+				return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the close-on-exit harness for leaf %s: %w", leaf, err)
+			}
+			args = append(args, "-e", closePath)
+			env = map[string]string{closePaneOnExitEnvVar: "1"}
+		}
+		return launch.LeafAugmentation{Args: args, Env: env}, nil
 	default:
 		return launch.LeafAugmentation{}, nil
 	}

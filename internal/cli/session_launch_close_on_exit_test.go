@@ -100,6 +100,18 @@ func findFlag(args []string, name string) (value string, present bool) {
 	return "", false
 }
 
+// findAllFlagValues returns every value following name in args (e.g. all
+// `-e` extension paths when name is "-e").
+func findAllFlagValues(args []string, name string) []string {
+	var values []string
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			values = append(values, args[i+1])
+		}
+	}
+	return values
+}
+
 // setCloseOnExitConfig stamps session_hosts.kinds.herdr.close_on_exit onto
 // the harness document so ResolveCloseOnExit consults it.
 func setCloseOnExitConfig(h *bindHarness, closeOnExit bool) {
@@ -250,9 +262,8 @@ func newPiBindHarness(t *testing.T) *bindHarness {
 }
 
 // TestCloseOnExitDefaultSetsEnvVarAndExtensionFlagForAPiLeaf is the pi
-// leg's product-default path: ordinary launch materializes both
-// DUO_CLOSE_PANE_ON_EXIT=1 and `-e <absolute path>` pointing at a real
-// close-on-exit extension file.
+// leg's product-default path: ordinary launch materializes inject and
+// close-on-exit as two `-e` flags, plus DUO_CLOSE_PANE_ON_EXIT=1.
 func TestCloseOnExitDefaultSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
 
@@ -272,21 +283,28 @@ func TestCloseOnExitDefaultSetsEnvVarAndExtensionFlagForAPiLeaf(t *testing.T) {
 		t.Errorf("pane-creation env DUO_CLOSE_PANE_ON_EXIT = %q, want \"1\"", got)
 	}
 
-	extensionPath, present := findFlag(req.ResolvedLaunchTuple.Args, "-e")
-	if !present {
-		t.Fatalf("leaf args = %v, want a -e flag", req.ResolvedLaunchTuple.Args)
+	extPaths := findAllFlagValues(req.ResolvedLaunchTuple.Args, "-e")
+	if len(extPaths) != 2 {
+		t.Fatalf("leaf args = %v, want exactly two -e flags, got %d", req.ResolvedLaunchTuple.Args, len(extPaths))
 	}
-	if !filepath.IsAbs(extensionPath) {
-		t.Errorf("-e path %q is not absolute", extensionPath)
-	}
-	if _, err := os.Stat(extensionPath); err != nil {
-		t.Errorf("the materialized close-on-exit extension is missing: %v", err)
+	wantBasenames := []string{"duo-inject.ts", "duo-close-on-exit.ts"}
+	for i, path := range extPaths {
+		if !filepath.IsAbs(path) {
+			t.Errorf("-e path[%d] %q is not absolute", i, path)
+		}
+		if got := filepath.Base(path); got != wantBasenames[i] {
+			t.Errorf("-e path[%d] basename = %q, want %q", i, got, wantBasenames[i])
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("the materialized extension at -e path[%d] is missing: %v", i, err)
+		}
 	}
 }
 
-// TestRemainOnExitLeavesArgsAndEnvUnchangedForAPiLeaf pins the opt-out for
-// pi: --remain-on-exit leaves pane-creation env and args unchanged.
-func TestRemainOnExitLeavesArgsAndEnvUnchangedForAPiLeaf(t *testing.T) {
+// TestRemainOnExitStillMaterializesInjectForAPiLeaf pins the opt-out for
+// close-on-exit only: --remain-on-exit still materializes inject but not
+// close-on-exit or DUO_CLOSE_PANE_ON_EXIT.
+func TestRemainOnExitStillMaterializesInjectForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
 
 	_, hosts := launchWithAugmenter(t, h, true)
@@ -302,13 +320,31 @@ func TestRemainOnExitLeavesArgsAndEnvUnchangedForAPiLeaf(t *testing.T) {
 		t.Errorf("pane-creation env unexpectedly carries DUO_CLOSE_PANE_ON_EXIT = %q",
 			req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"])
 	}
-	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "-e"); present {
-		t.Errorf("leaf args = %v, want no -e flag", req.ResolvedLaunchTuple.Args)
+
+	extPaths := findAllFlagValues(req.ResolvedLaunchTuple.Args, "-e")
+	if len(extPaths) != 1 {
+		t.Fatalf("leaf args = %v, want exactly one -e flag, got %d", req.ResolvedLaunchTuple.Args, len(extPaths))
+	}
+	injectPath := extPaths[0]
+	if !filepath.IsAbs(injectPath) {
+		t.Errorf("-e path %q is not absolute", injectPath)
+	}
+	if got := filepath.Base(injectPath); got != "duo-inject.ts" {
+		t.Errorf("-e path basename = %q, want duo-inject.ts", got)
+	}
+	if _, err := os.Stat(injectPath); err != nil {
+		t.Errorf("the materialized inject extension is missing: %v", err)
+	}
+	for _, path := range extPaths {
+		if filepath.Base(path) == "duo-close-on-exit.ts" {
+			t.Errorf("leaf args = %v, want no duo-close-on-exit.ts -e flag", req.ResolvedLaunchTuple.Args)
+		}
 	}
 }
 
 // TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf pins config
-// close_on_exit: false as remain for a pi leaf.
+// close_on_exit: false as remain for close-on-exit only; inject still
+// materializes.
 func TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf(t *testing.T) {
 	h := newPiBindHarness(t)
 	setCloseOnExitConfig(h, false)
@@ -326,7 +362,24 @@ func TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf(t *testing.T) {
 		t.Errorf("pane-creation env unexpectedly carries DUO_CLOSE_PANE_ON_EXIT = %q",
 			req.ResolvedLaunchTuple.Env["DUO_CLOSE_PANE_ON_EXIT"])
 	}
-	if _, present := findFlag(req.ResolvedLaunchTuple.Args, "-e"); present {
-		t.Errorf("leaf args = %v, want no -e flag", req.ResolvedLaunchTuple.Args)
+
+	extPaths := findAllFlagValues(req.ResolvedLaunchTuple.Args, "-e")
+	if len(extPaths) != 1 {
+		t.Fatalf("leaf args = %v, want exactly one -e flag, got %d", req.ResolvedLaunchTuple.Args, len(extPaths))
+	}
+	injectPath := extPaths[0]
+	if !filepath.IsAbs(injectPath) {
+		t.Errorf("-e path %q is not absolute", injectPath)
+	}
+	if got := filepath.Base(injectPath); got != "duo-inject.ts" {
+		t.Errorf("-e path basename = %q, want duo-inject.ts", got)
+	}
+	if _, err := os.Stat(injectPath); err != nil {
+		t.Errorf("the materialized inject extension is missing: %v", err)
+	}
+	for _, path := range extPaths {
+		if filepath.Base(path) == "duo-close-on-exit.ts" {
+			t.Errorf("leaf args = %v, want no duo-close-on-exit.ts -e flag", req.ResolvedLaunchTuple.Args)
+		}
 	}
 }
