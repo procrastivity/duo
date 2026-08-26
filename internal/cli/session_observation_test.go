@@ -102,8 +102,8 @@ func TestSessionInspectAndConversationList_FakePair(t *testing.T) {
 	for _, op := range shown.Result.Operations {
 		byOp[op.Operation] = op.Availability
 	}
-	if byOp[promptOp] != "unsupported" {
-		t.Errorf("%s availability = %q, want unsupported", promptOp, byOp[promptOp])
+	if byOp[promptOp] != "available" {
+		t.Errorf("%s availability = %q, want available", promptOp, byOp[promptOp])
 	}
 	if byOp[conversationOp] != "available" {
 		t.Errorf("%s availability = %q, want available", conversationOp, byOp[conversationOp])

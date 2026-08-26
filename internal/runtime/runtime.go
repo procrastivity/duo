@@ -5,10 +5,11 @@
 // This package implements RuntimeCorrelator, ConversationProvider,
 // ConditionProvider, and RuntimePromptProvider. Stage 1 shipped the first
 // two and left ConditionProvider unscaffolded; the observation slice
-// brought it in (see condition.go). Step 10 names RuntimePromptProvider
-// (see prompt.go); Claude fills it in step 12. UsageProvider,
-// RuntimeConfigurationProvider, and HarnessRenderer remain out of this
-// package — no empty interfaces, no TODO types. See
+// brought it in (see condition.go). Step 10 named RuntimePromptProvider
+// (see prompt.go); step 12 adds DeliverPrompt on that same interface and
+// Claude implements it over the per-session messaging socket. Pi does
+// not. UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer
+// remain out of this package — no empty interfaces, no TODO types. See
 // docs/adapters/decisions.md.
 //
 // RuntimeClaim, RuntimeCorrelationEvidence, and RuntimeCorrelator are

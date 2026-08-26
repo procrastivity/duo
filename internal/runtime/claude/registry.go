@@ -8,18 +8,19 @@ import (
 
 // registryEntry is the subset of `~/.claude/sessions/<pid>.json` this
 // adapter reads. The full 2.1.240 shape (notes/16 §6) carries more fields
-// (startedAt, procStart, peerFeatures, messagingSocketPath, name,
-// nameSource, nameSince, status, updatedAt, statusUpdatedAt,
-// bridgeSessionId, tmux, ...); only SessionID is load-bearing for
-// Correlate's inferred-confidence lookup, so the rest is left for a
-// caller that needs them to parse the file itself. This is undocumented,
-// version-fragile surface (notes/16 §6: "still undocumented, still
-// inferred-cap") — json.Unmarshal already ignores fields it does not
-// know about, and an individual file that fails to parse at all is
-// skipped rather than treated as a lookup failure (see registryHasSession).
+// (startedAt, procStart, peerFeatures, name, nameSource, nameSince,
+// status, updatedAt, statusUpdatedAt, bridgeSessionId, tmux, ...);
+// SessionID is load-bearing for Correlate's inferred-confidence lookup,
+// and PID plus MessagingSocketPath locate the per-session inbox for
+// RuntimePromptProvider. This is undocumented, version-fragile surface
+// (notes/16 §6: "still undocumented, still inferred-cap") —
+// json.Unmarshal already ignores fields it does not know about, and an
+// individual file that fails to parse at all is skipped rather than
+// treated as a lookup failure (see registryHasSession).
 type registryEntry struct {
-	PID       int    `json:"pid"`
-	SessionID string `json:"sessionId"`
+	PID                 int    `json:"pid"`
+	SessionID           string `json:"sessionId"`
+	MessagingSocketPath string `json:"messagingSocketPath"`
 }
 
 // registryHasSession reports whether any file under
@@ -31,13 +32,20 @@ type registryEntry struct {
 // exist," since that is the one case a caller might reasonably want to
 // distinguish from an honest empty result.
 func (r *Runtime) registryHasSession(sessionID string) (bool, error) {
+	_, ok, err := r.registryLookup(sessionID)
+	return ok, err
+}
+
+// registryLookup returns the first parseable sessions/*.json entry whose
+// sessionId matches. Missing directory is "no evidence," not an error.
+func (r *Runtime) registryLookup(sessionID string) (registryEntry, bool, error) {
 	dir := filepath.Join(r.claudeDir, "sessions")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return registryEntry{}, false, nil
 		}
-		return false, err
+		return registryEntry{}, false, err
 	}
 
 	for _, de := range entries {
@@ -58,8 +66,8 @@ func (r *Runtime) registryHasSession(sessionID string) (bool, error) {
 			continue
 		}
 		if entry.SessionID == sessionID {
-			return true, nil
+			return entry, true, nil
 		}
 	}
-	return false, nil
+	return registryEntry{}, false, nil
 }

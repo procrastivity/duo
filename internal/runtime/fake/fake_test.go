@@ -151,3 +151,40 @@ func TestConditionSnapshotExited(t *testing.T) {
 		t.Fatalf("ObservationID = %q, want obs-exited-1", got.ObservationID)
 	}
 }
+
+func TestPromptPathIsComposerSafe(t *testing.T) {
+	r := runtimefake.New("integration-1")
+	got, err := r.PromptPath(context.Background(), runtime.RuntimeBinding{ExternalAgentSessionID: "external-1"})
+	if err != nil {
+		t.Fatalf("PromptPath: %v", err)
+	}
+	if !got.ComposerSafe || got.Quality != "exact" || got.Realization != "native" {
+		t.Fatalf("candidate = %+v, want exact/native/ComposerSafe", got)
+	}
+}
+
+func TestDeliverPromptHonorsSeededEffect(t *testing.T) {
+	r := runtimefake.New("integration-1")
+	ctx := context.Background()
+	req := runtime.PromptDeliveryRequest{
+		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "external-1"},
+		Text:    "hello",
+	}
+
+	got, err := r.DeliverPrompt(ctx, req)
+	if err != nil {
+		t.Fatalf("DeliverPrompt default: %v", err)
+	}
+	if got.Effect != runtime.PromptEffectDelivered {
+		t.Fatalf("default Effect = %q, want delivered", got.Effect)
+	}
+
+	r.SeedPromptEffect(runtime.PromptEffectUnknownEffect)
+	got, err = r.DeliverPrompt(ctx, req)
+	if err != nil {
+		t.Fatalf("DeliverPrompt seeded: %v", err)
+	}
+	if got.Effect != runtime.PromptEffectUnknownEffect {
+		t.Fatalf("seeded Effect = %q, want unknown_effect", got.Effect)
+	}
+}

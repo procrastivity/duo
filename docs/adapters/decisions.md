@@ -358,12 +358,16 @@ package's `Probe` to launch the binary.
 - `SupportedExternalVersions` is the literal set `{"2.1.240", "2.1.241"}`,
   not a range expression — §5.1 leaves the version-rule syntax to a
   future evaluator, so this package does not invent one unilaterally.
-- The messaging-socket credential (`CLAUDE_CODE_MESSAGING_TOKEN`,
-  notes/16 §10's "first native, vendor-issued credentialed-reporter
-  primitive") is a distinct primitive from the launch-env
-  `ReporterCredential` this package correlates on; its semantics are
-  unprobed and this package does not use it. Recorded so a later step
-  does not conflate the two credentials.
+- `CLAUDE_CODE_MESSAGING_TOKEN` (notes/16 §10) is a distinct vendor
+  primitive from the launch-env `ReporterCredential` this package
+  correlates on. Step 12 (2026-08-26) sends NDJSON to the bound
+  instance's messaging socket and still correlates only on
+  `ReporterCredential`. Notes/10 admitted a frame with no token;
+  notes/16 recorded the token's existence with unprobed semantics, so
+  this adapter does not invent a token handshake and does not put
+  either secret on the frame. If a later pinned claude requires the
+  token to admit, pass `CLAUDE_CODE_MESSAGING_TOKEN` as itself — never
+  the reporter credential as the socket secret.
 - Generated-hook file generation/installation is out of scope by the Step
   18 spec; `Correlate` is built to accept a claim that already carries
   hook-reported identity, not to produce the hook configuration that
@@ -869,3 +873,37 @@ adds that subscription) and does not promote the claim's `idle` /
   `idle` / `lastSettledAt` pair for the injected-abort session; the
   observation for that transcript is still `inferred`.
 - `blocked` stays absent (zero `herdr:blocked` emitters at 0.83.0).
+
+## RuntimePromptProvider delivery (delegation-loop step 12, 2026-08-26)
+
+§5.3 names only `PromptPath`, which does not send. The seal tests need
+socket I/O and effect certainty, so this step added `DeliverPrompt` on
+the **same** `RuntimePromptProvider` interface rather than a companion.
+`PromptPath` still does not dial. Attempt-result types
+(`PromptEffect`, `PromptDeliveryRequest`, `PromptDeliveryResult`) live
+in `internal/runtime` so adapters never import `internal/domain`.
+
+Claude locates the target instance's inbox from
+`~/.claude/sessions/<pid>.json`: `messagingSocketPath` when present,
+else `$XDG_RUNTIME_DIR/cc-socks/<pid>.sock` (typical
+`/run/user/<uid>/cc-socks/<pid>.sock`). Duo's own
+`CLAUDE_CODE_MESSAGING_SOCKET` is some other session's inbox and is
+not consulted — send only to the bound instance; hop-chain relay is
+not a Duo feature. No live probe.
+
+The frame is newline-delimited JSON, the object notes/10 documented:
+
+```
+{"type":"user","message":{"role":"user","content":"<text>"}}
+```
+
+Peer wrapping (`isMeta`, security preamble) is accepted. Socket accepts
+the frame with the peer still there → `delivered` (exact/native,
+`ComposerSafe: true`). Connection loss after write → `unknown_effect`.
+Dial failure with no write → `no_effect`. Quiet-gate is step 13.
+
+Pi does not implement `RuntimePromptProvider`.
+`TestExtensionHasNoPromptDeliveryCall` still forbids a delivery call
+on the generated extension (notes/18 inject socket stays parked). The
+fake runtime compile-asserts the interface with a scriptable
+`SeedPromptEffect` stub.

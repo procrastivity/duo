@@ -1,5 +1,5 @@
-// Package claude is the Claude Code agent-runtime adapter: the §5.3
-// Stage-1 surface only (RuntimeCorrelator, ConversationProvider) plus a
+// Package claude is the Claude Code agent-runtime adapter: RuntimeCorrelator,
+// ConversationProvider, ConditionProvider, and RuntimePromptProvider plus a
 // §5.1 factory, built against the evidence in
 // terminal-multiplexers/notes/16-claude-refresh.md and
 // terminal-multiplexers/review/05-close-report.md at the re-pinned
@@ -9,10 +9,14 @@
 // forced.
 //
 // Deliberately out of scope, matching the internal/runtime package's own
-// Stage-1 cut plus the delegation-loop observation slice: RuntimePromptProvider,
-// UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer.
-// ConditionProvider is implemented (condition.go) as a transcript-first
-// snapshot: no generated-hook install, no UserPromptSubmit subscription.
+// Stage-1 cut plus the delegation-loop observation slice: UsageProvider,
+// RuntimeConfigurationProvider, and HarnessRenderer. ConditionProvider is
+// implemented (condition.go) as a transcript-first snapshot: no
+// generated-hook install, no UserPromptSubmit subscription.
+// RuntimePromptProvider is implemented (prompt.go) over the per-session
+// messaging socket (notes/10 §3, notes/13, notes/16): PromptPath offers
+// the native peer-queue path without dialing; DeliverPrompt writes one
+// NDJSON frame to that instance's socket. Quiet-gate stays step 13.
 // Correlate is built to accept a runtime.RuntimeClaim that already carries
 // hook-reported identity (the session id and the launch-env reporter
 // credential passed through to hook env, notes/16 §10), not to generate or
@@ -54,10 +58,11 @@ type Runtime struct {
 }
 
 var (
-	_ runtime.RuntimeCorrelator    = (*Runtime)(nil)
-	_ runtime.ConversationProvider = (*Runtime)(nil)
-	_ runtime.ConditionProvider    = (*Runtime)(nil)
-	_ adapter.Factory[*Runtime]    = Factory{}
+	_ runtime.RuntimeCorrelator     = (*Runtime)(nil)
+	_ runtime.ConversationProvider  = (*Runtime)(nil)
+	_ runtime.ConditionProvider     = (*Runtime)(nil)
+	_ runtime.RuntimePromptProvider = (*Runtime)(nil)
+	_ adapter.Factory[*Runtime]     = Factory{}
 )
 
 // New returns a Claude Code runtime adapter for one integration instance.

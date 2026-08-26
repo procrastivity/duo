@@ -1,8 +1,9 @@
 // Package fake is the Stage 0 fake agent-runtime adapter: a first-class,
 // permanent implementation of the §5.3 runtime interfaces this package
 // currently owns (RuntimeCorrelator, ConversationProvider,
-// ConditionProvider). Every cross-composition gate runs it alongside
-// internal/host/fake.
+// ConditionProvider, RuntimePromptProvider). Every cross-composition
+// gate runs it alongside internal/host/fake. Prompt delivery is a
+// scriptable stub (SeedPromptEffect); it does not implement quiet-gate.
 package fake
 
 import (
@@ -24,13 +25,15 @@ type Runtime struct {
 	turns                 map[string][]runtime.ConversationTurn
 	conditions            map[string]runtime.ConditionObservation // external agent-session ID -> current snapshot
 	conditionStreams      []*conditionStream
+	nextPromptEffect      runtime.PromptEffect
 }
 
 var (
-	_ runtime.RuntimeCorrelator    = (*Runtime)(nil)
-	_ runtime.ConversationProvider = (*Runtime)(nil)
-	_ runtime.ConditionProvider    = (*Runtime)(nil)
-	_ adapter.Factory[*Runtime]    = Factory{}
+	_ runtime.RuntimeCorrelator     = (*Runtime)(nil)
+	_ runtime.ConversationProvider  = (*Runtime)(nil)
+	_ runtime.ConditionProvider     = (*Runtime)(nil)
+	_ runtime.RuntimePromptProvider = (*Runtime)(nil)
+	_ adapter.Factory[*Runtime]     = Factory{}
 )
 
 // New returns a fake runtime adapter for one integration instance.
@@ -237,4 +240,36 @@ func (s *conditionStream) emit(obs runtime.ConditionObservation) {
 	case s.ch <- obs:
 	default:
 	}
+}
+
+// SeedPromptEffect scripts the next DeliverPrompt result. Empty means
+// delivered. Test and gate setup use this; it is not part of the §5.3
+// contract. Quiet-gate is not implemented here.
+func (r *Runtime) SeedPromptEffect(effect runtime.PromptEffect) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.nextPromptEffect = effect
+}
+
+// PromptPath implements runtime.RuntimePromptProvider. The fake always
+// offers an exact, native, composer-safe path so a host+runtime pair
+// can exercise runtime-path selection without a messaging socket.
+func (r *Runtime) PromptPath(context.Context, runtime.RuntimeBinding) (runtime.PromptPathCandidate, error) {
+	return runtime.PromptPathCandidate{
+		Quality:      "exact",
+		Realization:  "native",
+		ComposerSafe: true,
+	}, nil
+}
+
+// DeliverPrompt implements runtime.RuntimePromptProvider. The result is
+// whatever SeedPromptEffect last set, defaulting to delivered.
+func (r *Runtime) DeliverPrompt(_ context.Context, _ runtime.PromptDeliveryRequest) (runtime.PromptDeliveryResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	effect := r.nextPromptEffect
+	if effect == "" {
+		effect = runtime.PromptEffectDelivered
+	}
+	return runtime.PromptDeliveryResult{Effect: effect}, nil
 }
