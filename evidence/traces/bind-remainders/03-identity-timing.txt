@@ -1,0 +1,159 @@
+# 03 identity timing probe
+when: 2026-08-26T20:05:35.905Z
+duo: duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+herdr: herdr 0.8.2
+herdr ping: {"capabilities": {"detached_server_daemon": true, "live_handoff": true}, "protocol": 20, "type": "pong", "version": "0.8.2"}
+isolation: /tmp/duo-dbr03 HERDR_SESSION=dbr03 env -i server; duo --host herdr:$SOCK; no HERDR_SOCKET_PATH on duo
+poll: agent.list + pane.list (+ pane.get once pane_id known) every ~200ms for 15s after launch-return
+do not MarkLive; do not scan ~/.claude/projects
+
+## herdr agent list (pre-launch, default)
+exit=0
+{"id":"cli:agent:list","result":{"agents":[],"type":"agent_list"}}
+## herdr agent list --json (pre-launch)
+exit=2 stderr='usage: herdr agent list'
+(empty)
+
+## launch
+$ duo session launch builder --require agent_runtime=claude --host herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock --workspace /tmp/duo-dbr03/ws --output json
+launch_started_unix=1787774735.909372
+launch_returned_unix=1787774739.307923
+launch_duration_ms=3399
+launch_exit=0
+stdout:
+{"schema":"duo.external/v1","request_id":"req_04168919e91d06a6","operation":"session.launch","result":{"session_id":"ses_b880de5dda3d0d74de5ff59f31066956","launch_resolution_id":"lrr_3587fd0bf736a9135f8dc70ea13c3dda","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","composition":{"name":"claude_sonnet@herdr","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock","host_source":"explicit-flag","outranked_evidence":[]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+stderr:
+duo: host bound: workspace ws_0d7b5ba7c1d52a39066581f7fd7d38a1 -> herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock (host_source=explicit-flag, fact fact_6d86520b53f3593b0728fc7947ca07fc)
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock --evidence "<what you checked>"
+
+## poll table
+t_ret_ms | t_birth_ms | agent_row | agent.value | launch_pending | interactive_ready | pane.list.value | pane.get.value
+--------------------------------------------------------------------------------------------------------------------------------------------
+       0 |            |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+     200 |       4348 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+     400 |       4548 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+     601 |       4748 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+     801 |       4949 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    1001 |       5149 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    1201 |       5349 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    1401 |       5549 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    1601 |       5749 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    1801 |       5949 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |      true      |         -         | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    2001 |       6149 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    2201 |       6349 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    2402 |       6549 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    2602 |       6750 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    2802 |       6950 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    3002 |       7150 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    3202 |       7350 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    3402 |       7550 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    3602 |       7750 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    3802 |       7950 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    4002 |       8150 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    4203 |       8351 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    4403 |       8551 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    4603 |       8751 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    4803 |       8951 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    5003 |       9151 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    5203 |       9351 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    5403 |       9551 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    5603 |       9751 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    5804 |       9951 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    6004 |      10152 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    6204 |      10352 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    6404 |      10552 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    6604 |      10752 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    6804 |      10952 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    7004 |      11152 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    7204 |      11352 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    7404 |      11552 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    7605 |      11752 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    7805 |      11953 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    8005 |      12153 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    8205 |      12353 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    8405 |      12553 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    8605 |      12753 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    8805 |      12953 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    9005 |      13153 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    9206 |      13354 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    9406 |      13554 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    9606 |      13754 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+    9806 |      13954 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   10006 |      14154 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   10206 |      14354 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   10406 |      14554 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   10607 |      14755 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   10807 |      14955 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   11007 |      15155 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   11207 |      15355 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   11407 |      15555 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   11607 |      15755 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   11807 |      15955 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   12007 |      16155 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   12208 |      16355 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   12408 |      16556 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   12608 |      16756 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   12808 |      16956 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   13008 |      17156 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   13208 |      17356 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   13408 |      17556 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   13608 |      17756 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   13809 |      17957 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   14009 |      18157 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   14209 |      18357 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   14409 |      18557 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   14609 |      18757 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   14809 |      18957 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+   15009 |      19157 |    yes    | c68ce867-493d-44d8-a855-f6fb39f5b9df     |       -        |       true        | c68ce867-493d-44d8-a855-f6fb39f5b9df     | c68ce867-493d-44d8-a855-f6fb39f5b9df
+
+## duo session show (after poll; read-only, no MarkLive)
+exit=0
+{"schema":"duo.external/v1","request_id":"req_a0bcfa5df7cf42f5","operation":"session.inspect","result":{"session_id":"ses_b880de5dda3d0d74de5ff59f31066956","workspace_id":"ws_0d7b5ba7c1d52a39066581f7fd7d38a1","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_9673a4977eadb91a9f30e1b2f2f6a32a","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"temporarily_unavailable"},{"operation":"conversation.list","availability":"temporarily_unavailable"}],"attachments":[{"attachment_id":"att_30aa0c15a473cbc5f94c1450b7b87067","state":"attached","integration_instance":"herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f8be13a8ac1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1117480,"started_at":"2026-08-26T20:05:35.160Z"},"claim_held":true,"reattach_command":"duo session reattach ses_b880de5dda3d0d74de5ff59f31066956 --integration-instance herdr:/tmp/duo-dbr03/xdg-config/herdr/sessions/dbr03/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f8be13a8ac1 --epoch-scope pane --container w1:p1 --process-pid 1117480 --process-started-at 2026-08-26T20:05:35.160Z"}]},"warnings":[],"features":[]}
+
+## herdr agent list (end, env-isolated)
+exit=0
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"c68ce867-493d-44d8-a855-f6fb39f5b9df"},"agent_status":"idle","cwd":"/tmp/duo-dbr03/ws","focused":true,"foreground_cwd":"/tmp/duo-dbr03/ws","interactive_ready":true,"name":"duo-main-lrr_3587fd0bf736a9135f8","pane_id":"w1:p1","revision":1,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_659f8be13a8ac1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"}],"type":"agent_list"}}
+## herdr agent list --json (end)
+exit=2
+usage: herdr agent list
+
+## herdr pane list (end)
+exit=0
+{"id":"cli:pane:list","result":{"panes":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"c68ce867-493d-44d8-a855-f6fb39f5b9df"},"agent_status":"idle","cwd":"/tmp/duo-dbr03/ws","focused":true,"foreground_cwd":"/tmp/duo-dbr03/ws","pane_id":"w1:p1","revision":1,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":39},"tab_id":"w1:t1","terminal_id":"term_659f8be13a8ac1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"}],"type":"pane_list"}}
+## herdr pane list --json (end)
+exit=2
+unknown option: --json
+
+## herdr pane get w1:p1 (end)
+exit=0
+{"id":"cli:pane:get","result":{"pane":{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"c68ce867-493d-44d8-a855-f6fb39f5b9df"},"agent_status":"idle","cwd":"/tmp/duo-dbr03/ws","focused":true,"foreground_cwd":"/tmp/duo-dbr03/ws","pane_id":"w1:p1","revision":1,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":39},"tab_id":"w1:t1","terminal_id":"term_659f8be13a8ac1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},"type":"pane_info"}}
+
+## first-identity summary
+session_id: ses_b880de5dda3d0d74de5ff59f31066956
+pane_id: w1:p1
+instance_state_after_poll: starting
+process_birth.pid: 1117480
+process_birth.started_at: 2026-08-26T20:05:35.160Z
+launch_duration_ms: 3399
+launch_return_minus_birth_ms: 4148
+first agent.list row: {"t_ret_ms": 0, "row_present": true, "agent_session_value": "c68ce867-493d-44d8-a855-f6fb39f5b9df", "agent_session": {"source": "herdr:claude", "agent": "claude", "kind": "id", "value": "c68ce867-493d-44d8-a855-f6fb39f5b9df"}, "launch_pending": true, "interactive_ready": null, "name": "duo-main-lrr_3587fd0bf736a9135f8", "pane_id": "w1:p1", "agent": "claude", "agent_status": "unknown"}
+first agent.list identity: {"t_ret_ms": 0, "value": "c68ce867-493d-44d8-a855-f6fb39f5b9df", "kind": "id", "launch_pending": true, "interactive_ready": null, "pane_id": "w1:p1", "name": "duo-main-lrr_3587fd0bf736a9135f8", "t_birth_ms": 4148}
+first pane.list identity: {"t_ret_ms": 0, "value": "c68ce867-493d-44d8-a855-f6fb39f5b9df", "pane_id": "w1:p1", "keys": ["agent", "agent_session", "agent_status", "cwd", "focused", "foreground_cwd", "pane_id", "revision", "scroll", "tab_id", "terminal_id", "terminal_title", "terminal_title_stripped", "workspace_id"], "t_birth_ms": 4148}
+first pane.get identity: {"t_ret_ms": 0, "value": "c68ce867-493d-44d8-a855-f6fb39f5b9df", "pane_id": "w1:p1", "t_birth_ms": 4148}
+optional jsonl stat (computed cwd+id path, no scan): {"path": "/home/dev/.claude/projects/-tmp-duo-dbr03-ws/c68ce867-493d-44d8-a855-f6fb39f5b9df.jsonl", "exists": false, "t_ret_ms_when_stat": 0}
+first_named_surface: agent.list, pane.list, and pane.get tied at t_ret=0ms (same id, first sample after launch-return)
+window_read: identity is not the slow record. D3 on agent.list is.
+
+## analysis (step 03 → step 04)
+
+Versions: duo e02d886 (HEAD 3a77091 is docs-only vs that binary); herdr 0.8.2 protocol 20. Isolation: disposable HERDR_SESSION=dbr03 under /tmp/duo-dbr03, env -i server, duo --host herdr:$SOCK with no HERDR_SOCKET_PATH on the client. Torn down with herdr server stop; live host herdr PIDs untouched. No MarkLive. No ~/.claude/projects directory scan (one stat of the cwd-slug+id path at t=0: file not yet present).
+
+Identity: all three surfaces named `c68ce867-493d-44d8-a855-f6fb39f5b9df` (kind=id, source=herdr:claude) at t_ret=0ms, ~4148ms after process_birth.started_at 2026-08-26T20:05:35.160Z. Launch itself ran 3399ms (settledBirth + defaultIdentityBindTimeout 3s). The 3s identity wait therefore already overlapped published identity.
+
+D3: agent.list had launch_pending=true and interactive_ready unset / agent_status=unknown from t_ret=0 through t_ret=1801ms. At t_ret=2001ms (~6149ms after birth) launch_pending omitted (false), interactive_ready=true, agent_status=idle. That is ~2s after launch returned.
+
+pane.list / pane.get carried the same agent_session at the same t but never launch_pending or interactive_ready (pane keys: agent, agent_session, agent_status, cwd, focused, foreground_cwd, pane_id, revision, scroll, tab_id, terminal_id, titles, workspace_id). Live 0.8.2 pane records do carry agent_session (contra notes/19 §1 / herdr types.go). They do not carry D3 flags. Decoding pane identity and treating a missing launch_pending as false would MarkLive while the agent row is still pending.
+
+Instance after 15s poll: still starting (this step did not MarkLive). bindStartingIdentity polls AgentOnPane → agent.list, holds commit-to-live while LaunchPending, and on the 3s timeout binds identity without MarkLive. That matches this trace: identity was visible inside the window; D3 was not.
+
+Conclusion for step 04: the 3s window is short for waiting out launch_pending, not for discovering identity, and bind is already watching the faster identity record plus the only D3 record. Do not switch the wait to pane.list. Raise a bounded launch wait to cover ~2s after current timeout / ~6s from process birth (or wait on !launch_pending with a cap). Do not weaken D3. Do not add session.settle.
