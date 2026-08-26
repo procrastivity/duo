@@ -1,10 +1,10 @@
 package pi_test
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
 
 // The tests below guard the inject TypeScript asset the same way
@@ -13,20 +13,11 @@ import (
 // load-bearing line is one careless edit away from a silently wrong
 // prompt delivery path.
 
-func readInjectAsset(t *testing.T) string {
-	t.Helper()
-	src, err := os.ReadFile(filepath.Join("inject", "duo-inject.ts"))
-	if err != nil {
-		t.Fatalf("reading inject asset: %v", err)
-	}
-	return string(src)
-}
-
 // TestInjectAssetReadsEnvWithoutScrubbing pins the module-load env reads
 // and confirms DUO_PI_SOCK is not scrubbed — unlike the reporter's
 // SOCKET_PATH/TOKEN, the socket path override names no secret.
 func TestInjectAssetReadsEnvWithoutScrubbing(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	for _, want := range []string{
 		`const DUO_PI_SOCK = process.env["DUO_PI_SOCK"] ?? "";`,
@@ -46,7 +37,7 @@ func TestInjectAssetReadsEnvWithoutScrubbing(t *testing.T) {
 // TestInjectAssetSessionStartHandler pins the session_start signature,
 // dedupe guard, and socket path convention.
 func TestInjectAssetSessionStartHandler(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, `pi.on("session_start", (event: any, ctx: any) => {`) {
 		t.Errorf("asset lost session_start handler signature")
@@ -62,7 +53,7 @@ func TestInjectAssetSessionStartHandler(t *testing.T) {
 // TestInjectAssetWritesClaimLineOnConnect pins that the connect handler
 // writes the claim line and keeps the connection open for prompt delivery.
 func TestInjectAssetWritesClaimLineOnConnect(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, "socket.write(claimLine(ctx))") {
 		t.Errorf("asset must socket.write(claimLine(ctx)) on connect")
@@ -74,7 +65,7 @@ func TestInjectAssetWritesClaimLineOnConnect(t *testing.T) {
 
 // TestInjectAssetDeliversPrompts pins prompt delivery via sendUserMessage.
 func TestInjectAssetDeliversPrompts(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, "pi.sendUserMessage(parsed.text)") {
 		t.Errorf("asset must call pi.sendUserMessage(parsed.text) for prompt frames")
@@ -83,7 +74,7 @@ func TestInjectAssetDeliversPrompts(t *testing.T) {
 
 // TestInjectAssetClaimLineFields pins the connect-line NDJSON shape.
 func TestInjectAssetClaimLineFields(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, "JSON.stringify({") {
 		t.Fatal("asset has no JSON.stringify claim line")
@@ -107,7 +98,7 @@ func TestInjectAssetClaimLineFields(t *testing.T) {
 
 // TestInjectAssetActsOnlyOnQuit pins the terminality guard on session_shutdown.
 func TestInjectAssetActsOnlyOnQuit(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, `pi.on("session_shutdown"`) {
 		t.Fatal("asset does not subscribe to session_shutdown")
@@ -119,7 +110,7 @@ func TestInjectAssetActsOnlyOnQuit(t *testing.T) {
 
 // TestInjectAssetCreatesSocketDirSecurely pins mkdirSync with mode 0o700.
 func TestInjectAssetCreatesSocketDirSecurely(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, "mkdirSync") {
 		t.Fatal("asset does not mkdir the socket directory")
@@ -134,7 +125,7 @@ func TestInjectAssetCreatesSocketDirSecurely(t *testing.T) {
 // ever loaded by the one pi process Duo launched it for (pi's own
 // `-e <path>`), so there is no second invocation it could be mistaken for.
 func TestInjectAssetHasNoModeGate(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	if !strings.Contains(src, "no ctx.mode gate") && !strings.Contains(src, "No ctx.mode gate") {
 		t.Errorf("asset must document no ctx.mode gate in its file comment")
@@ -152,7 +143,7 @@ func TestInjectAssetHasNoModeGate(t *testing.T) {
 // TestInjectAssetOmitsForbiddenDeliveryAndAbort pins absence of abort
 // handling, deliverAs, agent_settled subscription, and ctx.abort calls.
 func TestInjectAssetOmitsForbiddenDeliveryAndAbort(t *testing.T) {
-	src := readInjectAsset(t)
+	src := runtimepi.InjectExtensionSource
 
 	for _, forbidden := range []string{
 		"ctx.abort(",
