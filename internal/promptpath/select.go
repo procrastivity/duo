@@ -4,8 +4,10 @@
 // ranks already-collected offers. It does not call adapters, Herdr, or a
 // messaging socket.
 //
-// Claude will fill RuntimePromptProvider (step 12). Pi will not (notes/18
-// inject socket stays parked), so Pi falls through to the host offer.
+// Claude and Pi both fill RuntimePromptProvider. Prefer-runtime when the
+// offer meets minimum quality is unchanged; an adapter that does not
+// implement the interface, or whose PromptPath errors, still falls through
+// to the host offer.
 package promptpath
 
 import "errors"
@@ -54,7 +56,7 @@ var ErrNoEligiblePath = errors.New("promptpath: no eligible prompt path meets mi
 
 // Selector applies the slice rule: prefer runtime when that offer meets
 // min quality; else host. Empty min accepts any declared quality. Nil
-// offers are skipped (Pi has no runtime path).
+// offers are skipped (the adapter did not offer a runtime path).
 type Selector struct{}
 
 // Select chooses one offer. It does not invoke adapters.

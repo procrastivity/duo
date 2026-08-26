@@ -7,8 +7,9 @@
 // two and left ConditionProvider unscaffolded; the observation slice
 // brought it in (see condition.go). Step 10 named RuntimePromptProvider
 // (see prompt.go); step 12 adds DeliverPrompt on that same interface and
-// Claude implements it over the per-session messaging socket. Pi does
-// not. UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer
+// Claude implements it over the per-session messaging socket. Pi
+// implements it over the inject extension socket (duo-pi-inject Stage A).
+// UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer
 // remain out of this package — no empty interfaces, no TODO types. See
 // docs/adapters/decisions.md.
 //

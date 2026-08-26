@@ -10,7 +10,8 @@ import (
 // herdrPromptPath is the static HostPromptProvider offer for Herdr
 // agent.prompt. Realization is native (Herdr's own complete-turn method,
 // not synthesized send-keys). Quality is exact so a min-exact selector
-// still has a host fallback for Pi, which has no runtime path. ComposerSafe
+// still has a host fallback when the runtime does not offer a path.
+// ComposerSafe
 // is false: notes/19 §2 verified that agent.prompt merges into and submits
 // a live human composer draft with a success result.
 var herdrPromptPath = host.PromptPathCandidate{

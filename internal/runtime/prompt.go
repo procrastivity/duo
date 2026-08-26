@@ -14,8 +14,8 @@ type RuntimeBinding struct {
 }
 
 // PromptPathCandidate is one runtime prompt path the composer can select
-// for a prompt.deliver attempt. Step 10 names the type; step 12 (Claude
-// messaging socket) fills it. Pi does not gain a runtime prompt path.
+// for a prompt.deliver attempt. Step 10 names the type; Claude (messaging
+// socket) and Pi (inject socket, duo-pi-inject Stage A) fill it.
 // PromptPath does not send input.
 //
 // Quality is exact | degraded | heuristic. Realization is native |

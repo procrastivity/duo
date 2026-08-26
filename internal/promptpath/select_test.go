@@ -36,7 +36,7 @@ func TestSelectHostWhenRuntimeAbsent(t *testing.T) {
 		t.Fatalf("Select: %v", err)
 	}
 	if got.Kind != KindHost {
-		t.Fatalf("kind = %s, want host (Pi has no runtime path)", got.Kind)
+		t.Fatalf("kind = %s, want host (no runtime offer)", got.Kind)
 	}
 }
 

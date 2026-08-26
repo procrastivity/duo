@@ -956,6 +956,28 @@ on the generated extension (notes/18 inject socket stays parked). The
 fake runtime compile-asserts the interface with a scriptable
 `SeedPromptEffect` stub.
 
+### duo-pi-inject Stage A (2026-08-26)
+
+Pi implements `RuntimePromptProvider` over the per-launch `-e` inject
+asset (`internal/runtime/pi/inject/duo-inject.ts`), not the reporter.
+`PromptPath` offers exact/native/`ComposerSafe: true` from
+`InjectSocketPath(binding.ExternalAgentSessionID)` without dialing or
+stat. Path-shaped Herdr identity is reduced via
+`SessionIDFromTranscriptName` before naming the socket. Convention:
+`$XDG_RUNTIME_DIR/duo/pi-inject/<id>.sock` (fallback
+`/run/user/<uid>/duo/pi-inject/<id>.sock`). `DeliverPrompt` dials that
+path, drains the connect-line greeting, and writes one frame
+`{"text":"<prompt>"}\n`. Effect mapping matches Claude: peer still there
+after write → `delivered`; connection loss after write →
+`unknown_effect`; dial with no write → `no_effect`. `DUO_PI_SOCK` is an
+extension-only listen override at module load; Go locate never reads it.
+Abort (`{"abort": true}`, `ctx.abort(`) is out of Stage A.
+`TestExtensionHasNoPromptDeliveryCall` still forbids delivery calls on
+the reporter asset; delivery lives on the inject asset. Prefer-runtime
+via `promptpath.Selector` is unchanged. D3 / `commitIdentityBind` is
+unchanged. Stage B idle is the connect-line `idle` field
+(`ctx.isIdle()`), not `agent_settled` on this socket.
+
 ## Prompt arbitration composer (delegation-loop step 13, 2026-08-26)
 
 `internal/delivery` is the composer between the step-10 command kernel

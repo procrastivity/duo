@@ -2,8 +2,11 @@ package delivery_test
 
 import (
 	"context"
+	"net"
+	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/procrastivity/duo/internal/promptpath"
 	"github.com/procrastivity/duo/internal/runtime"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
+	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 	"github.com/procrastivity/duo/internal/store"
 )
 
@@ -115,7 +119,7 @@ func TestDraftHoldsEvenOnRuntimePath(t *testing.T) {
 	}
 }
 
-func TestPiSelectsHostPath(t *testing.T) {
+func TestConditionOnlyRuntimeSelectsHostPath(t *testing.T) {
 	h := newHarness(t)
 	pi := &conditionOnlyRuntime{obs: idleObs()}
 	hostAd := hostfake.New(hostIntegration)
@@ -128,13 +132,47 @@ func TestPiSelectsHostPath(t *testing.T) {
 		t.Fatalf("held: %+v", res.Hold)
 	}
 	if res.Path.Kind != promptpath.KindHost {
-		t.Fatalf("path = %s, want host (Pi has no runtime prompt path)", res.Path.Kind)
+		t.Fatalf("path = %s, want host (no runtime offer)", res.Path.Kind)
 	}
 	if res.Command.State != domain.ResponsibilityDelivered {
 		t.Fatalf("state = %s, want delivered", res.Command.State)
 	}
 	if len(res.Command.Attempts) != 1 || res.Command.Attempts[0].PathKind != domain.PromptPathHost {
 		t.Fatalf("attempts = %+v, want one host attempt", res.Command.Attempts)
+	}
+}
+
+func TestPiSelectsRuntimePath(t *testing.T) {
+	h := newHarness(t)
+	dir := shortRuntimeDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	sockPath, err := runtimepi.InjectSocketPath(externalSession)
+	if err != nil {
+		t.Fatalf("InjectSocketPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(sockPath), 0o700); err != nil {
+		t.Fatalf("mkdir inject socket dir: %v", err)
+	}
+	startAdmitStandIn(t, sockPath, true)
+
+	rt := runtimepi.New(agentIntegration)
+	hostAd := hostfake.New(hostIntegration)
+
+	launched := mustLaunchDuoCreated(t, h.a, "w1:p1", "term_a", 4242)
+	cmd := mustAccept(t, h.a, launched.Session, launched.Instance, "key-pi-rt", "digest-pi-rt")
+
+	res := mustRelease(t, composer(h.a, rt, hostAd, h.now.Add(11*time.Second)), cmd.ID)
+	if res.Held {
+		t.Fatalf("held: %+v", res.Hold)
+	}
+	if res.Path.Kind != promptpath.KindRuntime {
+		t.Fatalf("path = %s, want runtime (Pi inject socket)", res.Path.Kind)
+	}
+	if res.Command.State != domain.ResponsibilityDelivered {
+		t.Fatalf("state = %s, want delivered", res.Command.State)
+	}
+	if len(res.Command.Attempts) != 1 || res.Command.Attempts[0].PathKind != domain.PromptPathRuntime {
+		t.Fatalf("attempts = %+v, want one runtime attempt", res.Command.Attempts)
 	}
 }
 
@@ -424,8 +462,8 @@ func idleObs() runtime.ConditionObservation {
 	}
 }
 
-// conditionOnlyRuntime is the Pi case: condition snapshots, no
-// RuntimePromptProvider. The type assertion in collectOffers must skip it.
+// conditionOnlyRuntime implements ConditionProvider but not
+// RuntimePromptProvider. collectOffers skips it for runtime path selection.
 type conditionOnlyRuntime struct {
 	obs runtime.ConditionObservation
 }
@@ -434,4 +472,47 @@ var _ runtime.ConditionProvider = (*conditionOnlyRuntime)(nil)
 
 func (r *conditionOnlyRuntime) ObserveCondition(context.Context, runtime.ConditionObservationRequest) (runtime.ConditionObservationStream, error) {
 	return runtime.NewStaticConditionStream(r.obs), nil
+}
+
+func shortRuntimeDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "pi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
+// startAdmitStandIn listens and, if greet is true, writes one NDJSON
+// connect-line before reading the prompt frame. The connection stays open
+// after read so peerGone sees the peer still there.
+func startAdmitStandIn(t *testing.T, sockPath string, greet bool) {
+	t.Helper()
+	ln, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("listen %s: %v", sockPath, err)
+	}
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if greet {
+			_, _ = conn.Write([]byte(`{"sessionId":"x","idle":true}` + "\n"))
+		}
+		buf := make([]byte, 64*1024)
+		_, _ = conn.Read(buf)
+		<-done
+	}()
+	t.Cleanup(func() {
+		close(done)
+		_ = ln.Close()
+		wg.Wait()
+	})
 }

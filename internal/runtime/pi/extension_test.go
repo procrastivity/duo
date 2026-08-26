@@ -157,13 +157,13 @@ func TestExtensionClosesPaneOnExitWhenActivated(t *testing.T) {
 	}
 }
 
-// Native prompt delivery is proven and documented, and deliberately absent
-// from the Stage 1 asset: it is Duo's Stage 2+ prompt surface.
+// Native prompt delivery lives on the inject asset (inject/duo-inject.ts),
+// not the reporter this test guards.
 func TestExtensionHasNoPromptDeliveryCall(t *testing.T) {
 	src := runtimepi.ExtensionSource()
 	for _, call := range []string{"sendUserMessage(", "ctx.abort(", "deliverAs"} {
 		if strings.Contains(src, call) {
-			t.Errorf("asset contains %q: prompt delivery is Stage 2+, not this step", call)
+			t.Errorf("asset contains %q: prompt delivery lives on the inject asset (inject/duo-inject.ts), not the reporter", call)
 		}
 	}
 	if !strings.Contains(src, "sendUserMessage") || !strings.Contains(src, "ctx.abort") {
