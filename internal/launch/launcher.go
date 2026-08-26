@@ -126,6 +126,13 @@ func WithLeafAugmenter(a LeafAugmenter) LauncherOption {
 	return func(l *Launcher) { l.augmenter = a }
 }
 
+// LauncherFor returns the session-host launcher for one tuple from the
+// same HostSet Launch used. The post-spawn identity bind looks the pane
+// up on that host; a cached fake must be the one Start just wrote to.
+func (l *Launcher) LauncherFor(t Tuple) (host.HostLauncher, error) {
+	return l.hosts.LauncherFor(t)
+}
+
 // NewLauncher builds a launcher over a resolver, a recorder, and a host
 // set, plus any LauncherOption.
 func NewLauncher(resolver *Resolver, recorder Recorder, hosts HostSet, opts ...LauncherOption) (*Launcher, error) {

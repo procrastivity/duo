@@ -376,3 +376,32 @@ func startFake(t *testing.T, h *hostfake.Host) (host.Attachment, host.ProcessBir
 		PaneID:                launched.Evidence.PaneID,
 	}, launched.Evidence.ProcessBirth
 }
+
+func TestAgentOnPaneReportsSeededBind(t *testing.T) {
+	h := hostfake.New("integration-1")
+	ident := host.AgentSessionIdentity{
+		Kind:  host.AgentSessionKindID,
+		Value: "sess-fake-1",
+	}
+	h.SeedAgentBind(host.AgentBindState{Session: &ident, LaunchPending: false, InteractiveReady: true})
+
+	attachment, _ := startFake(t, h)
+	state, found, err := h.AgentOnPane(context.Background(), attachment.PaneID)
+	if err != nil {
+		t.Fatalf("AgentOnPane: %v", err)
+	}
+	if !found {
+		t.Fatal("AgentOnPane: row missing after Start with SeedAgentBind")
+	}
+	if state.Session == nil || state.Session.Value != "sess-fake-1" || state.LaunchPending {
+		t.Fatalf("AgentBindState = %+v", state)
+	}
+
+	_, found, err = h.AgentOnPane(context.Background(), "no-such-pane")
+	if err != nil {
+		t.Fatalf("missing pane: %v", err)
+	}
+	if found {
+		t.Fatal("missing pane must not invent an agent row")
+	}
+}

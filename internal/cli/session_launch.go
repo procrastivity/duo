@@ -287,12 +287,15 @@ func openLaunchAuthority(ctx context.Context, write bool) (*domain.Authority, io
 // rather than of the order two statements happen to appear in a command
 // handler. Launcher.Launch already makes "record before spawn" unforgeable
 // (its unexported `committed` token, invariant I-1); this makes "spawn
-// before recording what the spawn proved" just as plain: neither
-// post-spawn write is reachable from a Launch that returned an error, so a
-// failing Start records no attachment and no correlation fact.
+// before recording what the spawn proved" just as plain: none of the
+// post-spawn writes are reachable from a Launch that returned an error, so a
+// failing Start records no attachment, no agent-session correlation, and no
+// host-correlation fact.
 //
-// The attachment goes first because it is the session's own fact and asks
-// nobody anything, while the first bind may stop to confirm an ambient-env
+// Host attachment goes first because it is the session's own fact from
+// spawn evidence. Agent-session bind is next: it may wait, bounded, for
+// the host to name an identity, then Bind + MarkLive (D3). The workspace
+// first bind is last because it may stop to confirm an ambient-env
 // deduction on the terminal.
 func launchAndBind(
 	ctx context.Context,
@@ -312,6 +315,7 @@ func launchAndBind(
 		return launch.Report{}, err
 	}
 	recordLaunchAttachments(ctx, streams, a, mat, result, actor)
+	bindLaunchIdentities(ctx, streams, a, launcher, result, actor)
 	bindFirstHost(ctx, streams, a, mat, result, actor)
 	return result.Report, nil
 }

@@ -3,9 +3,11 @@
 // plus the evidence and request/result types they share.
 //
 // This package implements HostDiscovery, HostLauncher,
-// HostAttachmentValidator, HostLifecycleSource, and HostPromptProvider.
-// HostPromptProvider is named here (delegation-loop step 10) and implemented
-// by Herdr (step 11) over `agent.prompt`; this package does not invoke it.
+// HostAttachmentValidator, HostLifecycleSource, HostPromptProvider,
+// and AgentIdentitySource. HostPromptProvider is named here
+// (delegation-loop step 10) and implemented by Herdr (step 11) over
+// `agent.prompt`; this package does not invoke it. AgentIdentitySource is
+// the post-launch bind pass's host read (handoff 26).
 // HostTerminalProvider stays out of scope — no empty interface, no TODO type. See
 // docs/adapters/decisions.md.
 //

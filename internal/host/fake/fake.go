@@ -24,6 +24,8 @@ type Host struct {
 	nextPID               int
 	candidates            []host.HostCandidate
 	attachments           map[string]host.Evidence // keyed by paneKey
+	agentBinds            map[string]host.AgentBindState
+	agentBindSeed         *host.AgentBindState
 	unreachable           bool
 	streams               []*observationStream
 	promptOutcome         host.PromptOutcome
@@ -35,6 +37,7 @@ var (
 	_ host.HostAttachmentValidator = (*Host)(nil)
 	_ host.HostLifecycleSource     = (*Host)(nil)
 	_ host.HostPromptProvider      = (*Host)(nil)
+	_ host.AgentIdentitySource     = (*Host)(nil)
 	_ adapter.Factory[*Host]       = Factory{}
 )
 
@@ -44,6 +47,7 @@ func New(integrationInstanceID string) *Host {
 		integrationInstanceID: integrationInstanceID,
 		nextPID:               1000,
 		attachments:           make(map[string]host.Evidence),
+		agentBinds:            make(map[string]host.AgentBindState),
 	}
 }
 
@@ -88,6 +92,44 @@ func (h *Host) SeedCandidate(c host.HostCandidate) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.candidates = append(h.candidates, c)
+}
+
+// SeedAgentBind scripts the agent-session identity Start will report for
+// each pane this fake launches. The bind pass reads it through AgentOnPane;
+// tests that want live without hand-injected MarkLive seed here. A zero
+// Session means the pane has a row but no identity yet.
+func (h *Host) SeedAgentBind(state host.AgentBindState) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	s := state
+	if state.Session != nil {
+		ident := *state.Session
+		s.Session = &ident
+	}
+	h.agentBindSeed = &s
+}
+
+// SetPaneAgentBind sets identity for one already-launched pane. Step 07
+// can reveal identity after spawn; the bind helper polls AgentOnPane.
+func (h *Host) SetPaneAgentBind(paneID string, state host.AgentBindState) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.agentBinds[paneKey(h.integrationInstanceID, paneID)] = state
+}
+
+// AgentOnPane implements host.AgentIdentitySource. A missing row is
+// (zero, false, nil) and is not process-gone.
+func (h *Host) AgentOnPane(_ context.Context, paneID string) (host.AgentBindState, bool, error) {
+	if paneID == "" {
+		return host.AgentBindState{}, false, fmt.Errorf("fake host: agent lookup has no pane ID")
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	state, ok := h.agentBinds[paneKey(h.integrationInstanceID, paneID)]
+	if !ok {
+		return host.AgentBindState{}, false, nil
+	}
+	return state, true, nil
 }
 
 // Discover implements host.HostDiscovery.
@@ -151,6 +193,9 @@ func (h *Host) Start(_ context.Context, prepared host.PreparedHostLaunch) (host.
 		PaneID: fmt.Sprintf("fake-pane-%d", pid),
 	}
 	h.attachments[paneKey(evidence.IntegrationInstanceID, evidence.PaneID)] = evidence
+	if h.agentBindSeed != nil {
+		h.agentBinds[paneKey(evidence.IntegrationInstanceID, evidence.PaneID)] = *h.agentBindSeed
+	}
 
 	return host.HostLaunchEvidence{Evidence: evidence, StartedAt: now}, nil
 }
@@ -190,6 +235,7 @@ func (h *Host) Kill(a host.Attachment) {
 	evidence, ok := h.attachments[paneKey(a.IntegrationInstanceID, a.PaneID)]
 	if ok {
 		delete(h.attachments, paneKey(a.IntegrationInstanceID, a.PaneID))
+		delete(h.agentBinds, paneKey(a.IntegrationInstanceID, a.PaneID))
 	}
 	streams := append([]*observationStream(nil), h.streams...)
 	h.mu.Unlock()

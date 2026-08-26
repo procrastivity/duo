@@ -123,6 +123,19 @@ func openKnownAgentRuntime(integrationInstanceID string) (any, error) {
 	}
 }
 
+// agentRuntimeIntegrationID maps a launch-tuple public agent-runtime kind
+// onto the adapter integration-instance ID openAgentRuntime knows.
+func agentRuntimeIntegrationID(kind string) string {
+	switch kind {
+	case "claude":
+		return "claude-code"
+	case "pi":
+		return "pi"
+	default:
+		return kind
+	}
+}
+
 // conditionObservationRequest builds the SnapshotCondition request from
 // store correlations. Adapters key on these external identifiers, not Duo
 // session IDs.
