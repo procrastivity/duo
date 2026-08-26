@@ -13,6 +13,7 @@ import (
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/domain/storerepo"
 	"github.com/procrastivity/duo/internal/exitcode"
+	"github.com/procrastivity/duo/internal/host"
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
@@ -376,6 +377,198 @@ func TestSessionLaunchHelpHasNoPromptFlag(t *testing.T) {
 	if strings.Contains(combined, "--prompt") {
 		t.Fatal("session launch --help must not mention --prompt")
 	}
+}
+
+func TestPromptSend_DelayedIdentityEndsDelivered(t *testing.T) {
+	const ident = "sess-delay-prompt-1"
+	pair := launchStartingClaudePair(t, ident)
+	pair.host.ScriptPromptOutcome(host.PromptOutcomeNoEffect)
+
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		pair.host.SetPaneAgentBind(pair.pane, host.AgentBindState{
+			Session: &host.AgentSessionIdentity{
+				Source: "herdr:claude",
+				Agent:  "claude",
+				Kind:   host.AgentSessionKindID,
+				Value:  ident,
+			},
+			LaunchPending:    false,
+			InteractiveReady: true,
+		})
+	}()
+	pair.harness.close()
+
+	expires := time.Now().UTC().Add(15 * time.Second).Format(time.RFC3339Nano)
+	code, out, errOut := runSession(t,
+		"prompt", "send", pair.session,
+		"--text", "Run the focused checks.",
+		"--idempotency-key", "key-delay-1",
+		"--expires-at", expires,
+		"--output", "json",
+	)
+	if code != exitcode.Success {
+		t.Fatalf("prompt send: exit code = %d (stderr: %s)\nstdout: %s", code, errOut, out)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var sent struct {
+		Result promptDeliverResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &sent); err != nil {
+		t.Fatalf("send JSON: %v", err)
+	}
+	if sent.Result.ResponsibilityState != string(domain.ResponsibilityDelivered) {
+		t.Fatalf("state = %q, want delivered (identity appeared after a short delay)", sent.Result.ResponsibilityState)
+	}
+	if sent.Result.Hold != nil {
+		t.Fatalf("hold present on delivered: %+v", sent.Result.Hold)
+	}
+
+	code, out, errOut = runSession(t, "prompt", "show", sent.Result.CommandID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("prompt show: exit code = %d (stderr: %s)", code, errOut)
+	}
+	var shown struct {
+		Result commandInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show JSON: %v", err)
+	}
+	if shown.Result.ResponsibilityState != string(domain.ResponsibilityDelivered) {
+		t.Errorf("inspect state = %q, want delivered", shown.Result.ResponsibilityState)
+	}
+	if len(shown.Result.Attempts) != 1 {
+		t.Fatalf("attempts = %d, want 1 (runtime path once bound)", len(shown.Result.Attempts))
+	}
+}
+
+func TestPromptSend_NeverBindsExpiresLoudly(t *testing.T) {
+	pair := launchStartingClaudePair(t, "sess-never-prompt-1")
+	sessionID := pair.session
+	pair.harness.close()
+
+	expires := time.Now().UTC().Add(800 * time.Millisecond).Format(time.RFC3339Nano)
+	code, out, errOut := runSession(t,
+		"prompt", "send", sessionID,
+		"--text", "Run the focused checks.",
+		"--idempotency-key", "key-never-1",
+		"--expires-at", expires,
+		"--output", "json",
+	)
+	if code == exitcode.Success {
+		t.Fatalf("never-binds send succeeded (stdout: %s stderr: %s)", out, errOut)
+	}
+	body := errOut
+	if body == "" {
+		body = out
+	}
+	assertValidExternalV1(t, []byte(body))
+	var env struct {
+		Error struct {
+			Code    string         `json:"code"`
+			Effect  string         `json:"effect"`
+			Details map[string]any `json:"details"`
+		} `json:"error"`
+		Result *promptDeliverResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(body), &env); err != nil {
+		t.Fatalf("failure JSON: %v\n%s", err, body)
+	}
+	if env.Result != nil && env.Result.ResponsibilityState == string(domain.ResponsibilityDelivered) {
+		t.Fatalf("never-binds looked like success: delivered %+v", env.Result)
+	}
+	if env.Error.Code != "command.expired" && env.Error.Code != "operation.temporarily_unavailable" {
+		t.Errorf("code = %q, want command.expired (or a loud unavailable), stdout=%s", env.Error.Code, out)
+	}
+	if state, _ := env.Error.Details["responsibility_state"].(string); state == string(domain.ResponsibilityDelivered) {
+		t.Fatalf("expired details claim delivered: %+v", env.Error.Details)
+	}
+	if state, _ := env.Error.Details["responsibility_state"].(string); state == string(domain.ResponsibilityQueued) {
+		t.Fatalf("never-binds expired as queued hold, which looks like success: %+v", env.Error.Details)
+	}
+
+	a, closer, err := openReadAuthority(context.Background())
+	if err != nil {
+		t.Fatalf("reopen authority: %v", err)
+	}
+	defer func() { _ = closer.Close() }()
+	sess, ok := a.Session(domain.SessionID(sessionID))
+	if !ok {
+		t.Fatalf("no session %s after never-binds send", sessionID)
+	}
+	inst, ok := a.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current instance")
+	}
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting (send must not MarkLive)", inst.State)
+	}
+	if _, ok := agentBindingsFor(a, sess); ok {
+		t.Fatal("agent.session correlation written although identity never appeared")
+	}
+}
+
+// launchStartingClaudePair launches a Duo-created Claude leaf with no
+// host identity at spawn. The instance stays starting; the cached fake
+// host is registered so a later in-process prompt send sees the same pane.
+func launchStartingClaudePair(t *testing.T, ident string) struct {
+	harness *bindHarness
+	session string
+	pane    string
+	host    *hostfake.Host
+} {
+	t.Helper()
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	rt := runtimefake.New("claude-code")
+	rt.SeedCondition(ident, runtime.ConditionObservation{
+		Value:      runtime.ConditionIdle,
+		Confidence: runtime.ConditionConfidenceInferred,
+		Freshness:  runtime.ConditionFreshnessFresh,
+	})
+	RegisterAgentRuntime("claude-code", rt)
+	t.Cleanup(func() { UnregisterAgentRuntime("claude-code") })
+
+	hosts := newIdentityHosts(nil)
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	if len(hosts.hosts) != 1 {
+		t.Fatalf("cached hosts = %d, want 1", len(hosts.hosts))
+	}
+	var (
+		hostID   string
+		fakeHost *hostfake.Host
+	)
+	for id, fh := range hosts.hosts {
+		hostID, fakeHost = id, fh
+	}
+	RegisterHostPromptProvider(hostID, fakeHost)
+	t.Cleanup(func() { UnregisterHostPromptProvider(hostID) })
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok || inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %+v, want starting", inst)
+	}
+	if _, ok := agentBindingsFor(h.authority, sess); ok {
+		t.Fatal("identity appeared at launch; want a delayed reveal")
+	}
+	att, ok := h.authority.Attachment(sess.Attachment)
+	if !ok || att.Container == "" {
+		t.Fatal("launch attachment has no pane id")
+	}
+	return struct {
+		harness *bindHarness
+		session string
+		pane    string
+		host    *hostfake.Host
+	}{h, report.SessionID, att.Container, fakeHost}
 }
 
 func TestPromptCLIPathsMatchRegistry(t *testing.T) {

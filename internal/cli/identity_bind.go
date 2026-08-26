@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -231,4 +232,60 @@ func identitySkipped(streams *iostreams.Streams, session domain.SessionID, forma
 		session, fmt.Sprintf(format, args...))
 	_, _ = fmt.Fprintln(streams.Err,
 		"duo: the launch itself succeeded; the instance stays starting until the host reports identity.")
+}
+
+// waitPromptIdentity is the send-path wait: type-assert the already-open
+// host prompt provider (no Launcher), resolve pane and runtime from the
+// attachment and launch tuple, and poll bindStartingIdentity until live
+// or deadline. Prompt send passes the command's expires_at, not
+// identityBindTimeout — tests zero that for launch, and a delay test
+// must still be able to wait.
+func waitPromptIdentity(
+	ctx context.Context,
+	streams *iostreams.Streams,
+	a *domain.Authority,
+	hostAd host.HostPromptProvider,
+	sess domain.Session,
+	actor string,
+	deadline time.Time,
+) identityBindOutcome {
+	source, _ := hostAd.(host.AgentIdentitySource)
+	return bindStartingIdentity(ctx, streams, a, source, sess, sess.Current,
+		paneIDForSession(a, sess), runtimeIDForSession(a, sess), actor, deadline)
+}
+
+// paneIDForSession is the launch pane: hostbind records pane_id as the
+// attachment container. Prompt send does not scan directories (I-6).
+func paneIDForSession(a *domain.Authority, sess domain.Session) string {
+	if sess.Attachment == "" {
+		return ""
+	}
+	att, ok := a.Attachment(sess.Attachment)
+	if !ok {
+		return ""
+	}
+	return att.Container
+}
+
+// runtimeIDForSession is the agent-runtime integration-instance ID for a
+// session that may not yet have an agent.session correlation. Prefer the
+// bound correlation; otherwise decode the launch-resolution assignment
+// (the launch tuple) and map through agentRuntimeIntegrationID. No
+// fourth BindingSource.
+func runtimeIDForSession(a *domain.Authority, sess domain.Session) string {
+	if b, ok := agentBindingsFor(a, sess); ok && b.IntegrationInstance != "" {
+		return b.IntegrationInstance
+	}
+	rec, ok := a.SessionLaunchResolution(sess.ID)
+	if !ok {
+		return ""
+	}
+	var body launch.Record
+	if err := json.Unmarshal(rec.Body, &body); err != nil {
+		return ""
+	}
+	if len(body.Assignment) == 0 {
+		return ""
+	}
+	return agentRuntimeIntegrationID(body.Assignment[0].Tuple.AgentRuntime)
 }

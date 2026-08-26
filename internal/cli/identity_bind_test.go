@@ -213,6 +213,25 @@ func TestClaimFromHostIdentityMapsKind(t *testing.T) {
 	}
 }
 
+func TestRuntimeIDForSessionUsesLaunchTupleWhenUnbound(t *testing.T) {
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+	report, err := h.launch(mat, newIdentityHosts(nil), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	if got := runtimeIDForSession(h.authority, sess); got != "claude-code" {
+		t.Errorf("runtimeIDForSession = %q, want claude-code from the launch tuple", got)
+	}
+	if got := paneIDForSession(h.authority, sess); got == "" {
+		t.Error("paneIDForSession empty; launch attachment should name the pane")
+	}
+}
+
 func correlationSource(a *domain.Authority, instance domain.InstanceID, kind string) string {
 	for _, c := range a.Correlations(domain.TargetInstance, string(instance)) {
 		if c.Status == domain.CorrelationActive && c.ExternalKind == kind {

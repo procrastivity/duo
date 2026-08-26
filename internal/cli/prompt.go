@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -169,6 +170,9 @@ func promptSendCommand(streams *iostreams.Streams) *cobra.Command {
 			if accepted.Command.State.Terminal() {
 				cmdState = accepted.Command
 			} else {
+				if err := waitPromptReady(cmd.Context(), streams, mode, op, a, accepted.Command, actor); err != nil {
+					return err
+				}
 				rt, hostAd, openErr := openPromptAdapters(a, accepted.Command.Session)
 				if openErr != nil {
 					return openErr
@@ -260,6 +264,138 @@ func promptShowCommand(streams *iostreams.Streams) *cobra.Command {
 func promptCanonicalDigest(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// promptStampLayout matches domain/store timestamps so command ExpiresAt
+// and instance StartedAt parse. Copied: internal/domain does not export it.
+const promptStampLayout = "2006-01-02T15:04:05.000Z"
+
+// waitPromptReady is the implicit send wait (D4): bindStartingIdentity
+// until live, using the command's expires_at as the only deadline, then
+// — for Duo-created sessions — the existing delivery launch-settle
+// window so Release can auto-deliver instead of returning a queued hold.
+// No duo session settle verb.
+func waitPromptReady(
+	ctx context.Context,
+	streams *iostreams.Streams,
+	mode, op string,
+	a *domain.Authority,
+	cmd domain.PromptCommand,
+	actor string,
+) error {
+	sess, ok := a.Session(cmd.Session)
+	if !ok {
+		return duoerr.New("object.not_found", fmt.Sprintf("No session named %q is known.", cmd.Session))
+	}
+	deadline := promptWaitDeadline(ctx, cmd)
+
+	hostAd, err := openHostPromptProvider(a, sess)
+	if err != nil {
+		return err
+	}
+	out := waitPromptIdentity(ctx, streams, a, hostAd, sess, actor, deadline)
+	if !out.Live {
+		return expireUnboundPrompt(ctx, streams, mode, op, a, cmd, actor, deadline)
+	}
+
+	if !delivery.DuoCreated(a, sess.ID) {
+		return nil
+	}
+	inst, ok := a.Instance(sess.Current)
+	if !ok {
+		return expireUnboundPrompt(ctx, streams, mode, op, a, cmd, actor, deadline)
+	}
+	if promptLaunchSettled(inst, time.Now()) {
+		return nil
+	}
+	if waitPromptLaunchSettled(ctx, a, sess.Current, deadline) {
+		return nil
+	}
+	return expireUnboundPrompt(ctx, streams, mode, op, a, cmd, actor, deadline)
+}
+
+func promptWaitDeadline(ctx context.Context, cmd domain.PromptCommand) time.Time {
+	deadline := time.Now().Add(domain.DefaultPromptExpiry)
+	if t, ok := parsePromptStamp(cmd.ExpiresAt); ok {
+		deadline = t
+	}
+	if ctx != nil {
+		if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+			return d
+		}
+	}
+	return deadline
+}
+
+func parsePromptStamp(s string) (time.Time, bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	for _, layout := range []string{promptStampLayout, time.RFC3339Nano, time.RFC3339} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
+}
+
+func promptLaunchSettled(inst domain.RuntimeInstance, now time.Time) bool {
+	started, ok := parsePromptStamp(inst.StartedAt)
+	if !ok {
+		return false
+	}
+	return !now.UTC().Before(started.Add(delivery.DefaultLaunchSettleTimeout))
+}
+
+func waitPromptLaunchSettled(ctx context.Context, a *domain.Authority, instance domain.InstanceID, deadline time.Time) bool {
+	poll := identityBindPoll
+	if poll <= 0 {
+		poll = defaultIdentityBindPoll
+	}
+	for {
+		inst, ok := a.Instance(instance)
+		if ok && promptLaunchSettled(inst, time.Now()) {
+			return true
+		}
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(poll):
+		}
+	}
+}
+
+func expireUnboundPrompt(
+	ctx context.Context,
+	streams *iostreams.Streams,
+	mode, op string,
+	a *domain.Authority,
+	cmd domain.PromptCommand,
+	actor string,
+	deadline time.Time,
+) error {
+	if remain := time.Until(deadline); remain > 0 {
+		select {
+		case <-ctx.Done():
+		case <-time.After(remain + time.Millisecond):
+		}
+	}
+	expired, err := a.ExpireIfDue(ctx, cmd.ID, actor)
+	if err != nil {
+		return err
+	}
+	latest, _ := a.Command(cmd.ID)
+	if latest.ID == "" {
+		latest = cmd
+	}
+	if expired || latest.State == domain.ResponsibilityExpired {
+		return mapPromptReleaseError(streams, mode, op, latest, domain.ErrCommandExpired)
+	}
+	return duoerr.New("operation.temporarily_unavailable",
+		fmt.Sprintf("session %s is still starting; no live agent-session bind before expires_at.", cmd.Session))
 }
 
 func openPromptAdapters(a *domain.Authority, session domain.SessionID) (any, host.HostPromptProvider, error) {
