@@ -62,3 +62,30 @@ func TestSnapshotConditionEmptyStreamErrors(t *testing.T) {
 		t.Fatal("expected error from a stream that closed with no observation")
 	}
 }
+
+func TestNewStaticConditionStreamEmitsThenWaitsForClose(t *testing.T) {
+	at := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	stream := runtime.NewStaticConditionStream(runtime.ConditionObservation{
+		ObservationID: "obs-static",
+		Value:         runtime.ConditionIdle,
+		Confidence:    runtime.ConditionConfidenceInferred,
+		Freshness:     runtime.ConditionFreshnessFresh,
+		ComputedAt:    at,
+	})
+
+	got, err := runtime.SnapshotCondition(context.Background(), staticProvider{stream: stream}, runtime.ConditionObservationRequest{})
+	if err != nil {
+		t.Fatalf("SnapshotCondition: %v", err)
+	}
+	if got.ObservationID != "obs-static" || got.Value != runtime.ConditionIdle {
+		t.Fatalf("got %+v, want static idle obs", got)
+	}
+}
+
+type staticProvider struct {
+	stream runtime.ConditionObservationStream
+}
+
+func (s staticProvider) ObserveCondition(context.Context, runtime.ConditionObservationRequest) (runtime.ConditionObservationStream, error) {
+	return s.stream, nil
+}

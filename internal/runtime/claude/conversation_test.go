@@ -110,8 +110,8 @@ func TestReadConversationDropsSubagentSidechain(t *testing.T) {
 // bookkeeping entry. The fixture's two interrupt-shape user entries
 // (notes/16 §2, "[Request interrupted by user]" /
 // "[Request interrupted by user for tool use]") are ordinary human-typed
-// user turns to this adapter — Stage 1's ConversationProvider has no
-// special casing for them, only ConditionProvider (out of scope) would.
+// user turns to this adapter — ConversationProvider does not special-case
+// them; ConditionProvider treats those exact texts as turn-close.
 func TestReadConversationDropsNewBookkeepingEntryTypes(t *testing.T) {
 	r := newConversationRuntime(t)
 	ctx := context.Background()

@@ -3,13 +3,12 @@
 //
 // # Scope
 //
-// Stage 1 implements exactly the two §5.3 interfaces internal/runtime
-// defines — RuntimeCorrelator and ConversationProvider — plus the §5.1
-// factory envelope. ConditionProvider, RuntimePromptProvider,
-// UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer are
-// Stage 2+ and are deliberately not scaffolded here, for the same reason
-// internal/runtime does not declare them: a stub would commit later
-// sessions to field shapes nobody has designed.
+// Stage 1 implements RuntimeCorrelator and ConversationProvider plus the
+// §5.1 factory envelope. The delegation-loop observation slice adds
+// ConditionProvider (condition.go): transcript-first idle/working, using
+// the lastSettledAt analog (assistant stopReason other than toolUse), never
+// agent_end. RuntimePromptProvider, UsageProvider,
+// RuntimeConfigurationProvider, and HarnessRenderer remain unscaffolded.
 //
 // # Two channels
 //
@@ -55,8 +54,8 @@
 // cooperative `herdr:blocked` EventBus convention, and a 2026-08-23 sweep of
 // the installed tree found zero emitters (one listener, no producer, and
 // nothing in the pi dist). A Duo reporter cannot lift evidence that is not
-// produced, so a future ConditionProvider must degrade this facet
-// explicitly rather than infer it.
+// A future reporter cannot lift blocked evidence that is not produced;
+// ConditionProvider degrades this facet by never emitting blocked.
 //
 // Working mode is unsupported. Pi has no built-in working-mode concept; its
 // --mode flag is an execution surface (tui/rpc/json/print) and plan behavior

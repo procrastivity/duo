@@ -254,10 +254,9 @@ minimality forced concrete drops, all ported straight from
   the kind of eventual-schema guess the runtime package's own decisions
   above already ruled out for this type.
 - `system/turn_duration` and the ported adapter's silence-armed
-  end-of-turn bookkeeping have no equivalent here at all. Stage 1's
-  `ConversationProvider` is a semantic-turn reader, not a turn-boundary
-  signal; that belongs to `ConditionProvider`, out of this step's scope
-  by the package doc comment's own cut.
+  end-of-turn bookkeeping have no equivalent here at all.
+  `ConversationProvider` is a semantic-turn reader; turn-boundary
+  signals belong to `ConditionProvider` (condition.go, step 08).
 - `isSidechain: true` entries are dropped unconditionally. A subagent's
   transcript is a physically separate file
   (`<slug>/<session-id>/subagents/agent-<id>.jsonl`), so a correctly
@@ -810,3 +809,63 @@ Completion (`exited`) is a closed value on the observation. Mapping
 (inspect/composer) mapping, not a runtime→host import. The fake seeds
 `exited` the same way it seeds `idle`, so later cross-composition tests
 have a host+runtime pair without this package importing `internal/host`.
+
+## ConditionProvider adapters (delegation-loop step 08, 2026-08-26)
+
+D2 cuts the credentialed rank-2 reporter, so both dogfood runtimes
+derive condition **transcript-first**. Confidence on every observation
+is schema `inferred` (`runtime.ConditionConfidenceInferred`), never
+`reported`. Correlate's per-adapter labels (`authoritative`,
+`pi-extension-exact`, …) stay on the identity bind; they do not leak
+into `ConditionObservation.Confidence`, whose vocabulary is closed by
+the schema.
+
+`done` is a closed value and is not emitted. Turn-end is idle, not
+qualified completion (review/answers/x02 §3). `exited` is also not
+emitted by these adapters: `internal/runtime` and the adapter packages
+must not import `internal/host`. Step 09's inspect caller maps
+`HostLifecycleSource` gone → `exited` as final (I-5). The fake already
+seeds `exited` for cross-composition tests.
+
+A missing or unreadable transcript degrades the observation to
+`unknown` and does not fail `Correlate`. Bound is identity.
+
+### Claude (`internal/runtime/claude`)
+
+Scan the JSONL (not `ReadConversation`'s projected turns — those drop
+`tool_use` / `turn_duration`). Last turn-boundary event wins:
+
+- Human-prompt user entry (string content) opens a turn → `working`.
+  Peer-origin prompts still open one: the agent is working. The
+  UserPromptSubmit hook is not consulted (notes/16 §5: its payload is
+  indistinguishable from a human prompt and must not be treated as
+  draft evidence).
+- Exact interrupt texts `[Request interrupted by user]` and
+  `[Request interrupted by user for tool use]` close the turn → `idle`.
+- `stop_reason: tool_use` and tool_result user envelopes keep the turn
+  open → `working`.
+- `system/turn_duration` (interactive) or `stop_reason: end_turn` /
+  `stop_sequence` (print mode, which never writes `turn_duration`)
+  settle → `idle`. A snapshot of a finished file treats last `end_turn`
+  as settled; there is no silence wait.
+- Sidechain lines are ignored. A sidechain-only file is `unknown`.
+
+### Pi (`internal/runtime/pi`)
+
+Scan the JSONL plus the lastSettledAt analog. Pi has no
+`turn_duration`; `adapter_pi.go` already defined the edge: an assistant
+message whose `stopReason` is anything but `toolUse` ends the turn.
+That is the same edge `agent_settled` stamps as `lastSettledAt` on the
+reporter claim. This step does not subscribe to `agent_end` (after
+`agent_end` pi may still retry, compact, or run a queued follow-up;
+`TestExtensionTerminalityAndLifecycleMarkers` stays red if someone
+adds that subscription) and does not promote the claim's `idle` /
+`lastSettledAt` fields to `reported`.
+
+- User message or `toolResult` or `stopReason: toolUse` → `working`.
+- Assistant `stopReason` other than `toolUse` (`stop`, `aborted`, …) →
+  `idle`, with `EffectiveAt` the assistant entry's timestamp (the
+  lastSettledAt analog). `reported-claim-tui.json` carries the live
+  `idle` / `lastSettledAt` pair for the injected-abort session; the
+  observation for that transcript is still `inferred`.
+- `blocked` stays absent (zero `herdr:blocked` emitters at 0.83.0).

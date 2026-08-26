@@ -9,13 +9,15 @@
 // forced.
 //
 // Deliberately out of scope, matching the internal/runtime package's own
-// Stage-1 cut: ConditionProvider, RuntimePromptProvider, UsageProvider,
-// RuntimeConfigurationProvider, and HarnessRenderer. Correlate is built to
-// accept a runtime.RuntimeClaim that already carries hook-reported identity
-// (the session id and the launch-env reporter credential passed through to
-// hook env, notes/16 §10), not to generate or install the hook
-// configuration a correlation-reporting hook would need — that installation
-// path is still out of scope here.
+// Stage-1 cut plus the delegation-loop observation slice: RuntimePromptProvider,
+// UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer.
+// ConditionProvider is implemented (condition.go) as a transcript-first
+// snapshot: no generated-hook install, no UserPromptSubmit subscription.
+// Correlate is built to accept a runtime.RuntimeClaim that already carries
+// hook-reported identity (the session id and the launch-env reporter
+// credential passed through to hook env, notes/16 §10), not to generate or
+// install the hook configuration a correlation-reporting hook would need —
+// that installation path is still out of scope here.
 //
 // closeonexit.go is a narrow exception: it generates and materializes one
 // single-purpose SessionEnd hook plus a `claude --settings` document for
@@ -54,6 +56,7 @@ type Runtime struct {
 var (
 	_ runtime.RuntimeCorrelator    = (*Runtime)(nil)
 	_ runtime.ConversationProvider = (*Runtime)(nil)
+	_ runtime.ConditionProvider    = (*Runtime)(nil)
 	_ adapter.Factory[*Runtime]    = Factory{}
 )
 

@@ -173,9 +173,8 @@ func parseTranscript(path string) ([]runtime.ConversationTurn, error) {
 //     minimal-shape reason. Turn-boundary bookkeeping
 //     (system/turn_duration, the end_turn/silence arming the original
 //     adapter does for live-tail turn-end detection) has no equivalent
-//     here either — Stage 1's ConversationProvider is a semantic-turn
-//     reader, not a turn-boundary signal; that belongs to
-//     ConditionProvider, which this step does not implement.
+//     here either — ConversationProvider is a semantic-turn reader;
+//     turn-boundary signals belong to ConditionProvider (condition.go).
 //   - Every other entry type (system, mode, permission-mode, attachment
 //     — including the new atis-latch, bridge-session, and
 //     total_tokens_reminder types notes/16 §1 found at 2.1.240 — ai-title,

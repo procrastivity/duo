@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -137,4 +138,33 @@ drain:
 		}
 	}
 	return latest, nil
+}
+
+// NewStaticConditionStream returns a ConditionObservationStream that
+// emits obs immediately and stays open until Close. Transcript-first
+// adapters use this: they compute idle/working/done once, emit it, and
+// wait; they do not watch files or install hooks.
+func NewStaticConditionStream(obs ConditionObservation) ConditionObservationStream {
+	ch := make(chan ConditionObservation, 1)
+	ch <- obs
+	return &staticConditionStream{ch: ch}
+}
+
+type staticConditionStream struct {
+	mu     sync.Mutex
+	ch     chan ConditionObservation
+	closed bool
+}
+
+func (s *staticConditionStream) Observations() <-chan ConditionObservation { return s.ch }
+
+func (s *staticConditionStream) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	close(s.ch)
+	return nil
 }
