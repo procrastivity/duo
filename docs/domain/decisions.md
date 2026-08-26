@@ -462,3 +462,16 @@ in attachment-ID order. `Session.Attachment` stays the last-bound
 current pointer. Full mapping, show contract, and the multi-leaf
 recovery table live in `docs/cli/decisions.md` and the planning note
 `notes/48-dogfood-recovery-semantics.md`.
+
+## 2026-08-26 — Post-launch Bind then MarkLive (handoff 26)
+
+The post-launch identity-bind milestone (handoff 26; not Stage 2)
+closes the gap after spawn: launch still leaves the instance
+`starting` and writes no `agent.session` / `transcript` correlation;
+tests inject those and call `MarkLive` by hand today. The path is
+`Authority.Bind` with `launch-plan` attestation (AgentSession +
+Transcript), then `MarkLive` — not `Enroll` (launch already minted the
+session and starting instance). `Bind` is already the late
+SessionStart path; host-reported agent-session identity is evidence on
+the claim, not a fourth `BindingSource`. Do not use `instance-claim`
+for this automatic bind.

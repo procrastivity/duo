@@ -410,3 +410,13 @@ The recovery lock above is wired in the CLI on the `go` branch:
 
 List and show remain read-only. Reconcile is explicit; there is no
 automatic reconciliation on read verbs.
+
+## 2026-08-26 — Honest starting and prompt wait (handoff 26)
+
+The post-launch identity-bind milestone (handoff 26; not Stage 2)
+keeps the interim skill at three verbs. While a runtime instance is
+`starting`, `duo session show` stays honest and omits `condition`.
+`duo prompt send` waits or stays queued until the instance is `live`
+(`queue_until_safe` already exists). Prefer that implicit wait on
+send. Do not add `duo session settle` unless a later implementation
+step earns a named, testable verb for the wait.

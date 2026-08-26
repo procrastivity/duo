@@ -986,3 +986,24 @@ Herdr has no attributed input, so the quiet period cannot fire on
 Herdr unless a later composition supplies `LastHumanInput`. The queued
 hold code is `prompt.human_priority_hold`. No composer-lease product
 surface, no `hold_for_release` verb, no tmux attribution.
+
+## 2026-08-26 — Post-launch identity ingest (handoff 26)
+
+The post-launch identity-bind milestone (handoff 26; not Stage 2) will
+ingest host-reported agent-session identity after spawn and present it
+as a `RuntimeClaim` for existing `Correlate`, then write through
+`Authority.Bind`. Do not install Duo reporter hooks. Do not bind the
+newest transcript in a directory.
+
+**Where identity lives (evidence, unresolved contradiction).** notes/07
+says `agent_session` surfaces on `pane.get`/`pane.list`. Live Herdr
+0.8.2 (notes/19) shows the pane record without `agent_session`; the
+agent record adds `{name, agent, agent_session, interactive_ready,
+state_change_seq}` and carries `launch_pending`. Prefer the live 0.8.2
+record for decode work; do not pretend the notes/07 vs notes/19
+contradiction is resolved beyond naming it.
+
+**Correlate is unchanged.** A claim still needs
+`ExternalAgentSessionID` (see Correlate above). Host identity on the
+claim is evidence for that field; `Correlate` does not discover an id
+from a pane on its own.
