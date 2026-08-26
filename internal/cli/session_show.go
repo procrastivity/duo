@@ -156,7 +156,10 @@ func inspectResultFor(ctx context.Context, a *domain.Authority, s domain.Session
 // Completion (I-5): step 08 adapters never emit exited or done. When the
 // store instance is terminal (InstanceExited / Terminal()), condition is
 // exited and final — inspect does not dial HostLifecycleSource (I-3: read
-// path, no streams). Otherwise SnapshotCondition on a ConditionProvider.
+// path, no streams). I-8: while starting (or otherwise not live), omit
+// condition even if agentBindingsFor succeeds — identity may be named while
+// launch_pending keeps the instance starting; do not invent a live
+// condition. Only live instances SnapshotCondition on a ConditionProvider.
 func conditionForInspect(ctx context.Context, a *domain.Authority, s domain.Session, haveInst bool, inst domain.RuntimeInstance) *conditionViewData {
 	if !haveInst {
 		return nil
@@ -171,6 +174,9 @@ func conditionForInspect(ctx context.Context, a *domain.Authority, s domain.Sess
 			ComputedAt:        now,
 			Reasons:           []string{"runtime instance state is exited"},
 		}
+	}
+	if inst.State != domain.InstanceLive {
+		return nil
 	}
 	bindings, ok := agentBindingsFor(a, s)
 	if !ok {

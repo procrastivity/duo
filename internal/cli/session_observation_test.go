@@ -12,6 +12,7 @@ import (
 	"github.com/procrastivity/duo/internal/buildinfo"
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/exitcode"
+	"github.com/procrastivity/duo/internal/host"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
@@ -22,6 +23,8 @@ import (
 // through the built root with the permanent fake-host + fake-runtime pair
 // (D6): session.inspect carries condition/operations, conversation.list
 // projects seeded turns, and both JSON envelopes validate.
+// Bound-live condition + turns on the enroll path; launch-path live inspect
+// is step 05's fake-pair coverage — do not duplicate it here.
 func TestSessionInspectAndConversationList_FakePair(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	root := t.TempDir()
@@ -175,6 +178,103 @@ func TestSessionInspectAndConversationList_FakePair(t *testing.T) {
 	}
 }
 
+// TestSessionShow_StartingOmitsCondition matches step-01 fixture honesty
+// (session-inspect-starting.json): runtime_instance_state is starting and
+// the condition key is absent — identity never appeared, no MarkLive.
+func TestSessionShow_StartingOmitsCondition(t *testing.T) {
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	report, err := h.launch(mat, newIdentityHosts(nil), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok || inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %+v, want starting", inst)
+	}
+	sessionID := report.SessionID
+	h.close()
+
+	code, out, errOut := runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d (stderr: %s)", code, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	result := inspectResultJSON(t, out)
+	if got, _ := result["runtime_instance_state"].(string); got != string(domain.InstanceStarting) {
+		t.Errorf("runtime_instance_state = %v, want starting", result["runtime_instance_state"])
+	}
+	if _, has := result["condition"]; has {
+		t.Fatalf("condition key present while starting: %v", result["condition"])
+	}
+}
+
+// TestSessionShow_StartingOmitsCondition_LaunchPendingBound is I-8: identity
+// is bound and correlations exist, but launch_pending left the instance
+// starting — show must still omit condition (not SnapshotCondition a live view).
+func TestSessionShow_StartingOmitsCondition_LaunchPendingBound(t *testing.T) {
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	const agentIntegration = "claude-code"
+	const externalSessionID = "sess-pending-show-1"
+	rt := runtimefake.New(agentIntegration)
+	at := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	rt.SeedCondition(externalSessionID, runtime.ConditionObservation{
+		ObservationID: "obs_pending",
+		Value:         runtime.ConditionIdle,
+		Confidence:    runtime.ConditionConfidenceInferred,
+		Freshness:     runtime.ConditionFreshnessFresh,
+		EffectiveAt:   at,
+		ComputedAt:    at,
+	})
+	RegisterAgentRuntime(agentIntegration, rt)
+	t.Cleanup(func() { UnregisterAgentRuntime(agentIntegration) })
+
+	ident := host.AgentSessionIdentity{
+		Kind:  host.AgentSessionKindID,
+		Value: externalSessionID,
+	}
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:       &ident,
+		LaunchPending: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, _ := h.authority.Instance(sess.Current)
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting while launch_pending", inst.State)
+	}
+	if _, ok := agentBindingsFor(h.authority, sess); !ok {
+		t.Fatal("want agentBindingsFor success while still starting (I-8 regression setup)")
+	}
+	sessionID := report.SessionID
+	h.close()
+
+	code, out, errOut := runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("show: exit code = %d (stderr: %s)", code, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	result := inspectResultJSON(t, out)
+	if got, _ := result["runtime_instance_state"].(string); got != string(domain.InstanceStarting) {
+		t.Errorf("runtime_instance_state = %v, want starting", result["runtime_instance_state"])
+	}
+	if _, has := result["condition"]; has {
+		t.Fatalf("condition key present while starting with bindings: %v", result["condition"])
+	}
+}
+
 func TestConversationList_NoBoundTranscript(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	root := t.TempDir()
@@ -285,4 +385,17 @@ func conversationResultField(raw, field string) (any, bool) {
 	}
 	v, ok := result[field]
 	return v, ok
+}
+
+func inspectResultJSON(t *testing.T, raw string) map[string]any {
+	t.Helper()
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatalf("show JSON: %v", err)
+	}
+	result, _ := doc["result"].(map[string]any)
+	if result == nil {
+		t.Fatal("show JSON missing result object")
+	}
+	return result
 }
