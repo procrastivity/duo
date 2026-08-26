@@ -58,6 +58,7 @@ func NewRootCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Com
 	root.AddCommand(doctorCommand(streams))
 	root.AddCommand(sessionCommand(streams))
 	root.AddCommand(conversationCommand(streams))
+	root.AddCommand(promptCommand(streams))
 	root.AddCommand(configCommand(streams))
 	root.AddCommand(workspaceCommand(streams))
 	root.AddCommand(providerCommand(streams))

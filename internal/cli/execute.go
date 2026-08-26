@@ -23,6 +23,14 @@ func Execute(root *cobra.Command, streams *iostreams.Streams) int {
 		return exitcode.Success
 	}
 
+	// A verb that already wrote a complete duo.external/v1 failure
+	// envelope (prompt.deliver conflict/expiry under --output json) must
+	// not be re-rendered as the chassis's short {"error":{code,message}}.
+	var written *failureWrittenError
+	if errors.As(err, &written) {
+		return exitcode.FromError(duoerr.New(written.code, ""))
+	}
+
 	var derr *duoerr.Error
 	if errors.As(err, &derr) {
 		// Read the flag off cmd rather than the context: a failure raised

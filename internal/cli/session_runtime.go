@@ -2,9 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/procrastivity/duo/internal/domain"
+	"github.com/procrastivity/duo/internal/duoerr"
+	"github.com/procrastivity/duo/internal/host"
+	hostfake "github.com/procrastivity/duo/internal/host/fake"
+	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
 	"github.com/procrastivity/duo/internal/runtime/claude"
@@ -136,5 +141,55 @@ func conversationReadRequest(b agentRuntimeBindings, after string, limit int) ru
 		TranscriptID:           b.TranscriptID,
 		After:                  after,
 		Limit:                  limit,
+	}
+}
+
+// registeredHostPromptProviders maps a session-host integration instance
+// ID to a HostPromptProvider. Tests register a seeded fake-host so
+// ScriptPromptOutcome survives across CLI calls; production falls back to
+// openKnownHostPromptProvider.
+var registeredHostPromptProviders sync.Map // string -> host.HostPromptProvider
+
+// RegisterHostPromptProvider binds p as the host prompt adapter for
+// integrationInstanceID. Tests call this with a seeded fake.
+func RegisterHostPromptProvider(integrationInstanceID string, p host.HostPromptProvider) {
+	registeredHostPromptProviders.Store(integrationInstanceID, p)
+}
+
+// UnregisterHostPromptProvider drops a prior RegisterHostPromptProvider entry.
+func UnregisterHostPromptProvider(integrationInstanceID string) {
+	registeredHostPromptProviders.Delete(integrationInstanceID)
+}
+
+// openHostPromptProviderFor returns the HostPromptProvider for one
+// integration instance. Prefer an explicitly registered handle; otherwise
+// construct fake-host or Herdr. Unknown IDs yield a nil provider (runtime
+// path only) rather than inventing a host kind.
+func openHostPromptProviderFor(integrationInstanceID string) (host.HostPromptProvider, error) {
+	if integrationInstanceID == "" {
+		return nil, nil
+	}
+	if v, ok := registeredHostPromptProviders.Load(integrationInstanceID); ok {
+		return v.(host.HostPromptProvider), nil
+	}
+	return openKnownHostPromptProvider(integrationInstanceID)
+}
+
+func openKnownHostPromptProvider(integrationInstanceID string) (host.HostPromptProvider, error) {
+	switch {
+	case integrationInstanceID == "fake-host":
+		return hostfake.New(integrationInstanceID), nil
+	case integrationInstanceID == herdr.AdapterID || strings.HasPrefix(integrationInstanceID, "herdr:"):
+		socket, err := herdrSocketForIntegration(integrationInstanceID)
+		if err != nil {
+			return nil, duoerr.New("operation.temporarily_unavailable",
+				fmt.Sprintf("No session-host prompt adapter is available for %q.", integrationInstanceID))
+		}
+		return herdr.New(herdr.Config{
+			IntegrationInstanceID: integrationInstanceID,
+			SocketPath:            socket,
+		})
+	default:
+		return nil, nil
 	}
 }
