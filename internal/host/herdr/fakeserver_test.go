@@ -64,8 +64,11 @@ type fakePaneState struct {
 }
 
 type fakeAgent struct {
-	name   string
-	paneID string
+	name             string
+	paneID           string
+	session          *agentSessionInfo
+	launchPending    bool
+	interactiveReady bool
 }
 
 func newFakeHerdr(t *testing.T) *fakeHerdr {
@@ -340,15 +343,17 @@ func (f *fakeHerdr) dispatch(method string, params json.RawMessage) (any, *wireE
 				}
 			}
 		}
-		f.agents = append(f.agents, fakeAgent{name: p.Name, paneID: p.PaneID})
+		// agent.start returns immediately with launch_pending at 0.8.2.
+		f.agents = append(f.agents, fakeAgent{
+			name:          p.Name,
+			paneID:        p.PaneID,
+			launchPending: true,
+		})
 		return map[string]any{"type": "agent_started", "argv": []string{p.Kind}}, nil
 	case "agent.list":
 		agents := make([]map[string]any, 0, len(f.agents))
 		for _, a := range f.agents {
-			agents = append(agents, map[string]any{
-				"name":    a.name,
-				"pane_id": a.paneID,
-			})
+			agents = append(agents, agentJSON(a))
 		}
 		return map[string]any{"type": "agent_list", "agents": agents}, nil
 	case "agent.prompt":
@@ -402,6 +407,9 @@ func (f *fakeHerdr) snapshotLocked() map[string]any {
 }
 
 func paneJSON(p fakePaneState) map[string]any {
+	// Live 0.8.2 pane records carry no agent_session (notes/19 §1).
+	// Identity and launch_pending / interactive_ready live on the agent
+	// record; do not invent pane fields the probe shape lacks.
 	return map[string]any{
 		"pane_id":      p.paneID,
 		"terminal_id":  p.terminalID,
@@ -411,6 +419,24 @@ func paneJSON(p fakePaneState) map[string]any {
 		"agent_status": "unknown",
 		"revision":     0,
 	}
+}
+
+func agentJSON(a fakeAgent) map[string]any {
+	out := map[string]any{
+		"name":              a.name,
+		"pane_id":           a.paneID,
+		"launch_pending":    a.launchPending,
+		"interactive_ready": a.interactiveReady,
+	}
+	if a.session != nil {
+		out["agent_session"] = map[string]any{
+			"source": a.session.Source,
+			"agent":  a.session.Agent,
+			"kind":   a.session.Kind,
+			"value":  a.session.Value,
+		}
+	}
+	return out
 }
 
 func (f *fakeHerdr) findLocked(paneID string) (fakePaneState, bool) {
@@ -586,6 +612,22 @@ func (f *fakeHerdr) addAgent(name, paneID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.agents = append(f.agents, fakeAgent{name: name, paneID: paneID})
+}
+
+// setAgentBindState sets the 0.8.2 agent-record fields the bind pass
+// decodes (session identity + D3 readiness) for an existing agent row.
+func (f *fakeHerdr) setAgentBindState(paneID string, session *agentSessionInfo, launchPending, interactiveReady bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.agents {
+		if f.agents[i].paneID == paneID {
+			f.agents[i].session = session
+			f.agents[i].launchPending = launchPending
+			f.agents[i].interactiveReady = interactiveReady
+			return
+		}
+	}
+	f.t.Fatalf("fake herdr: agent on pane %s not found", paneID)
 }
 
 func (f *fakeHerdr) setAgentPromptError(code, message string) {

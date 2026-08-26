@@ -135,12 +135,30 @@ type agentPromptParams struct {
 	Text   string `json:"text"`
 }
 
-// agentInfo is the decoded subset of a Herdr agent record used to resolve
-// agent.prompt's target from a pane_id. revision is deliberately absent:
-// at 0.8.2 it is not a change detector (TestNoRevisionDependence).
+// agentSessionInfo is Herdr's AgentSessionInfo (notes/07-herdr): the
+// host-reported agent-session identity the post-launch bind pass needs.
+// kind is "id" or "path".
+type agentSessionInfo struct {
+	Source string `json:"source"`
+	Agent  string `json:"agent"`
+	Kind   string `json:"kind"`
+	Value  string `json:"value"`
+}
+
+// agentInfo is the decoded subset of a Herdr agent record.
+//
+// At live 0.8.2 (notes/19 §1) agent_session, interactive_ready, and the
+// schema's launch_pending live on the agent record — not on the pane
+// record, which carries no agent_session. This adapter therefore decodes
+// identity and D3 readiness here, never by inventing a pane field the
+// live shape lacks. revision is deliberately absent: at 0.8.2 it is not
+// a change detector (TestNoRevisionDependence).
 type agentInfo struct {
-	Name   string `json:"name"`
-	PaneID string `json:"pane_id"`
+	Name             string            `json:"name"`
+	PaneID           string            `json:"pane_id"`
+	AgentSession     *agentSessionInfo `json:"agent_session"`
+	LaunchPending    bool              `json:"launch_pending"`
+	InteractiveReady bool              `json:"interactive_ready"`
 }
 
 type agentListResult struct {
