@@ -1,6 +1,6 @@
 # contracts/SOURCE — written by contrib/sync-contracts; do not edit.
-source-sha: 3c9c2ba444c423ae64e2eed8852f16cb570d4f71
-0a6ffc37ebda41c6c541f4d3c0d77105eead888a3f0670ec472ee706fb5bcec0  fixtures/duo-external-v1/README.md
+source-sha: 71625725946c3df3bfd554e47e0738c32fc90f5d
+88e05c597bd0dea8baeea34a221463af01b63e6aa86152b0c625db9279662894  fixtures/duo-external-v1/README.md
 562e3625dde7a2fc19b83e0c94fc037c109ef8937aae02d3dfd4780ad439b9f0  fixtures/duo-external-v1/command-inspect.json
 57afbee93eaf6c3e0e16ca795b0eb85fdcb4f678e2e90804c0069d34aeb37f7d  fixtures/duo-external-v1/command-result-stream-item.json
 91ca8a7db0eab863b4ee7d9fed89618ac45dcd5c1e0097fc56e28177603f5b71  fixtures/duo-external-v1/condition-stream-item.json
@@ -20,6 +20,7 @@ e065b47eb2f76d364ce5df068f28c038d4ec63449af665549263c9000f47acba  fixtures/duo-e
 c3ee5cdf85829c7beb0206f8d722041c8abc50dbc4df9d1f50f553977758b4b9  fixtures/duo-external-v1/runtime-configuration-selected.json
 a577ce2217dc49471e5ffa4db31413b83511e55748d2953b36a33a0162af184a  fixtures/duo-external-v1/session-enroll-conflict.json
 e16707b75e06fa3fdc2705aedacbba2fcf3f315aad22e3cab27e28df409a412e  fixtures/duo-external-v1/session-enroll.json
+59ce73bd55bcf775272d16847dd3459210a827523c5467366a155cfd37b27c09  fixtures/duo-external-v1/session-inspect-starting.json
 9ac84c654d52cf73d8bbff071c0abe2d80f41f8ccf1e6c1a0b572eb611329dfd  fixtures/duo-external-v1/session-inspect.json
 a454952ec804147df05a004ea65dcc5830be9c0dbb86506ea633278b1f418c61  fixtures/duo-external-v1/session-launch-distinct-model-family.json
 ed91eded479dae7b1a09622666c31ae311a3cb8bd990463df4a70fc95ba7adf2  fixtures/duo-external-v1/session-launch-distinct-model-line.json

@@ -1,0 +1,61 @@
+{
+  "schema": "duo.external/v1",
+  "request_id": "req_fixture_inspect_starting",
+  "operation": "session.inspect",
+  "result": {
+    "session_id": "ses_fixture_starting_1",
+    "workspace_id": "wsp_fixture_1",
+    "lifecycle": "active",
+    "view": "recovering",
+    "runtime_instance_id": "run_fixture_starting_1",
+    "runtime_instance_state": "starting",
+    "attachments": [
+      {
+        "attachment_id": "att_fixture_starting_1",
+        "state": "attached",
+        "integration_instance": "herdr:fixture",
+        "epoch": {
+          "kind": "herdr.terminal_id",
+          "value": "term_fixture_starting_1",
+          "scope": "pane"
+        },
+        "container": "w3:p2",
+        "process_birth": {
+          "pid": 41210,
+          "started_at": "2026-08-24T18:31:07.412Z"
+        },
+        "claim_held": true,
+        "reattach_command": "duo session reattach ses_fixture_starting_1 --integration-instance herdr:fixture --epoch-kind herdr.terminal_id --epoch-value term_fixture_starting_1 --epoch-scope pane --container w3:p2 --process-pid 41210 --process-started-at 2026-08-24T18:31:07.412Z"
+      }
+    ],
+    "operations": [
+      {
+        "operation": "prompt.deliver",
+        "revision": "3",
+        "availability": "unsupported",
+        "quality": "exact",
+        "realization": "adapted",
+        "constraints": [],
+        "authorization": {
+          "allowed": true,
+          "policy_version": "12"
+        }
+      },
+      {
+        "operation": "terminal.read",
+        "revision": "2",
+        "availability": "available",
+        "quality": "degraded",
+        "realization": "adapted",
+        "terminal_fidelity": "repaint_only",
+        "constraints": [],
+        "authorization": {
+          "allowed": true,
+          "policy_version": "12"
+        }
+      }
+    ]
+  },
+  "warnings": [],
+  "features": []
+}
