@@ -49,10 +49,11 @@ type Runtime struct {
 }
 
 var (
-	_ runtime.RuntimeCorrelator    = (*Runtime)(nil)
-	_ runtime.ConversationProvider = (*Runtime)(nil)
-	_ runtime.ConditionProvider    = (*Runtime)(nil)
-	_ adapter.Factory[*Runtime]    = Factory{}
+	_ runtime.RuntimeCorrelator     = (*Runtime)(nil)
+	_ runtime.ConversationProvider  = (*Runtime)(nil)
+	_ runtime.ConditionProvider     = (*Runtime)(nil)
+	_ runtime.RuntimePromptProvider = (*Runtime)(nil)
+	_ adapter.Factory[*Runtime]     = Factory{}
 )
 
 // Option configures a Runtime.

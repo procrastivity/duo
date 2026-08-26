@@ -7,7 +7,8 @@
 // §5.1 factory envelope. The delegation-loop observation slice adds
 // ConditionProvider (condition.go): transcript-first idle/working, using
 // the lastSettledAt analog (assistant stopReason other than toolUse), never
-// agent_end. RuntimePromptProvider, UsageProvider,
+// agent_end. RuntimePromptProvider is implemented in prompt.go over the
+// per-launch inject `-e` asset (duo-pi-inject Stage A). UsageProvider,
 // RuntimeConfigurationProvider, and HarnessRenderer remain unscaffolded.
 //
 // # Two channels
@@ -62,15 +63,16 @@
 // is extension-only. A future RuntimeConfigurationProvider must report the
 // facet as unsupported rather than map --mode onto it.
 //
-// # Documented, not implemented
+// # Native prompt delivery
 //
-// Native prompt delivery works: a 0.83.0 probe proved that the same
-// extension shape can deliver text as a real user turn labelled
-// input.source "extension" (native provenance the PTY channel cannot
-// produce) and can interrupt a running tool call, both over the same socket.
-// That is Duo's Stage 2+ prompt surface. The generated asset stays read-only
-// until the prompt-delivery contract lands, and extension_test.go guards
-// that it has no delivery call in it.
+// A 0.83.0 probe proved that a generated extension can deliver text as a
+// real user turn labelled input.source "extension" (native provenance the
+// PTY channel cannot produce) and can interrupt a running tool call, both
+// over the same socket. Delivery lives on inject/duo-inject.ts, loaded
+// per launch with `-e`; prompt.go dials that socket. The reporter
+// (duo-pi-reporter.ts) still has no delivery call — extension_test.go
+// guards that. Abort is out of this stage. This is not a Stage 2 claim
+// and does not change D3 / MarkLive.
 //
 // See docs/adapters/decisions.md for the decisions behind these choices and
 // their evidence.
