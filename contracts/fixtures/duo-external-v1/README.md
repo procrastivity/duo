@@ -31,8 +31,8 @@ because the configuration and installation contracts sanction them there.
 | `cursor-expired.json` | Reconnect requires a new snapshot and barrier. |
 | `manifest.json` | Static operation projectability without live support. |
 | `projection-stamp.json` | Generated ownership and drift inputs. |
-| `config.json` | `duo.config/v3` root: policy-only `session_hosts` (no instance, no socket path), `agent_runtimes`, `model_family`-carrying `launch_variants`, and variant-targeting `presets.review` / `presets.build_and_verify` (no authored compositions; the host late-binds at launch). |
-| `session-launch.json` | Ordinary `session.launch` success: chosen leaf, resolved model line, and launch-resolution reference. |
+| `config.json` | `duo.config/v3` root: policy-only `session_hosts` (no instance, no socket path), per-kind `launch_target` and `close_on_exit`, `deduce.cwd`, `agent_runtimes`, `model_family`-carrying `launch_variants`, and variant-targeting `presets.review` / `presets.build_and_verify` (no authored compositions; the host late-binds at launch). |
+| `session-launch.json` | Ordinary `session.launch` success: chosen leaf, resolved model line, launch-resolution reference, and informational `target` / `target_source`. |
 | `session-launch-exhausted.json` | `launch.constraints_exhausted`: rejected candidate, elimination reason, and zero surviving assignments. |
 | `session-launch-model-line-relent.json` | Model-line soft avoid relent: avoid eliminated all candidates, relent restores pre-avoid pool, and chosen candidate reported with relented constraint. |
 | `session-launch-runtime-relent.json` | Agent-runtime soft avoid relent: avoid eliminated all candidates, relent restores pre-avoid pool, and chosen candidate reported with relented constraint. |

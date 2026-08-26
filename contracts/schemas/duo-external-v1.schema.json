@@ -273,6 +273,8 @@
       ]
     },
     "host_source": {"enum": ["explicit-flag", "workspace-correlation", "cwd-correlation", "ambient-env", "policy-default"]},
+    "launch_target_value": {"enum": ["tab", "pane"]},
+    "launch_target_source": {"enum": ["explicit-flag", "config-default", "built-in"]},
     "launch_constraint_predicate": {
       "type": "object",
       "required": ["axis", "value"],
@@ -313,6 +315,8 @@
           "items": {"$ref": "#/$defs/launch_resolution_leaf"}
         },
         "host": {"$ref": "#/$defs/launch_deduced_host"},
+        "target": {"$ref": "#/$defs/launch_target_value"},
+        "target_source": {"$ref": "#/$defs/launch_target_source"},
         "evidence_bundle": {"$ref": "#/$defs/launch_evidence_bundle"},
         "relations": {
           "type": "array",
@@ -361,7 +365,7 @@
       "additionalProperties": true
     },
     "launch_outranked_evidence": {
-      "description": "Host evidence captured at materialization and outranked by a higher rung of the fixed deduction ranking (explicit flag > workspace correlation > ambient environment > policy default).",
+      "description": "Host evidence captured at materialization and outranked by a higher rung of the fixed deduction ranking (explicit flag > workspace correlation > cwd-correlation > ambient environment > policy default).",
       "type": "object",
       "required": ["source"],
       "properties": {

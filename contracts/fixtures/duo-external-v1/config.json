@@ -13,7 +13,9 @@
     "prefer": ["herdr"],
     "kinds": {
       "herdr": {
-        "enabled": true
+        "enabled": true,
+        "launch_target": "tab",
+        "close_on_exit": true
       },
       "tmux": {
         "enabled": false
@@ -21,6 +23,9 @@
     },
     "deduce": {
       "workspace": {
+        "enabled": true
+      },
+      "cwd": {
         "enabled": true
       },
       "env": {

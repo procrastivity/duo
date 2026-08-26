@@ -33,7 +33,9 @@
       "host_source": "ambient-env",
       "workspace_id": "ws_new",
       "outranked_evidence": []
-    }
+    },
+    "target": "tab",
+    "target_source": "config-default"
   },
   "warnings": [],
   "features": []

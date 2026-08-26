@@ -26,7 +26,7 @@
       "additionalProperties": {"type": "object"}
     },
     "session_hosts": {
-      "description": "Session-host policy only. Host instances and socket paths are state (workspace<->host correlation records in duo.db), never authored here. The deduction ranking is fixed in the resolver: explicit flag > workspace correlation > ambient environment > policy default. This block configures which kinds may be used and which deduction sources are consulted; it never configures their ranking.",
+      "description": "Session-host policy only. Host instances and socket paths are state (workspace<->host correlation records in duo.db), never authored here. The deduction ranking is fixed in the resolver: explicit flag > workspace correlation > cwd-correlation > ambient environment > policy default. This block configures which kinds may be used and which deduction sources are consulted; it never configures their ranking. Kind stanzas may also name launch_target and close_on_exit; both are launcher inputs, not resolution inputs (2026-08-26 handoff 24; notes/51).",
       "type": "object",
       "properties": {
         "prefer": {
@@ -53,7 +53,15 @@
     "session_host_kind": {
       "type": "object",
       "properties": {
-        "enabled": {"type": "boolean"}
+        "enabled": {"type": "boolean"},
+        "launch_target": {
+          "description": "Per-kind default container for a new launch. Absent means the host's built-in default (Herdr: tab). Allowed values are tab and pane. A kind that has neither container rejects the key at launch (2026-08-26 handoff 24; notes/51 record 1).",
+          "enum": ["tab", "pane"]
+        },
+        "close_on_exit": {
+          "description": "Whether a clean agent exit closes the host container. Absent means true. A kind with no container ignores the key. Crash paths never close (2026-08-26 handoff 24; notes/51 record 7).",
+          "type": "boolean"
+        }
       },
       "additionalProperties": false
     },
