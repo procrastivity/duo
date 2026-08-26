@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -10,20 +12,14 @@ import (
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	"github.com/procrastivity/duo/internal/iostreams"
+	"github.com/procrastivity/duo/internal/runtime"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
-// sessionInspectResult is session.inspect's result. Only the fields the
-// domain kernel can answer today are populated: "condition" and
-// "operations" (duo-external-v1's condition_view_data / support_view) are
-// presentation-service usage and operation-availability projections
-// (duo-vnext-projection-contracts.md) that no component built through Step
-// 21's dependencies (14, 15) produces evidence for, so this result omits
-// them rather than fabricate a value. Both are optional in the schema's
-// session.inspect conditional (no "required" list under either $ref).
-//
-// Attachments is the locked multi-leaf show projection (notes/48 §1): an
-// array, never a singular "attachment" field.
+// sessionInspectResult is session.inspect's result. Condition and operations
+// are populated from the session's correlated agent runtime when available
+// (delegation-loop step 09). Attachments stay the locked multi-leaf show
+// projection (notes/48 §1): an array, never a singular "attachment" field.
 type sessionInspectResult struct {
 	SessionID         string                     `json:"session_id"`
 	WorkspaceID       string                     `json:"workspace_id"`
@@ -34,7 +30,32 @@ type sessionInspectResult struct {
 	Quarantined       bool                       `json:"quarantined,omitempty"`
 	Owner             string                     `json:"owner,omitempty"`
 	Creator           string                     `json:"creator,omitempty"`
+	Condition         *conditionViewData         `json:"condition,omitempty"`
+	Operations        []operationSupportView     `json:"operations,omitempty"`
 	Attachments       []sessionAttachmentInspect `json:"attachments,omitempty"`
+}
+
+// conditionViewData is $defs.condition_view_data plus the inspect extras the
+// schema permits as additional properties (runtime_instance_id, times,
+// determining_observations, reasons). Revision is omitted: this milestone
+// has no condition-view revision store.
+type conditionViewData struct {
+	Value                   string   `json:"value"`
+	Confidence              string   `json:"confidence,omitempty"`
+	Freshness               string   `json:"freshness,omitempty"`
+	RuntimeInstanceID       string   `json:"runtime_instance_id,omitempty"`
+	EffectiveAt             string   `json:"effective_at,omitempty"`
+	ComputedAt              string   `json:"computed_at,omitempty"`
+	DeterminingObservations []string `json:"determining_observations,omitempty"`
+	Reasons                 []string `json:"reasons,omitempty"`
+}
+
+// operationSupportView is one $defs.support_view row plus the operation name
+// the fixture carries. Only prompt.deliver and conversation.list are listed;
+// terminal.read, leases, and streams are never fabricated.
+type operationSupportView struct {
+	Operation    string `json:"operation"`
+	Availability string `json:"availability"`
 }
 
 // sessionAttachmentInspect is one element of session.inspect's attachments
@@ -63,8 +84,8 @@ type sessionAttachmentProcessBirth struct {
 	StartedAt string `json:"started_at"`
 }
 
-// sessionShowCommand constructs `duo session show`: internal/registry's
-// "session.inspect" operation, CLI path {"session", "show"}.
+// sessionShowCommand constructs `duo session show`: the registry operation
+// whose CLI path is session/show.
 func sessionShowCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show <session-id>",
@@ -84,10 +105,10 @@ func sessionShowCommand(streams *iostreams.Streams) *cobra.Command {
 			if !ok {
 				return duoerr.New("object.not_found", fmt.Sprintf("No session named %q is known.", args[0]))
 			}
-			result := inspectResultFor(a, s)
+			result := inspectResultFor(cmd.Context(), a, s)
 
 			if mode == "json" {
-				b, err := json.Marshal(newEnvelope("session.inspect", result))
+				b, err := json.Marshal(newEnvelope(registeredOpByCLI("session", "show"), result))
 				if err != nil {
 					return duoerr.New("internal.session_show_encode_failed", err.Error())
 				}
@@ -101,7 +122,7 @@ func sessionShowCommand(streams *iostreams.Streams) *cobra.Command {
 	return cmd
 }
 
-func inspectResultFor(a *domain.Authority, s domain.Session) sessionInspectResult {
+func inspectResultFor(ctx context.Context, a *domain.Authority, s domain.Session) sessionInspectResult {
 	view, _ := a.View(s.ID)
 	result := sessionInspectResult{
 		SessionID:   string(s.ID),
@@ -112,16 +133,114 @@ func inspectResultFor(a *domain.Authority, s domain.Session) sessionInspectResul
 		Owner:       s.Owner,
 		Creator:     s.Creator,
 	}
+	var inst domain.RuntimeInstance
+	var haveInst bool
 	if s.Current != "" {
 		result.RuntimeInstanceID = string(s.Current)
-		if inst, ok := a.Instance(s.Current); ok {
+		if i, ok := a.Instance(s.Current); ok {
+			inst = i
+			haveInst = true
 			result.InstanceState = string(inst.State)
 		}
 	}
 	for _, att := range a.Attachments(s.ID) {
 		result.Attachments = append(result.Attachments, attachmentInspectFor(a, s.ID, att))
 	}
+	result.Condition = conditionForInspect(ctx, a, s, haveInst, inst)
+	result.Operations = operationsForInspect(a, s, haveInst, inst)
 	return result
+}
+
+// conditionForInspect chooses the session.inspect condition view.
+//
+// Completion (I-5): step 08 adapters never emit exited or done. When the
+// store instance is terminal (InstanceExited / Terminal()), condition is
+// exited and final — inspect does not dial HostLifecycleSource (I-3: read
+// path, no streams). Otherwise SnapshotCondition on a ConditionProvider.
+func conditionForInspect(ctx context.Context, a *domain.Authority, s domain.Session, haveInst bool, inst domain.RuntimeInstance) *conditionViewData {
+	if !haveInst {
+		return nil
+	}
+	if inst.State.Terminal() {
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		return &conditionViewData{
+			Value:             string(runtime.ConditionExited),
+			Confidence:        string(runtime.ConditionConfidenceReported),
+			Freshness:         string(runtime.ConditionFreshnessFresh),
+			RuntimeInstanceID: string(inst.ID),
+			ComputedAt:        now,
+			Reasons:           []string{"runtime instance state is exited"},
+		}
+	}
+	bindings, ok := agentBindingsFor(a, s)
+	if !ok {
+		return nil
+	}
+	rt, err := openAgentRuntime(bindings.IntegrationInstance)
+	if err != nil {
+		return nil
+	}
+	provider, ok := rt.(runtime.ConditionProvider)
+	if !ok {
+		return nil
+	}
+	obs, err := runtime.SnapshotCondition(ctx, provider, conditionObservationRequest(bindings))
+	if err != nil {
+		return nil
+	}
+	return conditionViewFromObservation(obs, string(inst.ID))
+}
+
+func conditionViewFromObservation(obs runtime.ConditionObservation, runtimeInstanceID string) *conditionViewData {
+	view := &conditionViewData{
+		Value:             string(obs.Value),
+		Confidence:        string(obs.Confidence),
+		Freshness:         string(obs.Freshness),
+		RuntimeInstanceID: runtimeInstanceID,
+		Reasons:           append([]string(nil), obs.Reasons...),
+	}
+	if !obs.EffectiveAt.IsZero() {
+		view.EffectiveAt = obs.EffectiveAt.UTC().Format(time.RFC3339Nano)
+	}
+	if !obs.ComputedAt.IsZero() {
+		view.ComputedAt = obs.ComputedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if obs.ObservationID != "" {
+		view.DeterminingObservations = []string{obs.ObservationID}
+	}
+	return view
+}
+
+// operationsForInspect lists the prompt-send and conversation-list support
+// rows only. Availability is available when the runtime implements the
+// provider and the instance is live; temporarily_unavailable when it
+// implements but is not live; unsupported when it does not implement.
+func operationsForInspect(a *domain.Authority, s domain.Session, haveInst bool, inst domain.RuntimeInstance) []operationSupportView {
+	live := haveInst && inst.State == domain.InstanceLive
+	var (
+		hasConversation bool
+		hasPrompt       bool
+	)
+	if bindings, ok := agentBindingsFor(a, s); ok {
+		if rt, err := openAgentRuntime(bindings.IntegrationInstance); err == nil {
+			_, hasConversation = rt.(runtime.ConversationProvider)
+			_, hasPrompt = rt.(runtime.RuntimePromptProvider)
+		}
+	}
+	return []operationSupportView{
+		{Operation: registeredOpByCLI("prompt", "send"), Availability: supportAvailability(hasPrompt, live)},
+		{Operation: registeredOpByCLI("conversation", "list"), Availability: supportAvailability(hasConversation, live)},
+	}
+}
+
+func supportAvailability(implements, live bool) string {
+	if !implements {
+		return "unsupported"
+	}
+	if live {
+		return "available"
+	}
+	return "temporarily_unavailable"
 }
 
 // attachmentInspectFor rebuilds the attachment fingerprint and projects
@@ -175,6 +294,11 @@ func renderSessionShowText(streams *iostreams.Streams, r sessionInspectResult) e
 		r.SessionID, r.WorkspaceID, r.Lifecycle, r.View, instance, instanceState, r.Owner, r.Quarantined,
 	); err != nil {
 		return err
+	}
+	if r.Condition != nil {
+		if _, err := fmt.Fprintf(streams.Out, "condition:          %s\n", r.Condition.Value); err != nil {
+			return err
+		}
 	}
 	for _, att := range r.Attachments {
 		if err := renderAttachmentShowText(streams, att); err != nil {
