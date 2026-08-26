@@ -190,7 +190,8 @@
 //     unsubmitted composer draft. This adapter does not wait, and does not
 //     claim composer-safety or merge into a human draft.
 //
-// Quiet-gate remains a later step; this adapter reports what the host did.
+// Quiet-gate lives in the prompt composer (internal/delivery); this adapter
+// reports what the host did.
 //
 // # Not implemented, deliberately
 //

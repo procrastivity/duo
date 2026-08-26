@@ -396,6 +396,11 @@ func liveRuntimeFingerprint(kind string, e host.Evidence) domain.Fingerprint {
 // `duo session detach`/`reattach` refused every launched session with
 // "session <id> has no host attachment" (found live, 2026-08-24 dogfood).
 //
+// The Bind below uses SourceLaunchPlan. That source on the attachment
+// correlations is the Duo-created stamp the prompt composer reads
+// (internal/delivery.DuoCreated). Herdr has no later human-attach
+// signal (notes/19); do not add a host probe here.
+//
 // It does not weaken invariant I-1. The session and its runtime instance
 // still commit before anything spawns; the attachment is a *post*-spawn
 // fact, because the evidence it rests on — the pane's terminal_id and the

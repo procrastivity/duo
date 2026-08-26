@@ -43,8 +43,9 @@ func (h *Host) PromptPath(_ context.Context, attachment host.Attachment) (host.P
 }
 
 // DeliverPrompt implements host.HostPromptProvider: one agent.prompt call
-// with no wait object and no retry loop. Quiet-gate, require_ready, and
-// kernel retry of no_effect stay outside this adapter.
+// with no wait object and no retry loop. Quiet-gate lives in
+// internal/delivery; require_ready and kernel retry of no_effect stay
+// outside this adapter.
 func (h *Host) DeliverPrompt(ctx context.Context, req host.PromptRequest) (host.PromptAttemptResult, error) {
 	if err := h.requireInstance(req.Attachment.IntegrationInstanceID); err != nil {
 		return host.PromptAttemptResult{}, err

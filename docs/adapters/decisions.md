@@ -947,10 +947,42 @@ The frame is newline-delimited JSON, the object notes/10 documented:
 Peer wrapping (`isMeta`, security preamble) is accepted. Socket accepts
 the frame with the peer still there → `delivered` (exact/native,
 `ComposerSafe: true`). Connection loss after write → `unknown_effect`.
-Dial failure with no write → `no_effect`. Quiet-gate is step 13.
+Dial failure with no write → `no_effect`. Quiet-gate is the
+`internal/delivery` composer (step 13).
 
 Pi does not implement `RuntimePromptProvider`.
 `TestExtensionHasNoPromptDeliveryCall` still forbids a delivery call
 on the generated extension (notes/18 inject socket stays parked). The
 fake runtime compile-asserts the interface with a scriptable
 `SeedPromptEffect` stub.
+
+## Prompt arbitration composer (delegation-loop step 13, 2026-08-26)
+
+`internal/delivery` is the composer between the step-10 command kernel
+and the step-11/12 adapters. It is not CLI. Order: revalidate the bound
+runtime instance (I-5, never rebind) → draft hold → attributed quiet
+period (default 30s) → ready boundary → `promptpath.Selector` →
+`CreateAttempt` + adapter `DeliverPrompt` + `CommitDelivered` /
+`ReconcileAttempt`. Adapter effect strings (`delivered`, `no_effect`,
+`unknown_effect`) are copied onto kernel actions; adapters still do
+not import `internal/domain`.
+
+Human-attached cannot be determined on Herdr (notes/19,
+`TestNoWriterPresenceSurface`). There is no composer lease and no
+writer-presence surface. The D3 carve-out is therefore
+**spawn-window-only**: Duo-created is the launch-plan Bind
+`recordLaunchAttachments` already writes after Start (`SourceLaunchPlan`
+on the attachment correlations). There is no later human-attach signal
+to revoke it. Auto-release requires that stamp, launch-settled idle
+(Herdr `LaunchSettleTimeout`, default 10s, elapsed since
+`instance.StartedAt`), and no caller-supplied draft or human-attached
+evidence. An enrolled / unstamped pane holds. `working` and `blocked`
+hold. `unknown` does not make the operation unsupported; it prevents
+automatic release unless the carve-out applies.
+
+Draft evidence in this slice is caller-supplied positive evidence, not
+keystroke attribution and not Claude `UserPromptSubmit` (step 08).
+Herdr has no attributed input, so the quiet period cannot fire on
+Herdr unless a later composition supplies `LastHumanInput`. The queued
+hold code is `prompt.human_priority_hold`. No composer-lease product
+surface, no `hold_for_release` verb, no tmux attribution.

@@ -3,7 +3,7 @@
 // currently owns (RuntimeCorrelator, ConversationProvider,
 // ConditionProvider, RuntimePromptProvider). Every cross-composition
 // gate runs it alongside internal/host/fake. Prompt delivery is a
-// scriptable stub (SeedPromptEffect); it does not implement quiet-gate.
+// scriptable stub (SeedPromptEffect); quiet-gate is the delivery composer.
 package fake
 
 import (
