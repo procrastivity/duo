@@ -157,6 +157,7 @@ func TestEveryDomainBoundaryIsAtomic(t *testing.T) {
 		"CommitIdentity":          func(r *Repo) func(context.Context, domain.Change) error { return r.CommitIdentity },
 		"CommitLaunchResolution":  func(r *Repo) func(context.Context, domain.Change) error { return r.CommitLaunchResolution },
 		"CommitCommandAcceptance": func(r *Repo) func(context.Context, domain.Change) error { return r.CommitCommandAcceptance },
+		"CommitCommandTransition": func(r *Repo) func(context.Context, domain.Change) error { return r.CommitCommandTransition },
 		"CommitObservation":       func(r *Repo) func(context.Context, domain.Change) error { return r.CommitObservation },
 	}
 
@@ -367,6 +368,20 @@ func TestFactRoundTrip(t *testing.T) {
 			Transcript: "/home/dev/.claude/t.jsonl", Evidence: "source=owner",
 			Reason: "continuity unverified", ReceivedAt: "t",
 		},
+		Command: &domain.CommandFact{
+			ID: "cmd_1", Revision: 1, Operation: domain.PromptDeliverOperation,
+			Session: "ses_1", Instance: "ri_1", Caller: "user:beau",
+			IdempotencyKey: "key-1", CanonicalDigest: "digest_a",
+			QueuePolicy: domain.QueueUntilSafe,
+			ExpiresAt:   "2026-08-13T12:10:00.000Z",
+			State:       domain.ResponsibilityQueued,
+			AcceptedAt:  "2026-08-13T12:00:30.000Z",
+			PathKind:    domain.PromptPathRuntime,
+			Attempt: &domain.CommandAttempt{
+				ID: "catt_1", PathKind: domain.PromptPathRuntime,
+				StartedAt: "2026-08-13T12:01:00.000Z",
+			},
+		},
 		Correlation: &domain.Correlation{
 			ID: "corr_1", TargetKind: domain.TargetInstance, TargetID: "ri_1",
 			ExternalKind: "agent.session", ExternalValue: "agent-abc", Scope: "claude@default",
@@ -461,6 +476,11 @@ func compareFacts(want, got domain.Fact) string {
 		return "the claim"
 	case *want.Parked != *got.Parked:
 		return "the parked report"
+	case (want.Command == nil) != (got.Command == nil):
+		return "the command payload presence"
+	case want.Command != nil && got.Command != nil &&
+		(want.Command.ID != got.Command.ID || want.Command.CanonicalDigest != got.Command.CanonicalDigest):
+		return "the command payload"
 	case want.LaunchResolution.ID != got.LaunchResolution.ID:
 		return "the launch-resolution record id"
 	case !bytes.Equal(want.LaunchResolution.Body, got.LaunchResolution.Body):

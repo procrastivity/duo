@@ -186,6 +186,10 @@ func (emptyRepository) CommitCommandAcceptance(context.Context, domain.Change) e
 	return errors.New("cli: emptyRepository is read-only; no authority store exists yet")
 }
 
+func (emptyRepository) CommitCommandTransition(context.Context, domain.Change) error {
+	return errors.New("cli: emptyRepository is read-only; no authority store exists yet")
+}
+
 func (emptyRepository) CommitObservation(context.Context, domain.Change) error {
 	return errors.New("cli: emptyRepository is read-only; no authority store exists yet")
 }

@@ -35,6 +35,11 @@ type (
 	// kernel stores it and compares it, and parses it no more than it parses
 	// any other ID.
 	LaunchResolutionID string
+	// CommandID names one accepted prompt-delivery command (decision-03
+	// §3.1). It is Duo-issued and never an adapter request ID.
+	CommandID string
+	// AttemptID names one command-attempt record (decision-03 §4.1).
+	AttemptID string
 )
 
 // ID prefixes. They are diagnostic sugar only: nothing parses an ID, and a
@@ -49,6 +54,9 @@ const (
 	factPrefix        = "fact"
 	parkedPrefix      = "park"
 	credentialPrefix  = "duocred"
+	commandPrefix     = "cmd"
+	// attemptPrefix is catt, not att: attachment IDs already use att.
+	attemptPrefix = "catt"
 )
 
 // mintID returns a fresh opaque ID with the given prefix. 128 random bits:

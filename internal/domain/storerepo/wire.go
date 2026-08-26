@@ -34,6 +34,7 @@ type wireFact struct {
 	Claim       *wireClaim       `json:"claim,omitempty"`
 	Parked      *wireParked      `json:"parked,omitempty"`
 	Provider    *wireProvider    `json:"provider,omitempty"`
+	Command     *wireCommand     `json:"command,omitempty"`
 
 	LaunchResolution *wireLaunchResolution `json:"launch_resolution,omitempty"`
 
@@ -233,6 +234,34 @@ type wireClaim struct {
 	HeldAt     string `json:"held_at,omitempty"`
 }
 
+// wireCommand is one prompt-command fact payload (delegation-loop step 10).
+type wireCommand struct {
+	ID              string       `json:"id"`
+	Revision        int          `json:"revision"`
+	Operation       string       `json:"operation"`
+	Session         string       `json:"session"`
+	Instance        string       `json:"instance"`
+	Caller          string       `json:"caller"`
+	IdempotencyKey  string       `json:"idempotency_key"`
+	CanonicalDigest string       `json:"canonical_digest"`
+	QueuePolicy     string       `json:"queue_policy"`
+	ExpiresAt       string       `json:"expires_at"`
+	State           string       `json:"state"`
+	AcceptedAt      string       `json:"accepted_at,omitempty"`
+	TerminalAt      string       `json:"terminal_at,omitempty"`
+	PathKind        string       `json:"path_kind,omitempty"`
+	Effect          string       `json:"effect,omitempty"`
+	Attempt         *wireAttempt `json:"attempt,omitempty"`
+}
+
+type wireAttempt struct {
+	ID              string `json:"id"`
+	PathKind        string `json:"path_kind,omitempty"`
+	StartedAt       string `json:"started_at"`
+	RecordedResult  string `json:"recorded_result,omitempty"`
+	EffectCertainty string `json:"effect_certainty,omitempty"`
+}
+
 func toWire(f domain.Fact) wireFact {
 	w := wireFact{
 		ID:            string(f.ID),
@@ -303,6 +332,9 @@ func toWire(f domain.Fact) wireFact {
 	}
 	if v := f.Provider; v != nil {
 		w.Provider = &wireProvider{Name: v.Name, Note: v.Note}
+	}
+	if v := f.Command; v != nil {
+		w.Command = commandToWire(v)
 	}
 	if v := f.Correlation; v != nil {
 		w.Correlation = &wireCorrelation{
@@ -409,6 +441,9 @@ func fromWire(w wireFact) domain.Fact {
 	if v := w.Provider; v != nil {
 		f.Provider = &domain.ProviderFact{Name: v.Name, Note: v.Note}
 	}
+	if v := w.Command; v != nil {
+		f.Command = commandFromWire(v)
+	}
 	if v := w.Correlation; v != nil {
 		f.Correlation = &domain.Correlation{
 			ID: domain.CorrelationID(v.ID), TargetKind: domain.CorrelationTarget(v.TargetKind),
@@ -434,4 +469,70 @@ func fromWire(w wireFact) domain.Fact {
 	f.HostBinding = hostBindingFromWire(w.HostBinding)
 	f.PreviousHostBinding = hostBindingFromWire(w.PreviousHostBinding)
 	return f
+}
+
+func commandToWire(c *domain.CommandFact) *wireCommand {
+	if c == nil {
+		return nil
+	}
+	w := &wireCommand{
+		ID:              string(c.ID),
+		Revision:        c.Revision,
+		Operation:       c.Operation,
+		Session:         string(c.Session),
+		Instance:        string(c.Instance),
+		Caller:          c.Caller,
+		IdempotencyKey:  c.IdempotencyKey,
+		CanonicalDigest: c.CanonicalDigest,
+		QueuePolicy:     string(c.QueuePolicy),
+		ExpiresAt:       c.ExpiresAt,
+		State:           string(c.State),
+		AcceptedAt:      c.AcceptedAt,
+		TerminalAt:      c.TerminalAt,
+		PathKind:        string(c.PathKind),
+		Effect:          string(c.Effect),
+	}
+	if c.Attempt != nil {
+		w.Attempt = &wireAttempt{
+			ID:              string(c.Attempt.ID),
+			PathKind:        string(c.Attempt.PathKind),
+			StartedAt:       c.Attempt.StartedAt,
+			RecordedResult:  c.Attempt.RecordedResult,
+			EffectCertainty: string(c.Attempt.EffectCertainty),
+		}
+	}
+	return w
+}
+
+func commandFromWire(w *wireCommand) *domain.CommandFact {
+	if w == nil {
+		return nil
+	}
+	c := &domain.CommandFact{
+		ID:              domain.CommandID(w.ID),
+		Revision:        w.Revision,
+		Operation:       w.Operation,
+		Session:         domain.SessionID(w.Session),
+		Instance:        domain.InstanceID(w.Instance),
+		Caller:          w.Caller,
+		IdempotencyKey:  w.IdempotencyKey,
+		CanonicalDigest: w.CanonicalDigest,
+		QueuePolicy:     domain.QueuePolicy(w.QueuePolicy),
+		ExpiresAt:       w.ExpiresAt,
+		State:           domain.ResponsibilityState(w.State),
+		AcceptedAt:      w.AcceptedAt,
+		TerminalAt:      w.TerminalAt,
+		PathKind:        domain.PromptPathKind(w.PathKind),
+		Effect:          domain.EffectCertainty(w.Effect),
+	}
+	if w.Attempt != nil {
+		c.Attempt = &domain.CommandAttempt{
+			ID:              domain.AttemptID(w.Attempt.ID),
+			PathKind:        domain.PromptPathKind(w.Attempt.PathKind),
+			StartedAt:       w.Attempt.StartedAt,
+			RecordedResult:  w.Attempt.RecordedResult,
+			EffectCertainty: domain.EffectCertainty(w.Attempt.EffectCertainty),
+		}
+	}
+	return c
 }

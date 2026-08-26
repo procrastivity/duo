@@ -89,6 +89,10 @@ func (r *loggingRepo) CommitCommandAcceptance(ctx context.Context, c domain.Chan
 	return r.inner.CommitCommandAcceptance(ctx, c)
 }
 
+func (r *loggingRepo) CommitCommandTransition(ctx context.Context, c domain.Change) error {
+	return r.inner.CommitCommandTransition(ctx, c)
+}
+
 func (r *loggingRepo) CommitObservation(ctx context.Context, c domain.Change) error {
 	return r.inner.CommitObservation(ctx, c)
 }

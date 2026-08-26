@@ -2,14 +2,13 @@
 // contract: independent interfaces an agent-runtime adapter can implement,
 // plus the evidence and request/result types they share.
 //
-// This package implements RuntimeCorrelator, ConversationProvider, and
-// ConditionProvider. Stage 1 shipped the first two and deliberately left
-// ConditionProvider unscaffolded; the delegation-loop observation slice
-// brings it in (see condition.go). §5.3 also defines
-// RuntimePromptProvider, UsageProvider, RuntimeConfigurationProvider, and
-// HarnessRenderer; those remain out of this package — no empty
-// interfaces, no TODO types — because a stub signature would commit
-// later sessions to field shapes nobody has designed. See
+// This package implements RuntimeCorrelator, ConversationProvider,
+// ConditionProvider, and RuntimePromptProvider. Stage 1 shipped the first
+// two and left ConditionProvider unscaffolded; the observation slice
+// brought it in (see condition.go). Step 10 names RuntimePromptProvider
+// (see prompt.go); Claude fills it in step 12. UsageProvider,
+// RuntimeConfigurationProvider, and HarnessRenderer remain out of this
+// package — no empty interfaces, no TODO types. See
 // docs/adapters/decisions.md.
 //
 // RuntimeClaim, RuntimeCorrelationEvidence, and RuntimeCorrelator are

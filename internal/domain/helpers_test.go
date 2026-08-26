@@ -17,6 +17,7 @@ type harness struct {
 	t    *testing.T
 	path string
 	s    *store.Store
+	repo *storerepo.Repo
 	a    *domain.Authority
 }
 
@@ -33,12 +34,13 @@ func (h *harness) open() {
 	if err != nil {
 		h.t.Fatalf("OpenAuthority: %v", err)
 	}
-	a, err := domain.Open(context.Background(), storerepo.New(s))
+	repo := storerepo.New(s)
+	a, err := domain.Open(context.Background(), repo)
 	if err != nil {
 		_ = s.Close()
 		h.t.Fatalf("domain.Open: %v", err)
 	}
-	h.s, h.a = s, a
+	h.s, h.repo, h.a = s, repo, a
 	h.t.Cleanup(func() { _ = s.Close() })
 }
 

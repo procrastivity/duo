@@ -117,6 +117,40 @@ const (
 	// already the default for a name with no standing fact — the write is
 	// durable evidence of the decision, not merely a state change.
 	FactProviderEnabled FactKind = "provider.enabled"
+
+	// --- Prompt-command facts (delegation-loop Stage D step 10; decision-03
+	// §3–§4, narrowed: delivered | expired | failed; not canceled) ---
+	//
+	// These are a recorded vocabulary add on the lifecycle fact log, not an
+	// I-2 elimination-reason add: launch/record.go stays closed.
+
+	// FactCommandAccepted records durable acceptance of one prompt.deliver
+	// command together with its idempotency record, bound runtime-instance
+	// ID, finite expiry, and initial queued responsibility (queue_until_safe
+	// only). Acceptance and idempotency commit in one CommandAcceptTx.
+	FactCommandAccepted FactKind = "command.accepted"
+	// FactCommandAttemptCreated records one command-attempt before any
+	// adapter is invoked. It is a CommandTransitionTx of its own, so a
+	// crash after this commit reloads the command as attempting and must
+	// not mint a second attempt.
+	FactCommandAttemptCreated FactKind = "command.attempt_created"
+	// FactCommandDelivered is the terminal transition after a path meets
+	// its complete-turn success condition. It commits after the adapter
+	// returns and before the result is visible.
+	FactCommandDelivered FactKind = "command.delivered"
+	// FactCommandExpired is the terminal transition for a command whose
+	// expires_at passed with no attempt (or no in-flight attempt to
+	// reconcile). Expiry during an unresolved attempt is command.failed
+	// with unknown_effect, not expired (decision-03 §7.2).
+	FactCommandExpired FactKind = "command.expired"
+	// FactCommandFailed is the terminal transition for a definite or
+	// indeterminate failure, including crash-before-terminal-commit
+	// reconciliation as unknown_effect.
+	FactCommandFailed FactKind = "command.failed"
+	// FactCommandRequeued records a proved no_effect attempt returning the
+	// command to queued so a later CreateAttempt may retry. Automatic retry
+	// is permitted only on this proof (decision-03 §4.3, §7.1).
+	FactCommandRequeued FactKind = "command.requeued"
 )
 
 // Fact is one durable, attributable lifecycle change.
@@ -169,6 +203,11 @@ type Fact struct {
 	// above — no Duo ID is minted for a provider — but the same
 	// exactly-one-pointer-set shape applies, keyed by name instead.
 	Provider *ProviderFact
+
+	// Command is the payload of a prompt-command fact (command.accepted,
+	// command.attempt_created, the three terminal kinds, and
+	// command.requeued). See CommandFact.
+	Command *CommandFact
 
 	// Transition targets. A transition fact names the object it changes and
 	// the new value.

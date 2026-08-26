@@ -2,13 +2,12 @@
 // contract: independent interfaces a session-host adapter can implement,
 // plus the evidence and request/result types they share.
 //
-// Stage-1 scope, deliberately: this package implements only HostDiscovery,
-// HostLauncher, HostAttachmentValidator, and HostLifecycleSource — the four
-// interfaces the Step 11 spec names. §5.2 also defines HostTerminalProvider
-// and HostPromptProvider; those are out of scope here and are not
-// scaffolded (no empty interface, no TODO type). See
-// docs/adapters/decisions.md for why that boundary is drawn there and not
-// mid-interface.
+// This package implements HostDiscovery, HostLauncher,
+// HostAttachmentValidator, HostLifecycleSource, and HostPromptProvider.
+// HostPromptProvider is named here (delegation-loop step 10) and filled by
+// Herdr in step 11; this package does not invoke it. HostTerminalProvider
+// stays out of scope — no empty interface, no TODO type. See
+// docs/adapters/decisions.md.
 //
 // The interface names and the types they reference in method signatures
 // (HostCandidate, HostLaunchRequest, HostLaunchEvidence, HostAttachmentClaim,

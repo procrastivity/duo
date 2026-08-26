@@ -53,6 +53,34 @@ var (
 	// ErrProviderNameRequired reports a provider.disabled or
 	// provider.enabled write with no provider name (step 08).
 	ErrProviderNameRequired = errors.New("domain: provider name is required")
+	// ErrIdempotencyKeyRequired reports a prompt command with no caller
+	// idempotency key.
+	ErrIdempotencyKeyRequired = errors.New("domain: prompt command requires an idempotency key")
+	// ErrCanonicalDigestRequired reports a prompt command with no canonical
+	// request digest.
+	ErrCanonicalDigestRequired = errors.New("domain: prompt command requires a canonical digest")
+	// ErrExpiryInPast reports an expires_at that is not later than now.
+	ErrExpiryInPast = errors.New("domain: prompt command expires_at must be later than now")
+	// ErrQueuePolicyUnsupported reports a queue policy other than
+	// queue_until_safe (require_ready and hold_for_release are out of this
+	// slice).
+	ErrQueuePolicyUnsupported = errors.New("domain: prompt command queue policy must be queue_until_safe")
+	// ErrCommandExpired reports a command whose expires_at passed before an
+	// attempt, now terminal expired.
+	ErrCommandExpired = errors.New("domain: prompt command expired")
+	// ErrCommandTerminal reports a verb that needs a nonterminal command.
+	ErrCommandTerminal = errors.New("domain: prompt command is terminal")
+	// ErrCommandAttempting reports a second attempt while one is already in
+	// flight (including after a crash that left the command attempting).
+	ErrCommandAttempting = errors.New("domain: prompt command already has an in-flight attempt")
+	// ErrUnknownCommand reports a command ID this authority never accepted.
+	ErrUnknownCommand = errors.New("domain: unknown prompt command")
+	// ErrPromptPathKind reports a CreateAttempt with an empty or unknown
+	// path kind. The kernel records the selected kind; it does not choose it.
+	ErrPromptPathKind = errors.New("domain: prompt attempt requires a path kind runtime or host")
+	// ErrCommandNotAttempting reports ReconcileAttempt on a command that is
+	// not in the attempting state.
+	ErrCommandNotAttempting = errors.New("domain: prompt command is not attempting")
 )
 
 // ConflictError is §4.2 step 5's outcome: evidence that overlaps two Duo
@@ -86,3 +114,17 @@ func (e *ConflictError) Error() string {
 
 // Unwrap exposes the underlying refusal to errors.Is.
 func (e *ConflictError) Unwrap() error { return e.Cause }
+
+// IdempotencyConflictError is command.idempotency_conflict: the same caller
+// key already binds a different canonical digest (decision-03 §3.2).
+type IdempotencyConflictError struct {
+	Key             string
+	ExistingCommand CommandID
+	ExistingDigest  string
+	RequestDigest   string
+}
+
+func (e *IdempotencyConflictError) Error() string {
+	return fmt.Sprintf("domain: command.idempotency_conflict: key %q already binds digest %s, not %s (command %s)",
+		e.Key, e.ExistingDigest, e.RequestDigest, e.ExistingCommand)
+}

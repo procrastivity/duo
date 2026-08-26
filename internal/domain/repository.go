@@ -38,7 +38,7 @@ type AuditEntry struct {
 	Detail string
 }
 
-// Repository is the domain's durability seam. Its four methods are the four
+// Repository is the domain's durability seam. Its five methods are the
 // §4.2 atomic boundaries this domain writes through, named for what the
 // domain is committing rather than for the transaction; see
 // docs/domain/decisions.md for the verb-to-boundary map.
@@ -62,9 +62,15 @@ type Repository interface {
 	CommitLaunchResolution(ctx context.Context, c Change) error
 
 	// CommitCommandAcceptance commits an accepted lifecycle command that is
-	// a request rather than a fact — stop (§4.2's command-acceptance
-	// boundary).
+	// a request rather than a fact — stop, and prompt.deliver acceptance
+	// plus caller idempotency (§4.2's command-acceptance boundary).
 	CommitCommandAcceptance(ctx context.Context, c Change) error
+
+	// CommitCommandTransition commits one prompt-command transition and its
+	// attempt or reconciliation metadata: attempt-create (before any
+	// adapter call) and the terminal or requeue commit (after the adapter
+	// returns, before the result is visible).
+	CommitCommandTransition(ctx context.Context, c Change) error
 
 	// CommitObservation commits accepted process or host evidence: live
 	// verification, exit, and late-report handling (§4.2's observation

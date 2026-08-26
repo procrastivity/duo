@@ -98,10 +98,23 @@ func (r *Repo) CommitCommandAcceptance(ctx context.Context, c domain.Change) err
 	return r.commit(ctx, r.s.CommandAcceptTx, c)
 }
 
+// CommitCommandTransition commits one prompt-command transition through the
+// command-transition boundary.
+func (r *Repo) CommitCommandTransition(ctx context.Context, c domain.Change) error {
+	return r.commit(ctx, r.s.CommandTransitionTx, c)
+}
+
 // CommitObservation commits accepted process or host evidence through the
 // observation boundary.
 func (r *Repo) CommitObservation(ctx context.Context, c domain.Change) error {
 	return r.commit(ctx, r.s.ObservationTx, c)
+}
+
+// InjectBeforeCommit is a test-only crash-injection hook. A non-nil fn
+// runs after the boundary body writes and before the store commits,
+// mirroring store.Store's beforeCommit. Production never calls it.
+func (r *Repo) InjectBeforeCommit(fn func() error) {
+	r.beforeCommit = fn
 }
 
 // commit writes one Change inside one store boundary: claims first, so a

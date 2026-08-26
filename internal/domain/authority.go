@@ -72,6 +72,12 @@ type Authority struct {
 	// name rather than by a minted Duo ID. A name absent from this map has
 	// no standing fact — see ProviderStanding and StandingProviderFacts.
 	providers map[string]ProviderStanding
+
+	// commands is the prompt-command read model (step 10): every accepted
+	// command by ID. idempotency indexes (caller, operation, target, key)
+	// onto that ID so a replay does not mint a second command.
+	commands    map[CommandID]*PromptCommand
+	idempotency map[string]CommandID
 }
 
 // Option configures an Authority.
@@ -108,6 +114,8 @@ func Open(ctx context.Context, repo Repository, opts ...Option) (*Authority, err
 		parked:         map[SessionID][]*ParkedReport{},
 		hostBindings:   map[WorkspaceID]*HostCorrelation{},
 		providers:      map[string]ProviderStanding{},
+		commands:       map[CommandID]*PromptCommand{},
+		idempotency:    map[string]CommandID{},
 
 		launchResolutions: map[LaunchResolutionID]*recordedLaunchResolution{},
 		sessionLaunch:     map[SessionID]LaunchResolutionID{},
@@ -305,6 +313,13 @@ func (a *Authority) apply(f Fact) {
 	// The fold lives in hostcorrelation.go beside the model it builds.
 	case FactWorkspaceHostBound, FactWorkspaceHostRebound:
 		a.applyHostCorrelation(f)
+
+	// Prompt-command facts (delegation-loop step 10). The fold lives in
+	// command.go beside the model it builds.
+	case FactCommandAccepted, FactCommandAttemptCreated,
+		FactCommandDelivered, FactCommandExpired, FactCommandFailed,
+		FactCommandRequeued:
+		a.applyCommand(f)
 	}
 }
 

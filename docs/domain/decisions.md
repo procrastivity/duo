@@ -163,13 +163,14 @@ attempts in history.
 ## Verb-to-boundary map
 
 §4.2 fixes eight boundaries and the store exposes exactly those eight. The
-domain uses four of them:
+domain uses five of them:
 
 | Boundary | Verbs |
 |---|---|
 | `EnrollmentTx` | enroll, bind, detach, reattach, resume, restart, archive, restore, remove, and every recorded conflict or rejected report |
 | `LaunchResolutionTx` | launch |
-| `CommandAcceptTx` | stop |
+| `CommandAcceptTx` | stop; prompt.deliver acceptance + caller idempotency (step 10) |
+| `CommandTransitionTx` | prompt-command attempt-create, terminal delivered/expired/failed, and no_effect requeue (step 10) |
 | `ObservationTx` | exit, live verification, recovery decisions, late reports |
 
 Two of those need a word. Archive, restore, and remove are not enrollments;
@@ -177,7 +178,12 @@ they take the enrollment boundary because it is §4.2's identity-and-lifecycle
 boundary and the set of eight is closed. Stop takes command acceptance
 because §5.2 makes stop a *request* — the command and delivery domain owns
 its work item and its result, and this kernel records only the accepted
-request and the `stop_requested` transition.
+request and the `stop_requested` transition. Prompt-command acceptance
+shares that boundary so the command, idempotency record, and initial queued
+state commit together (decision-03 §3.2). Attempt-create and the terminal
+commit are separate `CommandTransitionTx` transactions: the first before any
+adapter call, the second after the adapter returns and before the result is
+visible.
 
 Exit takes the observation boundary because §5.3 makes exit an accepted fact
 from process or host evidence, whatever verb records it. `Restart` therefore
