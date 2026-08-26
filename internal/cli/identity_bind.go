@@ -14,11 +14,15 @@ import (
 )
 
 // identityBindTimeout is how long launch waits for host identity and D3
-// readiness. Prompt send (step 07) calls the same helper with the
-// command's own deadline. Tests zero this so existing launches do one
-// poll and return; a live agent that has not reported yet stays
-// starting without hanging the CLI.
-const defaultIdentityBindTimeout = 3 * time.Second
+// readiness (!launch_pending). Production is 8s: identity is usually
+// already on agent.list (AgentOnPane) inside the old 3s window, but
+// launch_pending can stay true until ~2s after that window / ~6s from
+// process birth. The cap is finite — identity discovery is not the
+// bottleneck, and the wait is not unbounded. Prompt send calls the same
+// helper with the command's own deadline. Tests zero this so existing
+// launches do one poll and return; a live agent that has not reported
+// yet stays starting without hanging the CLI.
+const defaultIdentityBindTimeout = 8 * time.Second
 
 const defaultIdentityBindPoll = 50 * time.Millisecond
 

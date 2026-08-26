@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/host"
@@ -43,6 +45,53 @@ func (h *identityHosts) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 		h.hosts[t.IntegrationInstanceID] = fake
 	}
 	return fake, nil
+}
+
+// delayedPendingHosts seeds identity immediately with launch_pending set,
+// then clears that flag on the cached fake after delay via SetPaneAgentBind.
+// Start and the bind poll share the same *hostfake.Host.
+type delayedPendingHosts struct {
+	inner *identityHosts
+	ident host.AgentSessionIdentity
+	delay time.Duration
+}
+
+func (h *delayedPendingHosts) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
+	inner, err := h.inner.LauncherFor(t)
+	if err != nil {
+		return nil, err
+	}
+	return &delayedPendingLauncher{
+		Host:  inner.(*hostfake.Host),
+		ident: h.ident,
+		delay: h.delay,
+	}, nil
+}
+
+type delayedPendingLauncher struct {
+	*hostfake.Host
+	ident host.AgentSessionIdentity
+	delay time.Duration
+}
+
+func (h *delayedPendingLauncher) Start(ctx context.Context, prepared host.PreparedHostLaunch) (host.HostLaunchEvidence, error) {
+	ev, err := h.Host.Start(ctx, prepared)
+	if err != nil {
+		return ev, err
+	}
+	paneID := ev.Evidence.PaneID
+	ident := h.ident
+	delay := h.delay
+	fake := h.Host
+	go func() {
+		time.Sleep(delay)
+		fake.SetPaneAgentBind(paneID, host.AgentBindState{
+			Session:          &ident,
+			LaunchPending:    false,
+			InteractiveReady: true,
+		})
+	}()
+	return ev, nil
 }
 
 func TestLaunchBindsIdentityAndMarksLiveWithoutHandInjectedMarkLive(t *testing.T) {
@@ -192,6 +241,53 @@ func TestLaunchPendingDoesNotMarkLive(t *testing.T) {
 	bindings, ok := agentBindingsFor(h.authority, sess)
 	if !ok || bindings.ExternalAgentSessionID != ident.Value {
 		t.Fatalf("want named agent.session while still starting, got ok=%v %+v", ok, bindings)
+	}
+}
+
+func TestLaunchMarksLiveWhenLaunchPendingClearsAfterThreeSeconds(t *testing.T) {
+	prev := identityBindTimeout
+	identityBindTimeout = defaultIdentityBindTimeout
+	t.Cleanup(func() { identityBindTimeout = prev })
+
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	ident := host.AgentSessionIdentity{
+		Source: "herdr:claude",
+		Agent:  "claude",
+		Kind:   host.AgentSessionKindID,
+		Value:  "sess-d3-delay-1",
+	}
+	RegisterAgentRuntime("claude-code", runtimefake.New("claude-code"))
+	t.Cleanup(func() { UnregisterAgentRuntime("claude-code") })
+
+	hosts := &delayedPendingHosts{
+		inner: newIdentityHosts(&host.AgentBindState{
+			Session:       &ident,
+			LaunchPending: true,
+		}),
+		ident: ident,
+		delay: 3*time.Second + 200*time.Millisecond,
+	}
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s, want live after launch_pending cleared (test body did not call MarkLive)", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok || bindings.ExternalAgentSessionID != ident.Value {
+		t.Fatalf("want named agent.session after D3 flip, got ok=%v %+v", ok, bindings)
 	}
 }
 
