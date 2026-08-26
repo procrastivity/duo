@@ -114,3 +114,24 @@ store path cannot be resolved at all, or JSON encoding of the report fails)
 raises a `*duoerr.Error`, and both use the `internal.` prefix
 `internal/exitcode.FromError` maps to exit 4 — an unexpected chassis
 failure, not a user mistake or a guard refusal.
+
+## 2026-08-26 — five-rung ranking line and scrub-gate warning (notes/51 9d)
+
+Delegation-loop step 05. The visibility rail already printed the deduced
+host; it did not print the locked ranking, and it did not warn when that
+host's panes would trip the Stage-1 scrub gate.
+
+- **Ranking.** `host_deduction.ranking` is `materialize.Rungs` as strings
+  (explicit-flag > workspace-correlation > cwd-correlation > ambient-env >
+  policy-default), matching the planning-foundation handoff 24 five-rung
+  clause. Human mode prints the ranking and a `winner:` line. This step
+  does not rebuild the ladder; if `Rungs` and the locked ranking ever
+  disagree, that is a bug (workplan risk 16), not a redesign.
+- **Scrub-gate warning.** When M1 deduces a herdr host, doctor reads the
+  *listener* process's exec-time environment via
+  `herdr.ListenerEnviron` (inode lookup in `/proc/net/unix` plus
+  `/proc/<pid>/environ` — no API dial, I-3) and runs
+  `scrub.SurvivingMarkers`. Survivors become `scrub_gate` on the report
+  and a human warning that names them. Doctor does not refuse; launch
+  still does. An unreadable or absent listener is silence (no survivors
+  to name), not a proxy refusal.

@@ -19,9 +19,11 @@ import (
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/duoerr"
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
+	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch/materialize"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
+	"github.com/procrastivity/duo/internal/scrub"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
@@ -119,13 +121,15 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 			}
 			configSection, policy := doctorConfigStatus(configPath)
 
+			deduction := doctorHostDeduction(cmd.Context(), a, root, policy)
 			report := doctorReport{
 				Report:              base,
 				HostBinding:         doctorHostBinding(a, root),
-				HostDeduction:       doctorHostDeduction(cmd.Context(), a, root, policy),
+				HostDeduction:       deduction,
 				Providers:           doctorProviders(a),
 				Config:              configSection,
 				RecoveringInstances: len(a.Recovering()),
+				ScrubGate:           doctorScrubGate(deduction),
 			}
 
 			if flags.JSON() {
@@ -182,6 +186,7 @@ func humanReport(report doctorReport) string {
 
 	writeHostBindingSection(&b, report.HostBinding)
 	writeHostDeductionSection(&b, report.HostDeduction)
+	writeScrubGateSection(&b, report.ScrubGate)
 	writeProvidersSection(&b, report.Providers)
 	writeConfigSection(&b, report.Config)
 
@@ -230,6 +235,11 @@ type doctorReport struct {
 	Providers           []doctorProviderStanding   `json:"providers"`
 	Config              doctorConfigSection        `json:"config"`
 	RecoveringInstances int                        `json:"recovering_instances"`
+	// ScrubGate is set when the deduced host's panes would trip the
+	// environment-scrub gate (notes/51 9d). Omitted when clean or when
+	// no host was deduced / the listener environ could not be observed.
+	// Doctor warns; launch still refuses.
+	ScrubGate *doctorScrubGateWarning `json:"scrub_gate,omitempty"`
 }
 
 // doctorHostDeductionSection is what M1 would deduce right now for the
@@ -242,6 +252,11 @@ type doctorHostDeductionSection struct {
 	// one field lookup, the same shape session.launch's own launch output
 	// names at its top level.
 	HostSource string `json:"host_source,omitempty"`
+	// Ranking is materialize.Rungs in rank order — the locked five-rung
+	// ladder (planning-foundation handoff 24 clause). Always present so a
+	// dogfood reader can see cwd-correlation outrank ambient-env without
+	// opening evidence.go.
+	Ranking []string `json:"ranking"`
 	// OutrankedEvidence is every rung that was consulted and either
 	// produced a host or carried a correlation/ambient capture, but did
 	// not win. Always present (as "[]" when empty), never null.
@@ -255,6 +270,14 @@ type doctorHostDeductionSection struct {
 	// itself a "no host deduced" answer (e.g. the working directory could
 	// not be resolved).
 	Detail string `json:"detail,omitempty"`
+}
+
+// doctorScrubGateWarning names the deduced host whose panes would be
+// refused by scrub.Gate, and the surviving marker names (values never
+// printed — same discipline as scrub.RefusalError).
+type doctorScrubGateWarning struct {
+	Host      string   `json:"host"`
+	Survivors []string `json:"survivors"`
 }
 
 // doctorDeducedHost mirrors duo.external/v1's launch_deduced_host shape
@@ -334,6 +357,9 @@ func writeHostBindingSection(b *strings.Builder, r workspaceHostShowResult) {
 // writeHostDeductionSection prints what M1 would deduce right now.
 func writeHostDeductionSection(b *strings.Builder, d doctorHostDeductionSection) {
 	b.WriteString("  host deduction (what M1 would deduce now):\n")
+	if len(d.Ranking) > 0 {
+		fmt.Fprintf(b, "    ranking: %s\n", strings.Join(d.Ranking, " > "))
+	}
 	if d.Detail != "" {
 		fmt.Fprintf(b, "    could not deduce: %s\n", d.Detail)
 		return
@@ -348,7 +374,7 @@ func writeHostDeductionSection(b *strings.Builder, d doctorHostDeductionSection)
 			fmt.Fprintf(b, "      %-22s %-14s %s\n", rung.Source, consulted, rung.Detail)
 		}
 	} else {
-		fmt.Fprintf(b, "    %s:%s (host_source=%s)\n", d.Host.Kind, d.Host.InstanceLabel, d.Host.HostSource)
+		fmt.Fprintf(b, "    winner:  %s (%s:%s)\n", d.Host.HostSource, d.Host.Kind, d.Host.InstanceLabel)
 	}
 	if len(d.OutrankedEvidence) > 0 {
 		b.WriteString("    outranked:\n")
@@ -356,6 +382,17 @@ func writeHostDeductionSection(b *strings.Builder, d doctorHostDeductionSection)
 			fmt.Fprintf(b, "      %s: %s\n", e.Source, e.Detail)
 		}
 	}
+}
+
+// writeScrubGateSection prints the notes/51 9d warning when the deduced
+// host's panes would trip scrub.Gate. Absent when clean or unobserved.
+func writeScrubGateSection(b *strings.Builder, w *doctorScrubGateWarning) {
+	if w == nil {
+		return
+	}
+	b.WriteString("  scrub gate:\n")
+	fmt.Fprintf(b, "    warning: deduced host %s panes would be refused; survivors: %s\n",
+		w.Host, strings.Join(w.Survivors, ", "))
 }
 
 // writeProvidersSection prints the standing provider facts.
@@ -425,7 +462,10 @@ func doctorHostBinding(a *domain.Authority, root string) workspaceHostShowResult
 // inputs than the launcher would report a different answer than the one
 // the operator is about to get.
 func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, policy config.SessionHostPolicy) doctorHostDeductionSection {
-	section := doctorHostDeductionSection{OutrankedEvidence: []doctorOutrankedEvidence{}}
+	section := doctorHostDeductionSection{
+		OutrankedEvidence: []doctorOutrankedEvidence{},
+		Ranking:           doctorRanking(),
+	}
 
 	result, mErr := materialize.Materialize(ctx, materialize.Options{
 		WorkspaceFlag: root,
@@ -488,6 +528,45 @@ func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, 
 	}
 
 	return section
+}
+
+// doctorRanking copies materialize.Rungs as strings — the locked five-rung
+// order, never a policy list.
+func doctorRanking() []string {
+	out := make([]string, len(materialize.Rungs))
+	for i, r := range materialize.Rungs {
+		out[i] = string(r)
+	}
+	return out
+}
+
+// doctorHostEnviron reads the environment a deduced herdr host's panes
+// would inherit. It is a package-level var so tests can inject a fixed
+// environ without a live listener; production points at
+// herdr.ListenerEnviron (procfs only — no dial, I-3).
+var doctorHostEnviron = herdr.ListenerEnviron
+
+// doctorScrubGate warns when the deduced host's panes would trip
+// scrub.Gate. It reuses SurvivingMarkers the same way the launch path's
+// refusal projection names survivors; it never refuses (launch still does).
+// An unobservable listener is silence, not a warning — doctor names
+// survivors, and an unreadable environ has none to name.
+func doctorScrubGate(d doctorHostDeductionSection) *doctorScrubGateWarning {
+	if d.Host == nil || d.Host.Kind != "herdr" || d.Host.InstanceLabel == "" {
+		return nil
+	}
+	environ, err := doctorHostEnviron(d.Host.InstanceLabel)
+	if err != nil {
+		return nil
+	}
+	survivors := scrub.SurvivingMarkers(environ)
+	if len(survivors) == 0 {
+		return nil
+	}
+	return &doctorScrubGateWarning{
+		Host:      d.Host.Kind + ":" + d.Host.InstanceLabel,
+		Survivors: survivors,
+	}
 }
 
 // doctorProviders builds the standing-provider-facts section from a's read

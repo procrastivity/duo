@@ -10,6 +10,7 @@ import (
 	"github.com/procrastivity/duo/internal/domain"
 	"github.com/procrastivity/duo/internal/exitcode"
 	"github.com/procrastivity/duo/internal/host/herdr"
+	"github.com/procrastivity/duo/internal/scrub"
 )
 
 // doctorJSON is the subset of `duo doctor --output json`'s output these tests
@@ -41,7 +42,8 @@ type doctorJSON struct {
 			InstanceID    string `json:"instance_id"`
 			HostSource    string `json:"host_source"`
 		} `json:"host"`
-		HostSource        string `json:"host_source"`
+		HostSource        string   `json:"host_source"`
+		Ranking           []string `json:"ranking"`
 		OutrankedEvidence []struct {
 			Source   string `json:"source"`
 			FactID   string `json:"fact_id"`
@@ -67,6 +69,10 @@ type doctorJSON struct {
 		MigrateHint string `json:"migrate_hint"`
 		Detail      string `json:"detail"`
 	} `json:"config"`
+	ScrubGate *struct {
+		Host      string   `json:"host"`
+		Survivors []string `json:"survivors"`
+	} `json:"scrub_gate"`
 }
 
 func runDoctorJSON(t *testing.T, args ...string) doctorJSON {
@@ -155,6 +161,10 @@ func TestDoctorVisibility_BoundWorkspace(t *testing.T) {
 			report.HostDeduction.HostSource, domain.HostSourceWorkspaceCorrelation)
 	}
 	hostSourceIsClosed(t, report.HostDeduction.HostSource)
+	assertDoctorRanking(t, report.HostDeduction.Ranking)
+	if report.ScrubGate != nil {
+		t.Errorf("scrub_gate = %+v, want absent (no live listener for testSocketA)", report.ScrubGate)
+	}
 }
 
 // TestDoctorVisibility_UnboundWithAmbientEnv covers a workspace with no
@@ -197,6 +207,7 @@ func TestDoctorVisibility_UnboundWithAmbientEnv(t *testing.T) {
 	if len(report.HostDeduction.DeductionTrail) != 0 {
 		t.Errorf("deduction_trail = %+v, want empty for a resolved deduction", report.HostDeduction.DeductionTrail)
 	}
+	assertDoctorRanking(t, report.HostDeduction.Ranking)
 }
 
 // TestDoctorVisibility_NoHostResolves covers the case where every rung
@@ -226,6 +237,7 @@ func TestDoctorVisibility_NoHostResolves(t *testing.T) {
 	for _, rung := range report.HostDeduction.DeductionTrail {
 		hostSourceIsClosed(t, rung.Source)
 	}
+	assertDoctorRanking(t, report.HostDeduction.Ranking)
 }
 
 // TestDoctorVisibility_UnboundWithCwdCorrelation covers a workspace with no
@@ -379,9 +391,129 @@ func TestDoctorVisibility_HumanModeIncludesNewSections(t *testing.T) {
 	if code != exitcode.Success {
 		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut)
 	}
-	for _, want := range []string{"workspace:", "host deduction", "providers:", "config:"} {
+	for _, want := range []string{"workspace:", "host deduction", "ranking:", "providers:", "config:"} {
 		if !contains(out, want) {
 			t.Errorf("human-mode output does not contain %q:\n%s", want, out)
 		}
+	}
+}
+
+// assertDoctorRanking pins host_deduction.ranking to materialize.Rungs —
+// the locked five-rung order planning-foundation's handoff 24 clause names.
+func assertDoctorRanking(t *testing.T, ranking []string) {
+	t.Helper()
+	want := []string{
+		string(domain.HostSourceExplicitFlag),
+		string(domain.HostSourceWorkspaceCorrelation),
+		string(domain.HostSourceCwdCorrelation),
+		string(domain.HostSourceAmbientEnv),
+		string(domain.HostSourcePolicyDefault),
+	}
+	if len(ranking) != len(want) {
+		t.Fatalf("ranking has %d rungs, want %d: %v", len(ranking), len(want), ranking)
+	}
+	for i := range want {
+		if ranking[i] != want[i] {
+			t.Errorf("ranking[%d] = %q, want %q", i, ranking[i], want[i])
+		}
+	}
+}
+
+// TestDoctorVisibility_ScrubGateWarnsWhenSurvivorsNames the notes/51 9d
+// golden: a bound workspace whose deduced host would trip scrub.Gate
+// surfaces survivors on the visibility rail. Doctor warns; it does not
+// refuse. The environ is injected — production reads the herdr listener
+// via procfs (herdr.ListenerEnviron) with no dial.
+func TestDoctorVisibility_ScrubGateWarnsWhenSurvivors(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	clearAmbientHerdrEnv(t)
+	dir := t.TempDir()
+	seedBoundWorkspace(t, dir, domain.HostSourceAmbientEnv, testSocketA)
+
+	prev := doctorHostEnviron
+	doctorHostEnviron = func(socketPath string) ([]string, error) {
+		if socketPath != testSocketA {
+			t.Fatalf("doctorHostEnviron called with %q, want %q", socketPath, testSocketA)
+		}
+		// Build from scrub.Markers — never retype a marker literal (single-
+		// source tripwire in internal/scrub).
+		out := make([]string, 0, len(scrub.Markers)+1)
+		for _, m := range scrub.Markers {
+			out = append(out, m+"=1")
+		}
+		out = append(out, "PATH=/usr/bin")
+		return out, nil
+	}
+	t.Cleanup(func() { doctorHostEnviron = prev })
+
+	report := runDoctorJSON(t, "--workspace", dir)
+	if report.ScrubGate == nil {
+		t.Fatal("scrub_gate is nil, want a warning naming survivors")
+	}
+	if report.ScrubGate.Host != "herdr:"+testSocketA {
+		t.Errorf("scrub_gate.host = %q, want herdr:%s", report.ScrubGate.Host, testSocketA)
+	}
+	if len(report.ScrubGate.Survivors) != len(scrub.Markers) {
+		t.Fatalf("survivors = %v, want every scrub.Markers entry", report.ScrubGate.Survivors)
+	}
+	for _, m := range scrub.Markers {
+		// SurvivingMarkers sorts; Markers order is not the report order.
+		found := false
+		for _, s := range report.ScrubGate.Survivors {
+			if s == m {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("survivors missing %q; got %v", m, report.ScrubGate.Survivors)
+		}
+	}
+
+	code, out, errOut := runSession(t, "doctor", "--workspace", dir)
+	if code != exitcode.Success {
+		t.Fatalf("human doctor: exit %d (stderr: %s)", code, errOut)
+	}
+	if !contains(out, "scrub gate:") || !contains(out, "survivors:") {
+		t.Errorf("human output missing scrub-gate warning:\n%s", out)
+	}
+	for _, m := range scrub.Markers {
+		if !contains(out, m) {
+			t.Errorf("human output missing survivor %q:\n%s", m, out)
+		}
+	}
+}
+
+// TestDoctorVisibility_ScrubGateSilentWhenClean is the clean-host half of
+// the notes/51 9d golden: a deduced host whose listener environ carries no
+// markers produces no scrub_gate field and no human warning line.
+func TestDoctorVisibility_ScrubGateSilentWhenClean(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	clearAmbientHerdrEnv(t)
+	dir := t.TempDir()
+	seedBoundWorkspace(t, dir, domain.HostSourceAmbientEnv, testSocketA)
+
+	prev := doctorHostEnviron
+	doctorHostEnviron = func(string) ([]string, error) {
+		return []string{"PATH=/usr/bin", "HOME=/tmp"}, nil
+	}
+	t.Cleanup(func() { doctorHostEnviron = prev })
+
+	report := runDoctorJSON(t, "--workspace", dir)
+	if report.ScrubGate != nil {
+		t.Errorf("scrub_gate = %+v, want absent on a clean host", report.ScrubGate)
+	}
+
+	code, out, errOut := runSession(t, "doctor", "--workspace", dir)
+	if code != exitcode.Success {
+		t.Fatalf("human doctor: exit %d (stderr: %s)", code, errOut)
+	}
+	if contains(out, "scrub gate:") {
+		t.Errorf("human output has a scrub-gate section on a clean host:\n%s", out)
+	}
+	if !contains(out, "winner:") || !contains(out, "ranking:") {
+		t.Errorf("human output missing ranking/winner lines:\n%s", out)
 	}
 }
