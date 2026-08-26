@@ -3,6 +3,7 @@ package fake_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/procrastivity/duo/internal/runtime"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
@@ -91,5 +92,62 @@ func TestReadConversationPaginatesWithCursor(t *testing.T) {
 	}
 	if second.Turns[0].ID != "3" {
 		t.Fatalf("second.Turns[0].ID = %s, want 3", second.Turns[0].ID)
+	}
+}
+
+func TestConditionSnapshotIdle(t *testing.T) {
+	ctx := context.Background()
+	r := runtimefake.New("integration-1")
+	at := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	r.SeedCondition("external-1", runtime.ConditionObservation{
+		ObservationID: "obs-idle-1",
+		Value:         runtime.ConditionIdle,
+		Confidence:    runtime.ConditionConfidenceReported,
+		Freshness:     runtime.ConditionFreshnessFresh,
+		EffectiveAt:   at,
+		ComputedAt:    at,
+	})
+
+	got, err := runtime.SnapshotCondition(ctx, r, runtime.ConditionObservationRequest{
+		ExternalAgentSessionID: "external-1",
+	})
+	if err != nil {
+		t.Fatalf("SnapshotCondition: %v", err)
+	}
+	if got.Value != runtime.ConditionIdle {
+		t.Fatalf("Value = %q, want idle", got.Value)
+	}
+	if got.ObservationID != "obs-idle-1" {
+		t.Fatalf("ObservationID = %q, want obs-idle-1", got.ObservationID)
+	}
+	if got.Confidence != runtime.ConditionConfidenceReported {
+		t.Fatalf("Confidence = %q, want reported", got.Confidence)
+	}
+}
+
+func TestConditionSnapshotExited(t *testing.T) {
+	ctx := context.Background()
+	r := runtimefake.New("integration-1")
+	at := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	r.SeedCondition("external-1", runtime.ConditionObservation{
+		ObservationID: "obs-exited-1",
+		Value:         runtime.ConditionExited,
+		Confidence:    runtime.ConditionConfidenceReported,
+		Freshness:     runtime.ConditionFreshnessFresh,
+		EffectiveAt:   at,
+		ComputedAt:    at,
+	})
+
+	got, err := runtime.SnapshotCondition(ctx, r, runtime.ConditionObservationRequest{
+		ExternalAgentSessionID: "external-1",
+	})
+	if err != nil {
+		t.Fatalf("SnapshotCondition: %v", err)
+	}
+	if got.Value != runtime.ConditionExited {
+		t.Fatalf("Value = %q, want exited", got.Value)
+	}
+	if got.ObservationID != "obs-exited-1" {
+		t.Fatalf("ObservationID = %q, want obs-exited-1", got.ObservationID)
 	}
 }

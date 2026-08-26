@@ -1,6 +1,8 @@
 // Package fake is the Stage 0 fake agent-runtime adapter: a first-class,
-// permanent implementation of the §5.3 Stage-1 runtime interfaces. Every
-// cross-composition gate runs it alongside internal/host/fake.
+// permanent implementation of the §5.3 runtime interfaces this package
+// currently owns (RuntimeCorrelator, ConversationProvider,
+// ConditionProvider). Every cross-composition gate runs it alongside
+// internal/host/fake.
 package fake
 
 import (
@@ -8,6 +10,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/procrastivity/duo/internal/adapter"
 	"github.com/procrastivity/duo/internal/runtime"
@@ -19,11 +22,14 @@ type Runtime struct {
 	integrationInstanceID string
 	bound                 map[string]string // external agent-session ID -> transcript ID
 	turns                 map[string][]runtime.ConversationTurn
+	conditions            map[string]runtime.ConditionObservation // external agent-session ID -> current snapshot
+	conditionStreams      []*conditionStream
 }
 
 var (
 	_ runtime.RuntimeCorrelator    = (*Runtime)(nil)
 	_ runtime.ConversationProvider = (*Runtime)(nil)
+	_ runtime.ConditionProvider    = (*Runtime)(nil)
 	_ adapter.Factory[*Runtime]    = Factory{}
 )
 
@@ -33,6 +39,7 @@ func New(integrationInstanceID string) *Runtime {
 		integrationInstanceID: integrationInstanceID,
 		bound:                 make(map[string]string),
 		turns:                 make(map[string][]runtime.ConversationTurn),
+		conditions:            make(map[string]runtime.ConditionObservation),
 	}
 }
 
@@ -150,4 +157,84 @@ func cursorOffset(after string) (int, error) {
 		return 0, fmt.Errorf("fake runtime: invalid cursor %q", after)
 	}
 	return n, nil
+}
+
+// SeedCondition registers the current condition snapshot for an external
+// agent-session ID so a later ObserveCondition / SnapshotCondition call
+// has something other than unknown to return. Test and gate setup use
+// this to script the fake's condition, including `exited`; mapping
+// HostLifecycleSource process-exit onto `exited` stays a caller concern
+// and this package does not import internal/host.
+func (r *Runtime) SeedCondition(externalAgentSessionID string, obs runtime.ConditionObservation) {
+	r.mu.Lock()
+	r.conditions[externalAgentSessionID] = obs
+	streams := append([]*conditionStream(nil), r.conditionStreams...)
+	r.mu.Unlock()
+	for _, s := range streams {
+		if s.sessionID == externalAgentSessionID {
+			s.emit(obs)
+		}
+	}
+}
+
+// ObserveCondition implements runtime.ConditionProvider. The stream
+// emits the seeded snapshot immediately (unknown when none was seeded)
+// and stays open until Close, matching HostObservationStream.
+func (r *Runtime) ObserveCondition(_ context.Context, req runtime.ConditionObservationRequest) (runtime.ConditionObservationStream, error) {
+	r.mu.Lock()
+	obs, ok := r.conditions[req.ExternalAgentSessionID]
+	if !ok {
+		obs = runtime.ConditionObservation{
+			Value:      runtime.ConditionUnknown,
+			Confidence: runtime.ConditionConfidenceUnknown,
+			Freshness:  runtime.ConditionFreshnessUnknown,
+			ComputedAt: time.Now().UTC(),
+		}
+	}
+	s := &conditionStream{
+		sessionID: req.ExternalAgentSessionID,
+		ch:        make(chan runtime.ConditionObservation, 16),
+	}
+	r.conditionStreams = append(r.conditionStreams, s)
+	r.mu.Unlock()
+	s.emit(obs)
+	return s, nil
+}
+
+// conditionStream is the fake's runtime.ConditionObservationStream
+// implementation.
+type conditionStream struct {
+	sessionID string
+	mu        sync.Mutex
+	ch        chan runtime.ConditionObservation
+	closed    bool
+}
+
+func (s *conditionStream) Observations() <-chan runtime.ConditionObservation { return s.ch }
+
+func (s *conditionStream) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	close(s.ch)
+	return nil
+}
+
+// emit is a non-blocking best-effort send, holding the same mutex Close
+// does so the two can never race into a send-on-closed-channel panic. A
+// full or closed stream drops the observation, matching the host fake's
+// lifecycle stream.
+func (s *conditionStream) emit(obs runtime.ConditionObservation) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	select {
+	case s.ch <- obs:
+	default:
+	}
 }

@@ -776,3 +776,37 @@ environment that cannot be read refuses too — `Config.ResolvePaneEnviron` is
 a seam for a different source, not an off switch. The full reasoning, the
 alternatives weighed, the known exec-time limit of `/proc/<pid>/environ`,
 and the test list are in `docs/scrub/decisions.md`'s 2026-08-23 section.
+
+## ConditionProvider (delegation-loop step 07, 2026-08-26)
+
+Stage 1 left `ConditionProvider` unscaffolded so a stub would not lock
+field shapes. The delegation-loop observation slice (handoff 25 D2) brings
+the interface in. Public streams stay cut: no condition subscribe command.
+The adapter method is still §5.3's stream:
+
+```go
+ObserveCondition(context.Context, ConditionObservationRequest) (ConditionObservationStream, error)
+```
+
+`ReadCondition` was the allowed alternative for a snapshot-only inspect.
+It was not taken. The public cut is the subscribe *command*, not the
+adapter contract. `session.inspect` reads one snapshot through
+`SnapshotCondition` (latest observation available after the first
+arrives). A later Stage 2 subscriber consumes the same stream. Transcript-
+first adapters (step 08) satisfy the stream by emitting the current
+snapshot on open and waiting until `Close`; they do not have to watch
+files or install hooks.
+
+Request fields follow `ConversationReadRequest`:
+`ExternalAgentSessionID` and `TranscriptID`. Duo `session_id`,
+`runtime_instance_id`, and view `revision` stay composer/projection
+fields. Observation fields match `$defs.condition_view_data` (`value`,
+`confidence`, `freshness`) plus adapter-fillable inspect extras
+(`ObservationID`, `EffectiveAt`, `ComputedAt`, `Reasons`). Reasons are
+degradation notes; conflict ranking is out of this milestone.
+
+Completion (`exited`) is a closed value on the observation. Mapping
+`HostLifecycleSource` process-exit onto `exited` is a caller
+(inspect/composer) mapping, not a runtime→host import. The fake seeds
+`exited` the same way it seeds `idle`, so later cross-composition tests
+have a host+runtime pair without this package importing `internal/host`.
