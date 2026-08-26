@@ -1,0 +1,7 @@
+# live Herdr+Claude launch (builder --require agent_runtime=claude)
+duo=duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+2026-08-26T18:02:14Z
+
+$ duo session launch builder --require agent_runtime=claude --host herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock --workspace /tmp/duo-dlb09/ws --output json
+{"schema":"duo.external/v1","request_id":"req_9e3b2abce22f54ca","operation":"session.launch","result":{"session_id":"ses_46dfda4a23424e3eb0380d17f1c154f3","launch_resolution_id":"lrr_17bc18488a8abfba4faacec2692c5843","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","composition":{"name":"claude_sonnet@herdr","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock","host_source":"explicit-flag","outranked_evidence":[]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0

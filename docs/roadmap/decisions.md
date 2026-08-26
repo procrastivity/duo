@@ -67,3 +67,24 @@ rather than the messaging socket); Pi `agent.prompt` returned
 `no_effect` while Herdr listed `launch_pending`; draft-hold is
 test-only on Herdr; D1's nested Duo-launched orchestrator was not
 stood up. tmux + Codex remain deferred.
+
+## 2026-08-26 — Post-launch identity-bind milestone (§3c) exit gate: PASS at named scope
+
+Evidence: `evidence/traces/launch-bind/` (gate.md maps every roadmap §3c
+gate bullet to a command transcript or test name). Binary `e02d886`.
+Live set: herdr 0.8.2, claude 2.1.246, pi 0.84.3, one disposable
+server (`dlb09`), isolated XDG homes, no live user session touched.
+
+This is the §3c exit, not Stage 2. Claude left `starting` and became
+`live` on post-launch `prompt send` (launch's 3s identity wait missed
+`agent.list`); pane showed a peer/messaging-socket `pong` with same-key
+replay and `command.idempotency_conflict` on a changed request. Show
+omits `condition` while starting (I-8) and reports it once live. Fake
+pair, `make check`, and `contracts/` (SOURCE `7162572`) are green. No
+`session.settle`; no launch `--prompt`.
+
+Limits recorded at gate time, not folded into a Stage 2 claim: live
+`conversation.list` lacks a transcript locator on Claude id-kind
+identity (JSONL existed; claim had no working directory); Pi stayed
+`launch_pending` and send expired `command.expired` rather than
+silent-pass; nested D1 remains a use-day. tmux + Codex remain deferred.

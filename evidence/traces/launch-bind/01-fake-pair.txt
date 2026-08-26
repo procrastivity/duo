@@ -1,0 +1,15 @@
+# fake-pair and cross-composition tests (D6)
+HEAD=e02d886
+2026-08-26T18:01:42Z
+
+## cli launch-bind / inspect / prompt fake-pair
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/cli	12.462s
+EXIT_CLI:0
+
+## host/fake runtime/fake conformance
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/host/fake	0.004s
+ok  	github.com/procrastivity/duo/internal/runtime/fake	0.004s
+ok  	github.com/procrastivity/duo/internal/conformance	0.009s
+EXIT_PACKAGES:0

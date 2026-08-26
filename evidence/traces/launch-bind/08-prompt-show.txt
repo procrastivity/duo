@@ -1,0 +1,15 @@
+# prompt show + replay + conflict (claude)
+duo=duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+2026-08-26T18:04:41Z
+
+$ duo prompt show cmd_511aa50aa885a47ad88b39ad9f658eba --output json
+{"schema":"duo.external/v1","request_id":"req_2d74d15ed489266c","operation":"command.inspect","result":{"command_id":"cmd_511aa50aa885a47ad88b39ad9f658eba","revision":"3","operation":"prompt.deliver","target":{"session_id":"ses_46dfda4a23424e3eb0380d17f1c154f3","runtime_instance_id":"ri_783d49c66fd74e43b5641248cd167873"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-26T18:06:17.000Z","attempts":[{"attempt_id":"catt_6c13b6bd508d6136b5903d590a8d0dec","realization":"native","started_at":"2026-08-26T18:04:17.494Z","recorded_result":"delivered"}],"milestones":{"accepted_at":"2026-08-26T18:04:17.471Z","delivered_at":"2026-08-26T18:04:17.509Z","activity_observed":false,"acknowledged":false},"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+
+## same key replay
+$ duo prompt send ses_46dfda4a23424e3eb0380d17f1c154f3 --text 'Reply with the single word pong.' --idempotency-key key-dlb09-claude-1 --output json
+{"schema":"duo.external/v1","request_id":"req_9231f9d71bedb8e1","operation":"prompt.deliver","result":{"command_id":"cmd_511aa50aa885a47ad88b39ad9f658eba","revision":"3","target":{"session_id":"ses_46dfda4a23424e3eb0380d17f1c154f3","runtime_instance_id":"ri_783d49c66fd74e43b5641248cd167873"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-26T18:06:17.000Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+replay_exit=0
+
+## changed text, same key → conflict
+$ duo prompt send ses_46dfda4a23424e3eb0380d17f1c154f3 --text 'Different text.' --idempotency-key key-dlb09-claude-1 --output json
+conflict_exit=1

@@ -1,0 +1,9 @@
+# session show + conversation list after claude prompt send (should be live)
+duo=duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+2026-08-26T18:04:41Z
+
+## duo session show claude
+{"schema":"duo.external/v1","request_id":"req_3a58f590ae4b9498","operation":"session.inspect","result":{"session_id":"ses_46dfda4a23424e3eb0380d17f1c154f3","workspace_id":"ws_b52749305ba546385db058699cccb0ff","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_783d49c66fd74e43b5641248cd167873","runtime_instance_state":"live","owner":"cli","creator":"cli","condition":{"value":"unknown","confidence":"inferred","freshness":"unknown","runtime_instance_id":"ri_783d49c66fd74e43b5641248cd167873","computed_at":"2026-08-26T18:04:41.198874206Z","reasons":["missing transcript"]},"operations":[{"operation":"prompt.deliver","availability":"available"},{"operation":"conversation.list","availability":"available"}],"attachments":[{"attachment_id":"att_60133bc33ab613baf8acf28d6ef8acdd","state":"attached","integration_instance":"herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f704eac99e1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1028557,"started_at":"2026-08-26T18:02:13.730Z"},"claim_held":true,"reattach_command":"duo session reattach ses_46dfda4a23424e3eb0380d17f1c154f3 --integration-instance herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f704eac99e1 --epoch-scope pane --container w1:p1 --process-pid 1028557 --process-started-at 2026-08-26T18:02:13.730Z"}]},"warnings":[],"features":[]}
+
+## duo conversation list claude
+conv_exit=4

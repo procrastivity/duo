@@ -1,0 +1,5 @@
+# I-1 record-before-spawn (test names from make check)
+HEAD=e02d886
+2026-08-26T18:08:02Z
+TestRecordCommitsBeforePrepareLaunch — covered by 00-make-check.txt ./internal/launchrecord and ./internal/launch
+identity bind does not unexport committed (I-1)

@@ -1,0 +1,23 @@
+# session show + conversation list after launch, before prompt send
+# I-8: identity may exist on Herdr while duo instance is still starting
+duo=duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+2026-08-26T18:04:17Z
+
+## herdr agent list (identity already named)
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"c8192c32-f94b-43d7-85f4-11957bbd7ae6"},"agent_status":"idle","cwd":"/tmp/duo-dlb09/ws","focused":true,"foreground_cwd":"/tmp/duo-dlb09/ws","interactive_ready":true,"name":"duo-main-lrr_17bc18488a8abfba4fa","pane_id":"w1:p1","revision":1,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_659f704eac99e1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},{"agent":"pi","agent_session":{"agent":"pi","kind":"path","source":"herdr:pi","value":"/home/dev/.pi/agent/sessions/--tmp-duo-dlb09-ws--/2026-08-26T18-02-27-119Z_01a03f3c-d7af-75e3-9740-118763354a47.jsonl"},"agent_status":"idle","cwd":"/tmp/duo-dlb09/ws","focused":false,"foreground_cwd":"/tmp/duo-dlb09/ws","launch_pending":true,"name":"duo-main-lrr_094f06c736666ed02ca","pane_id":"w1:p2","revision":1,"screen_detection_skipped":true,"state_change_seq":2,"tab_id":"w1:t2","terminal_id":"term_659f705a531582","terminal_title":"π - ws","terminal_title_stripped":"π - ws","workspace_id":"w1"}],"type":"agent_list"}}
+
+## duo session show claude
+$ duo session show ses_46dfda4a23424e3eb0380d17f1c154f3 --output json
+{"schema":"duo.external/v1","request_id":"req_1d48624ff27ed356","operation":"session.inspect","result":{"session_id":"ses_46dfda4a23424e3eb0380d17f1c154f3","workspace_id":"ws_b52749305ba546385db058699cccb0ff","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_783d49c66fd74e43b5641248cd167873","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"temporarily_unavailable"},{"operation":"conversation.list","availability":"temporarily_unavailable"}],"attachments":[{"attachment_id":"att_60133bc33ab613baf8acf28d6ef8acdd","state":"attached","integration_instance":"herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f704eac99e1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1028557,"started_at":"2026-08-26T18:02:13.730Z"},"claim_held":true,"reattach_command":"duo session reattach ses_46dfda4a23424e3eb0380d17f1c154f3 --integration-instance herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f704eac99e1 --epoch-scope pane --container w1:p1 --process-pid 1028557 --process-started-at 2026-08-26T18:02:13.730Z"}]},"warnings":[],"features":[]}
+
+## duo conversation list claude
+$ duo conversation list ses_46dfda4a23424e3eb0380d17f1c154f3 --output json
+conv_claude_exit=0
+
+## duo session show pi
+$ duo session show ses_57e7b6f2f447ebc4df9bc4b47b6dea9b --output json
+{"schema":"duo.external/v1","request_id":"req_e4ba862ee65de061","operation":"session.inspect","result":{"session_id":"ses_57e7b6f2f447ebc4df9bc4b47b6dea9b","workspace_id":"ws_b52749305ba546385db058699cccb0ff","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_c800b5a9d1a6259a67fe9485a265bb08","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"unsupported"},{"operation":"conversation.list","availability":"temporarily_unavailable"}],"attachments":[{"attachment_id":"att_7e85dfbf5a72c3e81c55c5fa62d0de30","state":"attached","integration_instance":"herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_659f705a531582","scope":"pane"},"container":"w1:p2","process_birth":{"pid":1029005,"started_at":"2026-08-26T18:02:25.940Z"},"claim_held":true,"reattach_command":"duo session reattach ses_57e7b6f2f447ebc4df9bc4b47b6dea9b --integration-instance herdr:/tmp/duo-dlb09/xdg-config/herdr/sessions/dlb09/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_659f705a531582 --epoch-scope pane --container w1:p2 --process-pid 1029005 --process-started-at 2026-08-26T18:02:25.940Z"}]},"warnings":[],"features":[]}
+
+## duo conversation list pi
+$ duo conversation list ses_57e7b6f2f447ebc4df9bc4b47b6dea9b --output json
+conv_pi_exit=0

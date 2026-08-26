@@ -1,0 +1,10 @@
+# pi prompt send after launch (launch_pending remainder)
+duo=duo version e02d886 (commit e02d886, built 2026-08-26T18:00:48Z)
+2026-08-26T18:04:41Z
+expires_at=2026-08-26T18:06:41.000Z
+
+## herdr agent list (pi launch_pending?)
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"c8192c32-f94b-43d7-85f4-11957bbd7ae6"},"agent_status":"idle","cwd":"/tmp/duo-dlb09/ws","focused":true,"foreground_cwd":"/tmp/duo-dlb09/ws","interactive_ready":true,"name":"duo-main-lrr_17bc18488a8abfba4fa","pane_id":"w1:p1","revision":1,"state_change_seq":4,"tab_id":"w1:t1","terminal_id":"term_659f704eac99e1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"},{"agent":"pi","agent_session":{"agent":"pi","kind":"path","source":"herdr:pi","value":"/home/dev/.pi/agent/sessions/--tmp-duo-dlb09-ws--/2026-08-26T18-02-27-119Z_01a03f3c-d7af-75e3-9740-118763354a47.jsonl"},"agent_status":"idle","cwd":"/tmp/duo-dlb09/ws","focused":false,"foreground_cwd":"/tmp/duo-dlb09/ws","launch_pending":true,"name":"duo-main-lrr_094f06c736666ed02ca","pane_id":"w1:p2","revision":1,"screen_detection_skipped":true,"state_change_seq":2,"tab_id":"w1:t2","terminal_id":"term_659f705a531582","terminal_title":"π - ws","terminal_title_stripped":"π - ws","workspace_id":"w1"}],"type":"agent_list"}}
+
+$ duo prompt send ses_57e7b6f2f447ebc4df9bc4b47b6dea9b --text 'Reply with the single word pong.' --idempotency-key key-dlb09-pi-1 --expires-at 2026-08-26T18:06:41.000Z --output json
+exit=1
