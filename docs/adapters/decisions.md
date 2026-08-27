@@ -271,13 +271,14 @@ minimality forced concrete drops, all ported straight from
   own conversation is a documented gap, not attempted.
 - A human-prompt user entry is dropped when it carries a non-nil `origin`
   whose `kind` isn't `"human"` — ported unchanged from
-  `adapter_claude.go`'s "task notifications etc." filter. This also drops
-  notes/16 §5's peer-injected turns (`origin.kind:"peer"`), whose
-  `UserPromptSubmit` hook payload is byte-shaped like a human prompt but
-  whose transcript entry alone carries the provenance. `-p` mode's
-  `origin: null` (2.1.240's churn against the 2.1.226 census, notes/16
-  §1) and interactive's `origin: {kind:"human"}` both pass unchanged,
-  since a nil `Origin` never trips the `kind != "human"` branch.
+  `adapter_claude.go`'s "task notifications etc." filter. The exception
+  is `origin.kind:"peer"` string-content entries (notes/16 §5): those
+  project as `Role:"peer"` with `OriginKind:"peer"` even when
+  `isMeta:true` (notes/53 §2). Other non-human origins and ordinary
+  `isMeta` bookkeeping entries still drop. `-p` mode's `origin: null`
+  (2.1.240's churn against the 2.1.226 census, notes/16 §1) and
+  interactive's `origin: {kind:"human"}` both pass unchanged, since a nil
+  `Origin` never trips the `kind != "human"` branch.
 - `ReadConversation` re-parses the whole transcript file on every call and
   paginates over the resulting ordered slice exactly like
   `internal/runtime/fake` does (`After` is a decimal offset, round-tripped
@@ -1076,3 +1077,23 @@ sentinel: ENOENT → `missing transcript`, else `unreadable transcript`.
 A transcript with no turn-boundary evidence still reports
 `transcript has no turn-boundary evidence` (Stage A). Ready /
 `runtimeReportsReady` and peel logic are unchanged.
+
+## 2026-08-27 — duo-d2-observe Stage E
+
+Stage E projects Claude peer-injected user entries as conversation turns
+instead of dropping them (notes/53 §2; notes/16 §5 on peer provenance and
+hooks, not list drop):
+
+- `runtime.ConversationTurn` gains `OriginKind` (empty when the runtime
+  did not name origin; zero value for Pi, fake, and human Claude turns).
+- Claude `userTurns`: string-content entries with `origin.kind:"peer"`
+  yield `Role:"peer"`, `OriginKind:"peer"`, full preamble+prompt text
+  (no stripping). `isMeta` still drops other bookkeeping entries;
+  `meta-drop-1` in `peer-inject.jsonl` stays dropped. Block-array
+  content does not project peer.
+- `conversation.list` sets `author_role` from `turn.Role` and emits
+  `origin.kind` only when `OriginKind` is non-empty (`omitempty` keeps
+  fake-pair and human turns schema-clean).
+- `ConditionProvider`, Pi adapters, and the skill are untouched — peer
+  distinction is a conversation-projection concern, not a condition or
+  hook change.

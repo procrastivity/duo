@@ -178,6 +178,72 @@ func TestSessionInspectAndConversationList_FakePair(t *testing.T) {
 	}
 }
 
+// TestConversationList_ProjectsPeerOrigin asserts conversation.list wires
+// runtime.ConversationTurn.OriginKind through author_role and origin.kind
+// without disturbing the fake-pair fixture's item count or schema shape.
+func TestConversationList_ProjectsPeerOrigin(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	root := t.TempDir()
+
+	const (
+		hostIntegration   = "fake-host"
+		agentIntegration  = "fake-runtime-peer"
+		externalSessionID = "external-agent-peer-1"
+	)
+
+	rt := runtimefake.New(agentIntegration)
+	at := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	rt.SeedTranscript(externalSessionID,
+		runtime.ConversationTurn{ID: "peer_1", Role: "peer", OriginKind: "peer", Text: "injected prompt", At: at},
+	)
+	RegisterAgentRuntime(agentIntegration, rt)
+	t.Cleanup(func() { UnregisterAgentRuntime(agentIntegration) })
+
+	code, out, errOut := runSession(t,
+		"session", "enroll", "--output", "json",
+		"--root-path", root,
+		"--integration-instance", hostIntegration,
+		"--epoch-kind", "fake.epoch",
+		"--epoch-value", "epoch-peer-1",
+		"--epoch-scope", "pane",
+		"--container", "pane-peer-1",
+		"--process-pid", "4343",
+		"--process-started-at", "2026-08-27T12:00:00.000Z",
+		"--agent-integration-instance", agentIntegration,
+		"--agent-session-id", externalSessionID,
+		"--transcript", "/tmp/fake-peer-transcript.jsonl",
+	)
+	if code != exitcode.Success {
+		t.Fatalf("enroll: exit code = %d (stderr: %s)", code, errOut)
+	}
+	var enrolled enrollEnvelope
+	if err := json.Unmarshal([]byte(out), &enrolled); err != nil {
+		t.Fatalf("enroll JSON: %v", err)
+	}
+
+	code, out, errOut = runSession(t, "conversation", "list", enrolled.Result.SessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("conversation list: exit code = %d (stderr: %s)", code, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var listed struct {
+		Result conversationListResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &listed); err != nil {
+		t.Fatalf("conversation list JSON: %v", err)
+	}
+	if len(listed.Result.Items) != 1 {
+		t.Fatalf("items = %d, want 1", len(listed.Result.Items))
+	}
+	item := listed.Result.Items[0]
+	if item.AuthorRole != "peer" {
+		t.Errorf("author_role = %q, want peer", item.AuthorRole)
+	}
+	if item.Origin == nil || item.Origin.Kind != "peer" {
+		t.Errorf("origin = %+v, want {kind:peer}", item.Origin)
+	}
+}
+
 // TestSessionShow_StartingOmitsCondition matches step-01 fixture honesty
 // (session-inspect-starting.json): runtime_instance_state is starting and
 // the condition key is absent — identity never appeared, no MarkLive.

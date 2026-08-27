@@ -32,9 +32,14 @@ type conversationListItem struct {
 	SessionID         string                  `json:"session_id"`
 	RuntimeInstanceID string                  `json:"runtime_instance_id,omitempty"`
 	AuthorRole        string                  `json:"author_role"`
+	Origin            *conversationOrigin     `json:"origin,omitempty"`
 	Blocks            []conversationTextBlock `json:"blocks"`
 	Completion        string                  `json:"completion,omitempty"`
 	ReceivedAt        string                  `json:"received_at,omitempty"`
+}
+
+type conversationOrigin struct {
+	Kind string `json:"kind"`
 }
 
 type conversationTextBlock struct {
@@ -162,6 +167,9 @@ func conversationItemFromTurn(sessionID, runtimeInstanceID string, turn runtime.
 	}
 	if !turn.At.IsZero() {
 		item.ReceivedAt = turn.At.UTC().Format(time.RFC3339Nano)
+	}
+	if turn.OriginKind != "" {
+		item.Origin = &conversationOrigin{Kind: turn.OriginKind}
 	}
 	return item
 }

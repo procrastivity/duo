@@ -96,10 +96,11 @@ type ConversationReadRequest struct {
 // docs/registry/decisions.md); this is the minimal shape a
 // ConversationProvider needs to be exercised now.
 type ConversationTurn struct {
-	ID   string
-	Role string
-	Text string
-	At   time.Time
+	ID         string
+	Role       string
+	Text       string
+	At         time.Time
+	OriginKind string // empty when the runtime did not name origin provenance
 }
 
 // ConversationBatch is ReadConversation's result.

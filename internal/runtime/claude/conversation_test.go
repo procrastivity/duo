@@ -136,8 +136,7 @@ func TestReadConversationDropsNewBookkeepingEntryTypes(t *testing.T) {
 
 // TestReadConversationProjectsPeerInject expects peer-injected isMeta user
 // lines (origin.kind:"peer") to project as peer-role turns alongside the
-// assistant reply. Today the adapter drops isMeta user entries, so this
-// test is red until step 11 implements peer projection.
+// assistant reply. Ordinary isMeta bookkeeping (meta-drop-1) stays dropped.
 func TestReadConversationProjectsPeerInject(t *testing.T) {
 	r := newConversationRuntime(t)
 	ctx := context.Background()
@@ -159,6 +158,9 @@ func TestReadConversationProjectsPeerInject(t *testing.T) {
 	if peer.Role != "peer" {
 		t.Fatalf("Turns[0].Role = %q, want peer", peer.Role)
 	}
+	if peer.OriginKind != "peer" {
+		t.Fatalf("Turns[0].OriginKind = %q, want peer", peer.OriginKind)
+	}
 	if !strings.Contains(peer.Text, "Another Claude session sent a message") || !strings.Contains(peer.Text, "Reply with the single word pong.") {
 		t.Fatalf("Turns[0].Text = %q, want peer inject preamble and prompt", peer.Text)
 	}
@@ -169,6 +171,9 @@ func TestReadConversationProjectsPeerInject(t *testing.T) {
 	}
 	if asst.Role != "assistant" {
 		t.Fatalf("Turns[1].Role = %q, want assistant", asst.Role)
+	}
+	if asst.OriginKind != "" {
+		t.Fatalf("Turns[1].OriginKind = %q, want empty", asst.OriginKind)
 	}
 	if asst.Text != "pong" {
 		t.Fatalf("Turns[1].Text = %q, want pong", asst.Text)

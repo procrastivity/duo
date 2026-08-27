@@ -150,17 +150,18 @@ func parseTranscript(path string) ([]runtime.ConversationTurn, error) {
 //     asserted directly. §5.3 has no Stage-1 concept of a subagent
 //     conversation thread; reading sidechains as their own transcripts is
 //     a recorded gap, not attempted here.
-//   - isMeta user entries are dropped (bookkeeping, not conversation).
+//   - isMeta user entries are dropped (bookkeeping, not conversation),
+//     except string-content entries whose origin.kind is "peer" — those
+//     project as peer-role turns with OriginKind "peer" (notes/16 §5,
+//     notes/53 §2; hooks, not list drop).
 //   - A human-prompt user entry (message.content is a plain string) is
 //     dropped when it carries a non-nil origin whose kind isn't "human"
-//     — task notifications, and (notes/16 §5) peer-injected turns, whose
-//     UserPromptSubmit hook payload is indistinguishable from a human's
-//     but whose transcript entry carries the tattling origin.kind:"peer".
-//     `-p` mode's origin: null (notes/16 §1, promptSource: "sdk" churn
-//     against the 2.1.226 census) and interactive's origin:
-//     {kind:"human"} both pass this check unchanged from the original
-//     adapter's logic — a nil Origin never trips the "kind != human"
-//     branch.
+//     and isn't "peer" — task notifications and similar. Peer-injected
+//     turns (origin.kind:"peer") are the exception above. `-p` mode's
+//     origin: null (notes/16 §1, promptSource: "sdk" churn against the
+//     2.1.226 census) and interactive's origin: {kind:"human"} both pass
+//     unchanged from the original adapter's logic — a nil Origin never
+//     trips the "kind != human" branch.
 //   - A tool-result user entry (message.content is a block array) yields
 //     a turn only for its "text" blocks; "tool_result" blocks are
 //     dropped. ConversationTurn's minimal shape (ID, Role, Text, At —
@@ -205,9 +206,6 @@ func parseLine(raw []byte) []runtime.ConversationTurn {
 }
 
 func userTurns(e claudeEntry, at time.Time) []runtime.ConversationTurn {
-	if e.IsMeta {
-		return nil
-	}
 	var m claudeMessage
 	if json.Unmarshal(e.Message, &m) != nil {
 		return nil
@@ -215,10 +213,20 @@ func userTurns(e claudeEntry, at time.Time) []runtime.ConversationTurn {
 
 	var text string
 	if json.Unmarshal(m.Content, &text) == nil {
+		if e.Origin != nil && e.Origin.Kind == "peer" {
+			return []runtime.ConversationTurn{{ID: e.UUID, Role: "peer", OriginKind: "peer", Text: text, At: at}}
+		}
+		if e.IsMeta {
+			return nil
+		}
 		if e.Origin != nil && e.Origin.Kind != "human" {
-			return nil // task notifications, peer-injected turns, etc. — see parseLine's doc comment.
+			return nil // task notifications, etc. — see parseLine's doc comment.
 		}
 		return []runtime.ConversationTurn{{ID: e.UUID, Role: "user", Text: text, At: at}}
+	}
+
+	if e.IsMeta {
+		return nil
 	}
 
 	var blocks []claudeBlock
