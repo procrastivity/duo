@@ -1062,3 +1062,17 @@ Stage A peels a UUID from that already-named path via
   live shape (path as session id) do not lie as `unknown` /
   `missing transcript`. Ready / `runtimeReportsReady` still pass
   `state.Session.Value` (I-15); peel sites above do not change that.
+
+## 2026-08-27 — duo-d2-observe Stage B
+
+Stage B maps `derive*` failures to honest `unknown` reasons (I-13).
+ENOENT and the existing empty-`TranscriptID` / resolve-miss paths keep
+`missing transcript` without calling derive. Pi header session-id
+mismatch uses a package sentinel in `checkHeader` and maps to
+`transcript header does not match session` via `errors.Is`. Any other
+derive error (header not JSON / wrong type / schema version; scanner;
+other open errors) maps to `unreadable transcript`. Claude has no
+sentinel: ENOENT → `missing transcript`, else `unreadable transcript`.
+A transcript with no turn-boundary evidence still reports
+`transcript has no turn-boundary evidence` (Stage A). Ready /
+`runtimeReportsReady` and peel logic are unchanged.

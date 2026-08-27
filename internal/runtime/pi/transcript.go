@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -27,6 +28,11 @@ const defaultConversationLimit = 200
 // maxTranscriptLine bounds one JSONL line. Real entries carry whole assistant
 // messages plus reasoning blobs, well past bufio.Scanner's 64 KiB default.
 const maxTranscriptLine = 8 << 20
+
+// errHeaderMismatch is the condition-reason sentinel for a transcript whose
+// header session id does not match the requested session. checkHeader wraps
+// it so ObserveCondition can map via errors.Is without string-matching.
+var errHeaderMismatch = errors.New("transcript header does not match session")
 
 // Pi's own message roles, used verbatim as the ConversationTurn role
 // vocabulary. Inventing Duo-side role names here would be a second, unpinned
@@ -235,7 +241,8 @@ func checkHeader(raw []byte, path, sessionID string) error {
 			path, h.Version, TranscriptSchemaVersion)
 	}
 	if h.ID != sessionID {
-		return fmt.Errorf("pi: transcript %s belongs to session %s, not %s", path, h.ID, sessionID)
+		return fmt.Errorf("%w: pi: transcript %s belongs to session %s, not %s",
+			errHeaderMismatch, path, h.ID, sessionID)
 	}
 	return nil
 }

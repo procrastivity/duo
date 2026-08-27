@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"time"
 
@@ -49,7 +50,7 @@ func snapshotCondition(req runtime.ConditionObservationRequest) runtime.Conditio
 	}
 	obs, err := deriveClaudeCondition(req.TranscriptID)
 	if err != nil {
-		unknown.Reasons = []string{"missing transcript"}
+		unknown.Reasons = []string{conditionReason(err)}
 		return unknown
 	}
 	obs.ComputedAt = now
@@ -66,6 +67,13 @@ const (
 	claudeTurnOpen
 	claudeTurnSettled
 )
+
+func conditionReason(err error) string {
+	if errors.Is(err, os.ErrNotExist) {
+		return "missing transcript"
+	}
+	return "unreadable transcript"
+}
 
 func deriveClaudeCondition(path string) (runtime.ConditionObservation, error) {
 	f, err := os.Open(path)

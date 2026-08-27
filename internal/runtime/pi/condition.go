@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"time"
@@ -60,6 +61,7 @@ func (r *Runtime) snapshotCondition(req runtime.ConditionObservationRequest) run
 
 	obs, err := derivePiCondition(path, sessionID)
 	if err != nil {
+		unknown.Reasons = []string{conditionReason(err)}
 		return unknown
 	}
 	obs.ComputedAt = now
@@ -92,6 +94,17 @@ type conditionEntry struct {
 			Type string `json:"type"`
 		} `json:"content"`
 	} `json:"message"`
+}
+
+func conditionReason(err error) string {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return "missing transcript"
+	case errors.Is(err, errHeaderMismatch):
+		return "transcript header does not match session"
+	default:
+		return "unreadable transcript"
+	}
 }
 
 func derivePiCondition(path, sessionID string) (runtime.ConditionObservation, error) {
