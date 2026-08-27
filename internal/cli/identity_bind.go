@@ -14,14 +14,15 @@ import (
 )
 
 // identityBindTimeout is how long launch waits for host identity and D3
-// readiness (!launch_pending). Production is 8s: identity is usually
-// already on agent.list (AgentOnPane) inside the old 3s window, but
-// launch_pending can stay true until ~2s after that window / ~6s from
-// process birth. The cap is finite — identity discovery is not the
-// bottleneck, and the wait is not unbounded. Prompt send calls the same
-// helper with the command's own deadline. Tests zero this so existing
-// launches do one poll and return; a live agent that has not reported
-// yet stays starting without hanging the CLI.
+// readiness (!launch_pending, or a runtime-offered Ready signal).
+// Production is 8s: identity is usually already on agent.list
+// (AgentOnPane) inside the old 3s window, but launch_pending can stay
+// true until ~2s after that window / ~6s from process birth. The cap is
+// finite — identity discovery is not the bottleneck, and the wait is
+// not unbounded. Prompt send calls the same helper with the command's
+// own deadline. Tests zero this so existing launches do one poll and
+// return; a live agent that has not reported yet stays starting without
+// hanging the CLI.
 const defaultIdentityBindTimeout = 8 * time.Second
 
 const defaultIdentityBindPoll = 50 * time.Millisecond
@@ -43,8 +44,9 @@ const identityBindReason = "host-reported agent-session identity after launch"
 
 // bindLaunchIdentities is the post-spawn agent-session bind: for each
 // launched leaf it polls the host for pane identity, Correlates, Binds
-// with launch-plan attestation, and MarkLive when D3 holds. It never
-// fails the launch command — the pane is already running.
+// with launch-plan attestation, and MarkLive when D3 holds. D3 is bound
+// identity and (!launch_pending or runtime Ready). It never fails the
+// launch command — the pane is already running.
 func bindLaunchIdentities(
 	ctx context.Context,
 	streams *iostreams.Streams,
@@ -81,9 +83,9 @@ func bindLaunchIdentities(
 // bindStartingIdentity polls one pane for host identity, writes
 // Authority.Bind (the late SessionStart path in domain.BindRequest) with
 // Attestation.Source = launch-plan, and MarkLive only when D3 holds:
-// bound identity and the pane past launch_pending. Callers that need a
-// longer wait (prompt send) pass a later deadline. A timeout leaves the
-// instance starting with no invented correlation.
+// bound identity and (!launch_pending or runtime Ready). Callers that
+// need a longer wait (prompt send) pass a later deadline. A timeout
+// leaves the instance starting with no invented correlation.
 func bindStartingIdentity(
 	ctx context.Context,
 	streams *iostreams.Streams,
@@ -118,7 +120,7 @@ func bindStartingIdentity(
 		if found && state.Session != nil && state.Session.Value != "" {
 			last = state
 			sawIdentity = true
-			if !state.LaunchPending {
+			if identityIsReady(ctx, runtimeID, state) {
 				return commitIdentityBind(ctx, streams, a, sess, instance, runtimeID, actor, state)
 			}
 		}
@@ -197,7 +199,7 @@ func commitIdentityBind(
 	}
 
 	out := identityBindOutcome{Bound: true}
-	if state.LaunchPending {
+	if !identityIsReady(ctx, runtimeID, state) {
 		return out
 	}
 	if inst, ok := a.Instance(instance); ok && inst.State == domain.InstanceLive {
@@ -205,12 +207,49 @@ func commitIdentityBind(
 		return out
 	}
 	evidence := "host reported agent-session identity and the pane is past launch_pending"
+	if state.LaunchPending {
+		evidence = "host reported agent-session identity and the runtime reports ready"
+	}
 	if err := a.MarkLive(ctx, instance, actor, evidence); err != nil {
 		identitySkipped(streams, sess.ID, "MarkLive: %v", err)
 		return out
 	}
 	out.Live = true
 	return out
+}
+
+// identityIsReady is D3 readiness: past launch_pending, or the runtime
+// reports Ready while still pending. Never dials when already past
+// launch_pending.
+func identityIsReady(ctx context.Context, runtimeID string, state host.AgentBindState) bool {
+	if !state.LaunchPending {
+		return true
+	}
+	return runtimeReportsReady(ctx, runtimeID, state)
+}
+
+// runtimeReportsReady asks an optional RuntimeReadyProvider. Missing
+// interface, open error, Ready error, or false → not ready. Errors never
+// fail the launch command.
+func runtimeReportsReady(ctx context.Context, runtimeID string, state host.AgentBindState) bool {
+	if state.Session == nil || state.Session.Value == "" {
+		return false
+	}
+	rt, err := openAgentRuntime(runtimeID)
+	if err != nil {
+		return false
+	}
+	provider, ok := rt.(runtime.RuntimeReadyProvider)
+	if !ok {
+		return false
+	}
+	ready, err := provider.Ready(ctx, runtime.RuntimeBinding{
+		ExternalAgentSessionID: state.Session.Value,
+	})
+	if err != nil || !ready {
+		return false
+	}
+	return true
 }
 
 // claimFromHostIdentity maps a host-reported id or path onto a RuntimeClaim

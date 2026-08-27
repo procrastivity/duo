@@ -3,15 +3,17 @@
 // plus the evidence and request/result types they share.
 //
 // This package implements RuntimeCorrelator, ConversationProvider,
-// ConditionProvider, and RuntimePromptProvider. Stage 1 shipped the first
-// two and left ConditionProvider unscaffolded; the observation slice
-// brought it in (see condition.go). Step 10 named RuntimePromptProvider
-// (see prompt.go); step 12 adds DeliverPrompt on that same interface and
-// Claude implements it over the per-session messaging socket. Pi
-// implements it over the inject extension socket (duo-pi-inject Stage A).
-// UsageProvider, RuntimeConfigurationProvider, and HarnessRenderer
-// remain out of this package — no empty interfaces, no TODO types. See
-// docs/adapters/decisions.md.
+// ConditionProvider, RuntimePromptProvider, and RuntimeReadyProvider.
+// Stage 1 shipped the first two and left ConditionProvider unscaffolded;
+// the observation slice brought it in (see condition.go). Step 10 named
+// RuntimePromptProvider (see prompt.go); step 12 adds DeliverPrompt on
+// that same interface and Claude implements it over the per-session
+// messaging socket. Pi implements it over the inject extension socket
+// (duo-pi-inject Stage A). RuntimeReadyProvider (see ready.go) is the
+// optional D3 ready arm: Pi fills it (duo-pi-inject Stage B); Claude and
+// the fake runtime do not. UsageProvider, RuntimeConfigurationProvider,
+// and HarnessRenderer remain out of this package — no empty interfaces,
+// no TODO types. See docs/adapters/decisions.md.
 //
 // RuntimeClaim, RuntimeCorrelationEvidence, and RuntimeCorrelator are
 // copied verbatim from §5.3's Go code block, including the "Runtime"

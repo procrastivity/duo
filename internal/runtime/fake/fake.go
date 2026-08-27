@@ -1,9 +1,11 @@
 // Package fake is the Stage 0 fake agent-runtime adapter: a first-class,
 // permanent implementation of the §5.3 runtime interfaces this package
 // currently owns (RuntimeCorrelator, ConversationProvider,
-// ConditionProvider, RuntimePromptProvider). Every cross-composition
-// gate runs it alongside internal/host/fake. Prompt delivery is a
-// scriptable stub (SeedPromptEffect); quiet-gate is the delivery composer.
+// ConditionProvider, RuntimePromptProvider). It does not implement
+// RuntimeReadyProvider; absence is the default D3 path. Every
+// cross-composition gate runs it alongside internal/host/fake. Prompt
+// delivery is a scriptable stub (SeedPromptEffect); quiet-gate is the
+// delivery composer.
 package fake
 
 import (

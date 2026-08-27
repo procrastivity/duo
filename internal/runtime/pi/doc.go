@@ -71,8 +71,9 @@
 // over the same socket. Delivery lives on inject/duo-inject.ts, loaded
 // per launch with `-e`; prompt.go dials that socket. The reporter
 // (duo-pi-reporter.ts) still has no delivery call — extension_test.go
-// guards that. Abort is out of this stage. This is not a Stage 2 claim
-// and does not change D3 / MarkLive.
+// guards that. Abort is out of this stage. This is not a Stage 2 claim.
+// Stage B implements RuntimeReadyProvider via ReadInjectIdle as D3's
+// additional ready arm; Claude's D3 is unchanged.
 //
 // See docs/adapters/decisions.md for the decisions behind these choices and
 // their evidence.

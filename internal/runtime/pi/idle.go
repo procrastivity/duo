@@ -7,7 +7,15 @@ import (
 	"errors"
 	"net"
 	"time"
+
+	"github.com/procrastivity/duo/internal/runtime"
 )
+
+// Ready implements runtime.RuntimeReadyProvider by reading inject
+// connect-line idle. It does not send input.
+func (r *Runtime) Ready(ctx context.Context, binding runtime.RuntimeBinding) (bool, error) {
+	return ReadInjectIdle(ctx, binding.ExternalAgentSessionID)
+}
 
 // ReadInjectIdle dials the inject socket for sessionID, reads one
 // connect-line greeting, and reports whether idle is JSON-boolean true.

@@ -978,6 +978,18 @@ via `promptpath.Selector` is unchanged. D3 / `commitIdentityBind` is
 unchanged. Stage B idle is the connect-line `idle` field
 (`ctx.isIdle()`), not `agent_settled` on this socket.
 
+## RuntimeReadyProvider (duo-pi-inject Stage B, 2026-08-27)
+
+`RuntimeReadyProvider` is an optional independent interface (not a
+method on `RuntimePromptProvider`). Pi fills it from the inject
+connect-line `idle` field via `ReadInjectIdle`. Claude and the fake
+runtime do not implement it; absence leaves D3 as host
+`!LaunchPending` only. The bind pass type-asserts after
+`openAgentRuntime`, the same pattern as `RuntimeCorrelator`. Ready is
+not a rank-2 reporter and is not an `agent_settled` push.
+`PromptPath` still does not dial. Host `agent_status` is unused for
+this arm.
+
 ## Prompt arbitration composer (delegation-loop step 13, 2026-08-26)
 
 `internal/delivery` is the composer between the step-10 command kernel
