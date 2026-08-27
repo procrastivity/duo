@@ -69,6 +69,13 @@ func TestObserveConditionTable(t *testing.T) {
 			fresh:   runtime.ConditionFreshnessFresh,
 		},
 		{
+			name:    "path-as-session-id with matching transcript (Herdr stores path as both)",
+			session: basicFixture,
+			path:    basicFixture,
+			want:    runtime.ConditionIdle,
+			fresh:   runtime.ConditionFreshnessFresh,
+		},
+		{
 			name:    "forked settled",
 			session: forkedSession,
 			path:    forkedFixture,

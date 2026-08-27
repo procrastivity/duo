@@ -473,7 +473,7 @@ func TestClaimFromHostIdentityMapsKind(t *testing.T) {
 		t.Errorf("id kind WorkingDirectory = %q, want workspace root", claim.WorkingDirectory)
 	}
 
-	path := "/tmp/pi/2026-08-26_sess.jsonl"
+	path := "/tmp/pi/session.jsonl"
 	p := host.AgentSessionIdentity{Kind: host.AgentSessionKindPath, Value: path}
 	claim, ref = claimFromHostIdentity("pi", p, cwd)
 	if ref.SessionID != path || claim.ExternalAgentSessionID != path {
@@ -484,6 +484,95 @@ func TestClaimFromHostIdentityMapsKind(t *testing.T) {
 	}
 	if claim.WorkingDirectory != cwd {
 		t.Errorf("path kind WorkingDirectory = %q, want workspace root", claim.WorkingDirectory)
+	}
+}
+
+const (
+	piBasicSessionUUID = "019fe2b8-12ed-73ac-b6ca-4b3b9a0b6c80"
+	piBasicFixtureSrc  = "../runtime/pi/testdata/basic-with-resume_2026-08-08T18-52-22-125Z_019fe2b8-12ed-73ac-b6ca-4b3b9a0b6c80.jsonl"
+)
+
+func copyPiBasicFixtureToTemp(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(piBasicFixtureSrc)
+	if err != nil {
+		t.Fatalf("ReadFile %s: %v", piBasicFixtureSrc, err)
+	}
+	path := filepath.Join(t.TempDir(), filepath.Base(piBasicFixtureSrc))
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	return path
+}
+
+func TestClaimFromHostIdentityPeelsPathKindUUID(t *testing.T) {
+	cwd := "/tmp/duo-ws"
+
+	peelable := copyPiBasicFixtureToTemp(t)
+	p := host.AgentSessionIdentity{Kind: host.AgentSessionKindPath, Value: peelable}
+	claim, ref := claimFromHostIdentity("pi", p, cwd)
+	if ref.SessionID != piBasicSessionUUID {
+		t.Errorf("peelable ref.SessionID = %q, want %q", ref.SessionID, piBasicSessionUUID)
+	}
+	if claim.ExternalAgentSessionID != piBasicSessionUUID {
+		t.Errorf("peelable ExternalAgentSessionID = %q, want %q", claim.ExternalAgentSessionID, piBasicSessionUUID)
+	}
+	if claim.TranscriptPath != peelable {
+		t.Errorf("peelable TranscriptPath = %q, want %q", claim.TranscriptPath, peelable)
+	}
+
+	emptyPeel := "/tmp/pi/session.jsonl"
+	ep := host.AgentSessionIdentity{Kind: host.AgentSessionKindPath, Value: emptyPeel}
+	claim, ref = claimFromHostIdentity("pi", ep, cwd)
+	if ref.SessionID != emptyPeel || claim.ExternalAgentSessionID != emptyPeel {
+		t.Fatalf("empty-peel mapping: claim=%+v ref=%+v", claim, ref)
+	}
+	if claim.TranscriptPath != emptyPeel {
+		t.Errorf("empty-peel TranscriptPath = %q, want %q", claim.TranscriptPath, emptyPeel)
+	}
+}
+
+func TestLaunchPeelablePathIdentityBindsUUIDAsAgentSession(t *testing.T) {
+	h := newPiBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	path := copyPiBasicFixtureToTemp(t)
+	ident := host.AgentSessionIdentity{
+		Source: "herdr:pi",
+		Agent:  "pi",
+		Kind:   host.AgentSessionKindPath,
+		Value:  path,
+	}
+
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:          &ident,
+		LaunchPending:    false,
+		InteractiveReady: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, _ := h.authority.Instance(sess.Current)
+	if inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s, want live", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok {
+		t.Fatal("agentBindingsFor failed for peelable path-shaped identity")
+	}
+	if bindings.ExternalAgentSessionID != piBasicSessionUUID {
+		t.Errorf("agent.session value = %q, want peeled uuid %q (not the path)", bindings.ExternalAgentSessionID, piBasicSessionUUID)
+	}
+	if bindings.TranscriptID != path {
+		t.Errorf("transcript = %q, want absolute path %q", bindings.TranscriptID, path)
+	}
+	if bindings.IntegrationInstance != "pi" {
+		t.Errorf("integration instance = %q, want pi", bindings.IntegrationInstance)
 	}
 }
 

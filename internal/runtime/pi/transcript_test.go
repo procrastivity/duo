@@ -62,6 +62,22 @@ func assertTurns(t *testing.T, got []runtime.ConversationTurn, want []wantTurn) 
 // The basic fixture is one `pi -p` run plus a `pi -c -p` resume appended to
 // the same file: the resume's turns must come back from the same read, with
 // no second header in the way.
+// Herdr path-kind identity stores the JSONL path as agent.session; after
+// peel that must still read when TranscriptID names the same file.
+func TestReadConversationPathAsExternalAgentSessionID(t *testing.T) {
+	r := runtimepi.New("integration-1")
+	batch, err := r.ReadConversation(context.Background(), runtime.ConversationReadRequest{
+		ExternalAgentSessionID: basicFixture,
+		TranscriptID:           basicFixture,
+	})
+	if err != nil {
+		t.Fatalf("ReadConversation: %v", err)
+	}
+	if len(batch.Turns) != 5 {
+		t.Fatalf("got %d turns, want 5", len(batch.Turns))
+	}
+}
+
 func TestReadConversationBasicFixture(t *testing.T) {
 	r := runtimepi.New("integration-1")
 	batch := readAll(t, r, basicSession, basicFixture)
