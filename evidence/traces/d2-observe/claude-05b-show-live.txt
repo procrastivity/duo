@@ -1,0 +1,8 @@
+# session show after live poll (up to 20s)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+elapsed_ms=0
+{"schema":"duo.external/v1","request_id":"req_ea795bb9b619c7df","operation":"session.inspect","result":{"session_id":"ses_8bf71fa646fe720e7df8dc22328713d8","workspace_id":"ws_3896536b3e4ab1567d2ec96c03bc2c0d","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_5954f3dd9281e7c3d7433e708b12895a","runtime_instance_state":"live","owner":"cli","creator":"cli","condition":{"value":"unknown","confidence":"inferred","freshness":"unknown","runtime_instance_id":"ri_5954f3dd9281e7c3d7433e708b12895a","computed_at":"2026-08-27T07:42:17.773508914Z","reasons":["missing transcript"]},"operations":[{"operation":"prompt.deliver","availability":"available"},{"operation":"conversation.list","availability":"available"}],"attachments":[{"attachment_id":"att_26335ee6fed7e406778effdcd98d1b4d","state":"attached","integration_instance":"herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_65a027959f6ff1","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1872423,"started_at":"2026-08-27T07:42:11.810Z"},"claim_held":true,"reattach_command":"duo session reattach ses_8bf71fa646fe720e7df8dc22328713d8 --integration-instance herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_65a027959f6ff1 --epoch-scope pane --container w1:p1 --process-pid 1872423 --process-started-at 2026-08-27T07:42:11.810Z"}]},"warnings":[],"features":[]}
+

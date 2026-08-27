@@ -1,0 +1,16 @@
+# store dump (correlations, commands, instance.state)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+$ python3 /home/dev/Code/duo-vnext/evidence/traces/d2-observe/dump-store.py /tmp/duo-d2o02/xdg-data/duo/duo.db
+## correlations
+{"kind":"correlation.claimed","session_id":null,"instance_id":null,"correlation":{"id":"corr_29ef4fda253c7f169f1b731a5ab11b66","target_kind":"instance","target_id":"ri_5954f3dd9281e7c3d7433e708b12895a","external_kind":"agent.session","external_value":"79f3011b-8a51-40f7-819e-0ab9a7d7964b","scope":"claude-code","source":"launch-plan","evidence":"attested agent-runtime report","first_verified_at":"2026-08-27T07:42:17.665Z","last_verified_at":"2026-08-27T07:42:17.665Z","status":"active"}}
+{"kind":"correlation.claimed","session_id":null,"instance_id":null,"correlation":{"id":"corr_7f9b8750f49b8ffd25bf2a908458d6d3","target_kind":"instance","target_id":"ri_5954f3dd9281e7c3d7433e708b12895a","external_kind":"transcript","external_value":"/home/dev/.claude/projects/-tmp-duo-d2o02-ws/79f3011b-8a51-40f7-819e-0ab9a7d7964b.jsonl","scope":"claude-code","source":"launch-plan","evidence":"reported with the attested agent-runtime session","first_verified_at":"2026-08-27T07:42:17.665Z","last_verified_at":"2026-08-27T07:42:17.665Z","status":"active"}}
+## commands
+## instance.state
+{"id":"fact_68784dd8a2a58190b26d4072352df0d5","instance_id":"ri_5954f3dd9281e7c3d7433e708b12895a","state":"live","reason":null,"evidence":"host reported agent-session identity and the pane is past launch_pending"}
+exit=0
+
+host_jsonl_from_transcript_correlation=/home/dev/.claude/projects/-tmp-duo-d2o02-ws/79f3011b-8a51-40f7-819e-0ab9a7d7964b.jsonl
+

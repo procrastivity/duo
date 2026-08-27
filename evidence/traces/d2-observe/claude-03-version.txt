@@ -1,0 +1,25 @@
+# tool versions for Stage C live gate (claude)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+$ duo_cmd version
+duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+exit=0
+
+$ herdr --version
+herdr 0.8.2
+exit=0
+
+$ pi --version
+0.84.3
+exit=0
+
+$ claude --version
+2.1.246 (Claude Code)
+exit=0
+
+$ git -C ~/Code/duo-vnext rev-parse HEAD
+071c45b2b9253570c6196226f41aa3dc14f8554c
+exit=0
+

@@ -1,0 +1,130 @@
+# observe poll after prompt send (up to 60s)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+--- sample ---
+elapsed_ms=0
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=missing transcript
+list_exit=4
+list_items=0
+host_jsonl_exists=false
+host_jsonl_bytes=0
+action=CONTINUE
+bytes_positive=false
+idle_or_working=false
+list_success=false
+
+--- sample ---
+elapsed_ms=200
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=400
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=600
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=800
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=1000
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=1200
+state=live
+view=recovering
+condition.value=unknown
+condition.reasons=transcript has no turn-boundary evidence
+list_exit=0
+list_items=0
+host_jsonl_exists=true
+host_jsonl_bytes=23898
+action=CONTINUE
+bytes_positive=true
+idle_or_working=false
+list_success=true
+
+--- sample ---
+elapsed_ms=1400
+state=live
+view=recovering
+condition.value=idle
+condition.reasons=inferred from system/turn_duration
+list_exit=0
+list_items=1
+host_jsonl_exists=true
+host_jsonl_bytes=26268
+action=PASS
+bytes_positive=true
+idle_or_working=true
+list_success=true
+
+first_bytes_ms=200
+first_idle_or_working_ms=1400
+first_list_success_ms=200
+outcome=PASS
+

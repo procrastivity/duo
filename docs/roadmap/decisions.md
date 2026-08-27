@@ -110,3 +110,36 @@ Limits recorded at gate time: after deliver Herdr's Pi row had
 `launch_pending` cleared (`screen_detection_skipped` still true) —
 recorded honestly, not a Herdr-fix claim. Nested D1 remains a
 use-day. tmux + Codex remain deferred.
+
+## 2026-08-27 — duo-d2-observe Stage C live observe gate
+
+Evidence: `evidence/traces/d2-observe/` (`gate.md` maps every Stage C
+bullet). Binary `728dbdd-dirty` (`-dirty` is unrelated
+`fixture-reconcile.json`). Live set: herdr 0.8.2, pi 0.84.3, Claude
+Code 2.1.246. Disposable servers `d2o01` (Pi) and `d2o02` (Claude),
+isolated XDG including `XDG_RUNTIME_DIR`, no live user session
+touched.
+
+This is duo-d2-observe Stage C, not Stage 2. After launch is `live`
+and one `prompt send` (`Reply with the single word pong.`):
+
+- Herdr+Pi: `session show` `idle` / `inferred from stopReason stop`
+  at 2000ms; `conversation list` returns the user prompt and
+  assistant `pong`. `agent.session` correlation is UUID
+  `01a04229-…` (I-11); `transcript` is the host JSONL path. Early
+  samples are `unknown` / `missing transcript` only while the file
+  is ENOENT — not the pi-inject header-mismatch-as-missing lie.
+- Herdr+Claude: `idle` / `inferred from system/turn_duration` at
+  1400ms; list returns `pong`. Wait budget for Stage D:
+  `first_bytes_ms=200`, `first_list_success_ms=200` (exit 0, 0
+  items), `first_idle_or_working_ms=1400` (pong present).
+- `view: recovering` on every `live` inspect; `condition` is
+  present (I-8 omit is starting-only). Fake pair, `make check`, and
+  `contracts/` are green.
+
+Limits recorded at gate time: first-poll `unknown` is still real
+(Pi ~2s, Claude no-boundary until the assistant turn). Stage D must
+poll until turn text, not until conversation-list exit 0, and must
+name a cap that also covers the slower `duo-bind-remainders` Claude
+wait (~15s), not only this gate's 2s. Nested D1 remains a use-day.
+tmux + Codex remain deferred. notes/52 stays unsubmitted.

@@ -1,0 +1,9 @@
+# conversation list final
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+$ duo_cmd conversation list ses_8bf71fa646fe720e7df8dc22328713d8 --output json
+{"schema":"duo.external/v1","request_id":"req_c264a93cb9e13ab6","operation":"conversation.list","result":{"session_id":"ses_8bf71fa646fe720e7df8dc22328713d8","items":[{"record_id":"9e687d02-c91b-49fb-86b4-bbe4d1af2276","session_id":"ses_8bf71fa646fe720e7df8dc22328713d8","runtime_instance_id":"ri_5954f3dd9281e7c3d7433e708b12895a","author_role":"assistant","blocks":[{"position":"0","type":"text","content":{"text":"pong"}}],"completion":"source_record_complete","received_at":"2026-08-27T07:42:24.38Z"}],"next_page":"1"},"warnings":[],"features":[]}
+exit=0
+

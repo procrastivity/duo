@@ -1,0 +1,15 @@
+# herdr agent list (claude row fields)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+$ herdr_cmd agent list
+{"id":"cli:agent:list","result":{"agents":[{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"79f3011b-8a51-40f7-819e-0ab9a7d7964b"},"agent_status":"idle","cwd":"/tmp/duo-d2o02/ws","focused":true,"foreground_cwd":"/tmp/duo-d2o02/ws","interactive_ready":true,"name":"duo-main-lrr_f1f0a8962600f607d6e","pane_id":"w1:p1","revision":1,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_65a027959f6ff1","terminal_title":"✳ Claude Code","terminal_title_stripped":"Claude Code","workspace_id":"w1"}],"type":"agent_list"}}
+exit=0
+
+agent_session_value=79f3011b-8a51-40f7-819e-0ab9a7d7964b
+pane_id=w1:p1
+launch_pending=False
+agent_status=idle
+host_jsonl=
+

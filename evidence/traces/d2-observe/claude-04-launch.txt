@@ -1,0 +1,9 @@
+# live Herdr+claude launch (builder --require agent_runtime=claude)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:42:12Z
+isolation: HERDR_SESSION=d2o02 scratch=/tmp/duo-d2o02 host=herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock runtime=claude
+
+$ duo_cmd session launch builder --require agent_runtime=claude --host "herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock" --workspace /tmp/duo-d2o02/ws --output json
+{"schema":"duo.external/v1","request_id":"req_86e830a4678dbe41","operation":"session.launch","result":{"session_id":"ses_8bf71fa646fe720e7df8dc22328713d8","launch_resolution_id":"lrr_f1f0a8962600f607d6e9d670dd80c69d","selection":"ordered","leaves":[{"name":"main","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","composition":{"name":"claude_sonnet@herdr","variant":"claude_sonnet","agent_runtime":"claude","model_line":"sonnet-5","model_family":"claude","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-d2o02/xdg-config/herdr/sessions/d2o02/herdr.sock","host_source":"explicit-flag","outranked_evidence":[{"source":"ambient-env","captures":[{"name":"HERDR_SESSION","value":"terminal-multiplexers","captured_at":"2026-08-27T07:42:12.625Z"}],"detail":"outranked by explicit-flag"}]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0
+
