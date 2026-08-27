@@ -1,0 +1,6 @@
+# contracts/ clean vs working tree
+HEAD=cd90fe6
+2026-08-27T00:35:07Z
+PLANNING_HEAD=08c364a
+SOURCE=71625725946c3df3bfd554e47e0738c32fc90f5d
+EXIT:0

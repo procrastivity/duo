@@ -1,0 +1,21 @@
+# fake-pair and cross-composition tests (D6 + Stage B/C pins)
+HEAD=cd90fe6
+2026-08-27T00:35:07Z
+
+Covered: TestSessionInspectAndConversationList_FakePair,
+TestLaunchInspectAndConversationList_FakePair,
+TestPromptSend_DeliveredFakePair, TestPromptSend_ReplaySameDigest,
+TestPromptSend_IdempotencyConflict, TestPiLaunchPendingIdleMarksLive,
+TestLaunchPendingDoesNotMarkLive, TestPiSelectsRuntimePath.
+
+## cli fake-pair + pi inject / D3 pins
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/cli	26.084s
+EXIT_CLI:0
+
+## host/fake runtime/fake conformance
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/host/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/runtime/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/conformance	(cached)
+EXIT_PACKAGES:0

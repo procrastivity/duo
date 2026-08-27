@@ -1,0 +1,48 @@
+# make check — Stage C green-suite
+HEAD=cd90fe6
+2026-08-27T00:35:07Z
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+golangci-lint run
+0 issues.
+go test ./...
+?   	github.com/procrastivity/duo/assets	[no test files]
+?   	github.com/procrastivity/duo/cmd/duo	[no test files]
+ok  	github.com/procrastivity/duo/contracts	(cached)
+ok  	github.com/procrastivity/duo/internal/adapter	0.122s
+?   	github.com/procrastivity/duo/internal/asset	[no test files]
+?   	github.com/procrastivity/duo/internal/buildinfo	[no test files]
+ok  	github.com/procrastivity/duo/internal/cli	28.552s
+?   	github.com/procrastivity/duo/internal/cliflags	[no test files]
+ok  	github.com/procrastivity/duo/internal/config	0.013s
+ok  	github.com/procrastivity/duo/internal/conformance	(cached)
+ok  	github.com/procrastivity/duo/internal/delivery	3.348s
+ok  	github.com/procrastivity/duo/internal/doctor	1.078s
+ok  	github.com/procrastivity/duo/internal/domain	10.254s
+ok  	github.com/procrastivity/duo/internal/domain/storerepo	1.523s
+?   	github.com/procrastivity/duo/internal/duoerr	[no test files]
+ok  	github.com/procrastivity/duo/internal/exitcode	(cached)
+?   	github.com/procrastivity/duo/internal/host	[no test files]
+ok  	github.com/procrastivity/duo/internal/host/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/host/herdr	0.783s
+ok  	github.com/procrastivity/duo/internal/iostreams	(cached)
+ok  	github.com/procrastivity/duo/internal/launch	(cached)
+ok  	github.com/procrastivity/duo/internal/launch/materialize	(cached)
+ok  	github.com/procrastivity/duo/internal/launchrecord	0.495s
+ok  	github.com/procrastivity/duo/internal/manifest	(cached)
+ok  	github.com/procrastivity/duo/internal/promptpath	(cached)
+ok  	github.com/procrastivity/duo/internal/registry	0.047s
+ok  	github.com/procrastivity/duo/internal/runtime	(cached)
+ok  	github.com/procrastivity/duo/internal/runtime/claude	0.115s
+ok  	github.com/procrastivity/duo/internal/runtime/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/runtime/pi	0.034s
+ok  	github.com/procrastivity/duo/internal/scrub	0.055s
+?   	github.com/procrastivity/duo/internal/selftest	[no test files]
+ok  	github.com/procrastivity/duo/internal/sessioncore	(cached)
+ok  	github.com/procrastivity/duo/internal/store	4.631s
+?   	github.com/procrastivity/duo/internal/surface	[no test files]
+EXIT:0
+
+## make build + version
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+CGO_ENABLED=0 go build -ldflags "-X main.version=cd90fe6-dirty -X main.commit=cd90fe6 -X main.date=2026-08-27T00:36:21Z" -o bin/duo ./cmd/duo
+duo version cd90fe6-dirty (commit cd90fe6, built 2026-08-27T00:36:21Z)
