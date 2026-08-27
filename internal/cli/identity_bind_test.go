@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,8 +13,10 @@ import (
 	"github.com/procrastivity/duo/internal/host"
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/runtime"
 	"github.com/procrastivity/duo/internal/runtime/claude"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
+	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
 
 func TestMain(m *testing.M) {
@@ -208,6 +211,171 @@ func TestLaunchPathIdentityBindsAsAgentSession(t *testing.T) {
 	}
 	if bindings.ExternalAgentSessionID != path {
 		t.Errorf("agent.session value = %q, want the named path (not a directory scan)", bindings.ExternalAgentSessionID)
+	}
+}
+
+const piInjectSessionID = "01a02c19-65e1-7346-b418-82ab0d32942c"
+
+func shortRuntimeDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "pi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
+// startLoopingIdleGreetStandIn accepts until cleanup and writes one NDJSON
+// greeting line per connect. identity_bind may dial Ready twice (poll +
+// commit).
+func startLoopingIdleGreetStandIn(t *testing.T, sockPath, greetLine string) {
+	t.Helper()
+	ln, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("listen %s: %v", sockPath, err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+				_, _ = c.Write([]byte(greetLine + "\n"))
+			}(conn)
+		}
+	}()
+	t.Cleanup(func() {
+		_ = ln.Close()
+		<-done
+	})
+}
+
+func setupPiInjectSocket(t *testing.T, sessionID string) string {
+	t.Helper()
+	sockPath, err := runtimepi.InjectSocketPath(sessionID)
+	if err != nil {
+		t.Fatalf("InjectSocketPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(sockPath), 0o700); err != nil {
+		t.Fatalf("mkdir inject socket dir: %v", err)
+	}
+	return sockPath
+}
+
+func piPendingPathIdentity() host.AgentSessionIdentity {
+	path := "/tmp/sessions/--cwd--/2026-08-27T00-00-00-000Z_" + piInjectSessionID + ".jsonl"
+	return host.AgentSessionIdentity{
+		Source: "herdr:pi",
+		Agent:  "pi",
+		Kind:   host.AgentSessionKindPath,
+		Value:  path,
+	}
+}
+
+func TestFakeRuntimeDoesNotOfferReady(t *testing.T) {
+	var rt any = runtimefake.New("claude-code")
+	if _, ok := rt.(runtime.RuntimeReadyProvider); ok {
+		t.Fatal("fake runtime must not implement RuntimeReadyProvider")
+	}
+}
+
+func TestPiLaunchPendingIdleMarksLive(t *testing.T) {
+	dir := shortRuntimeDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	h := newPiBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	ident := piPendingPathIdentity()
+	sockPath := setupPiInjectSocket(t, ident.Value)
+	startLoopingIdleGreetStandIn(t, sockPath, `{"idle":true}`)
+
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:       &ident,
+		LaunchPending: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, _ := h.authority.Instance(sess.Current)
+	if inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s, want live while launch_pending and idle (test body did not call MarkLive)", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok || bindings.ExternalAgentSessionID != ident.Value {
+		t.Fatalf("want named agent.session bound to path, got ok=%v %+v", ok, bindings)
+	}
+}
+
+func TestPiLaunchPendingNotIdleStaysStarting(t *testing.T) {
+	dir := shortRuntimeDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	h := newPiBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	ident := piPendingPathIdentity()
+	sockPath := setupPiInjectSocket(t, ident.Value)
+	startLoopingIdleGreetStandIn(t, sockPath, `{"idle":false}`)
+
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:       &ident,
+		LaunchPending: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, _ := h.authority.Instance(sess.Current)
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting while launch_pending and not idle", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok || bindings.ExternalAgentSessionID != ident.Value {
+		t.Fatalf("want named agent.session while still starting, got ok=%v %+v", ok, bindings)
+	}
+}
+
+func TestPiLaunchPendingNoListenerStaysStarting(t *testing.T) {
+	dir := shortRuntimeDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	h := newPiBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	ident := piPendingPathIdentity()
+	_ = setupPiInjectSocket(t, ident.Value) // mkdir parent only; no listener
+
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:       &ident,
+		LaunchPending: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, _ := h.authority.Instance(sess.Current)
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting with no inject listener", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok || bindings.ExternalAgentSessionID != ident.Value {
+		t.Fatalf("want named agent.session while still starting, got ok=%v %+v", ok, bindings)
 	}
 }
 
