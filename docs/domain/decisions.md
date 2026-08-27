@@ -475,3 +475,17 @@ session and starting instance). `Bind` is already the late
 SessionStart path; host-reported agent-session identity is evidence on
 the claim, not a fourth `BindingSource`. Do not use `instance-claim`
 for this automatic bind.
+
+## 2026-08-27 — D3 idle-as-ready arm (duo-pi-inject Stage B)
+
+MarkLive after the post-launch bind still requires bound identity
+**and** D3 readiness. The default ready arm is the pane past
+`launch_pending` (handoff 26 D3; I-12 for Claude). duo-pi-inject
+Stage B adds one additional arm: a runtime-offered Ready signal,
+filled first by Pi from the inject connect-line boolean `idle`
+(`ctx.isIdle()`), readable by dialing the same convention path
+`DeliverPrompt` uses. The bind pass does not name a runtime kind;
+adapters that do not implement the helper leave D3 as host
+`!launch_pending` only. Do not MarkLive from `settledBirth` /
+process handover (notes/46). Do not treat host `agent_status` as
+this arm. This is not Stage 2.

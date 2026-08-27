@@ -420,3 +420,13 @@ keeps the interim skill at three verbs. While a runtime instance is
 (`queue_until_safe` already exists). Prefer that implicit wait on
 send. Do not add `duo session settle` unless a later implementation
 step earns a named, testable verb for the wait.
+
+## 2026-08-27 — Prompt wait unblocks on D3 idle-as-ready
+(duo-pi-inject Stage B)
+
+`duo prompt send` still waits or stays queued until the instance
+is `live`. Live may now be reached while the host still reports
+`launch_pending` when the runtime reports Ready (Pi inject
+`idle`). Claude-shaped pending still stays `starting` until
+`launch_pending` clears. No `duo session settle` verb. Not Stage
+2.
