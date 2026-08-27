@@ -188,6 +188,23 @@ var table = []Descriptor{
 		MCPTool:        "",
 		Route:          nil,
 	},
+	{
+		// "config.show" is an authored operation name for decision-05 /
+		// projection-contracts' `duo config show` verb. It is a local document
+		// read with no grant required — the same permission-gap flag as
+		// config.migrate. Not a dogfood-milestone row, so Milestone stays
+		// the zero value (false).
+		Name:           "config.show",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    nil,
+		Idempotency:    IdempotencyNotApplicable,
+		Audit:          AuditNone,
+		CLI:            []string{"config", "show"},
+		MCPTool:        "",
+		Route:          nil,
+	},
 
 	// --- duo.config/v3 workspace<->host correlation verbs ---
 	//
