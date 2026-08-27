@@ -3,6 +3,7 @@ package claude_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/runtime"
@@ -129,6 +130,53 @@ func TestReadConversationDropsNewBookkeepingEntryTypes(t *testing.T) {
 	for i, text := range want {
 		if batch.Turns[i].Role != "user" || batch.Turns[i].Text != text {
 			t.Fatalf("turn %d = %+v, want Role=user Text=%q", i, batch.Turns[i], text)
+		}
+	}
+}
+
+// TestReadConversationProjectsPeerInject expects peer-injected isMeta user
+// lines (origin.kind:"peer") to project as peer-role turns alongside the
+// assistant reply. Today the adapter drops isMeta user entries, so this
+// test is red until step 11 implements peer projection.
+func TestReadConversationProjectsPeerInject(t *testing.T) {
+	r := newConversationRuntime(t)
+	ctx := context.Background()
+
+	batch, err := r.ReadConversation(ctx, runtime.ConversationReadRequest{
+		TranscriptID: filepath.Join("testdata", "claude", "peer-inject.jsonl"),
+	})
+	if err != nil {
+		t.Fatalf("ReadConversation: %v", err)
+	}
+	if len(batch.Turns) != 2 {
+		t.Fatalf("got %d turns, want 2: %+v", len(batch.Turns), batch.Turns)
+	}
+
+	peer := batch.Turns[0]
+	if peer.ID != "peer-user-1" {
+		t.Fatalf("Turns[0].ID = %q, want peer-user-1", peer.ID)
+	}
+	if peer.Role != "peer" {
+		t.Fatalf("Turns[0].Role = %q, want peer", peer.Role)
+	}
+	if !strings.Contains(peer.Text, "Another Claude session sent a message") || !strings.Contains(peer.Text, "Reply with the single word pong.") {
+		t.Fatalf("Turns[0].Text = %q, want peer inject preamble and prompt", peer.Text)
+	}
+
+	asst := batch.Turns[1]
+	if asst.ID != "peer-asst-1" {
+		t.Fatalf("Turns[1].ID = %q, want peer-asst-1", asst.ID)
+	}
+	if asst.Role != "assistant" {
+		t.Fatalf("Turns[1].Role = %q, want assistant", asst.Role)
+	}
+	if asst.Text != "pong" {
+		t.Fatalf("Turns[1].Text = %q, want pong", asst.Text)
+	}
+
+	for _, turn := range batch.Turns {
+		if turn.ID == "meta-drop-1" {
+			t.Fatalf("meta-drop-1 must not appear as a turn: %+v", batch.Turns)
 		}
 	}
 }
