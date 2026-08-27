@@ -1,0 +1,23 @@
+# pi transcript excerpt (host-named path only)
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+transcript_path=/home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl
+
+$ head -20 /home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl
+{"type":"session","version":3,"id":"01a040a6-de81-7e94-bf74-54b18552d075","timestamp":"2026-08-27T00:37:52.897Z","cwd":"/tmp/duo-dpi01/ws"}
+{"type":"model_change","id":"bc426e57","parentId":null,"timestamp":"2026-08-27T00:37:53.263Z","provider":"openai-codex","modelId":"gpt-5.6-luna"}
+{"type":"thinking_level_change","id":"7a070236","parentId":"bc426e57","timestamp":"2026-08-27T00:37:53.263Z","thinkingLevel":"high"}
+{"type":"message","id":"a08f9270","parentId":"7a070236","timestamp":"2026-08-27T00:38:02.550Z","message":{"role":"user","content":[{"type":"text","text":"Reply with the single word pong."}],"timestamp":1787791082534}}
+{"type":"message","id":"d4c7bbe5","parentId":"a08f9270","timestamp":"2026-08-27T00:38:05.815Z","message":{"role":"assistant","content":[{"type":"text","text":"pong","textSignature":"{\"v\":1,\"id\":\"msg_078db8aec6a8418f016a8f86edb83487d2b0d03b0a434f900f\",\"phase\":\"final_answer\"}"}],"api":"openai-codex-responses","provider":"openai-codex","model":"gpt-5.6-luna","usage":{"input":2444,"output":5,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2449,"cost":{"input":0.0004888000000000001,"output":0.000006,"cacheRead":0,"cacheWrite":0,"total":0.0004948000000000001}},"stopReason":"stop","timestamp":1787791082569,"responseId":"resp_078db8aec6a8418f016a8f86ed136087d282f05670108bf2c6","rawStopReason":"completed"}}
+exit=0
+
+$ tail -5 /home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl
+{"type":"session","version":3,"id":"01a040a6-de81-7e94-bf74-54b18552d075","timestamp":"2026-08-27T00:37:52.897Z","cwd":"/tmp/duo-dpi01/ws"}
+{"type":"model_change","id":"bc426e57","parentId":null,"timestamp":"2026-08-27T00:37:53.263Z","provider":"openai-codex","modelId":"gpt-5.6-luna"}
+{"type":"thinking_level_change","id":"7a070236","parentId":"bc426e57","timestamp":"2026-08-27T00:37:53.263Z","thinkingLevel":"high"}
+{"type":"message","id":"a08f9270","parentId":"7a070236","timestamp":"2026-08-27T00:38:02.550Z","message":{"role":"user","content":[{"type":"text","text":"Reply with the single word pong."}],"timestamp":1787791082534}}
+{"type":"message","id":"d4c7bbe5","parentId":"a08f9270","timestamp":"2026-08-27T00:38:05.815Z","message":{"role":"assistant","content":[{"type":"text","text":"pong","textSignature":"{\"v\":1,\"id\":\"msg_078db8aec6a8418f016a8f86edb83487d2b0d03b0a434f900f\",\"phase\":\"final_answer\"}"}],"api":"openai-codex-responses","provider":"openai-codex","model":"gpt-5.6-luna","usage":{"input":2444,"output":5,"cacheRead":0,"cacheWrite":0,"reasoning":0,"totalTokens":2449,"cost":{"input":0.0004888000000000001,"output":0.000006,"cacheRead":0,"cacheWrite":0,"total":0.0004948000000000001}},"stopReason":"stop","timestamp":1787791082569,"responseId":"resp_078db8aec6a8418f016a8f86ed136087d282f05670108bf2c6","rawStopReason":"completed"}}
+exit=0
+

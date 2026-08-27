@@ -1,0 +1,16 @@
+# inject socket under XDG_RUNTIME_DIR
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+uuid_from_transcript=01a040a6-de81-7e94-bf74-54b18552d075.
+inject_sock=/tmp/duo-dpi01/xdg-runtime/duo/pi-inject/01a040a6-de81-7e94-bf74-54b18552d075..sock
+
+$ ls -l /tmp/duo-dpi01/xdg-runtime/duo/pi-inject/01a040a6-de81-7e94-bf74-54b18552d075..sock
+ls: cannot access '/tmp/duo-dpi01/xdg-runtime/duo/pi-inject/01a040a6-de81-7e94-bf74-54b18552d075..sock': No such file or directory
+exit=0
+
+$ stat /tmp/duo-dpi01/xdg-runtime/duo/pi-inject/01a040a6-de81-7e94-bf74-54b18552d075..sock
+stat: cannot statx '/tmp/duo-dpi01/xdg-runtime/duo/pi-inject/01a040a6-de81-7e94-bf74-54b18552d075..sock': No such file or directory
+exit=0
+

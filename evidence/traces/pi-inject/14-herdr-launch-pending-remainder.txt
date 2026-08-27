@@ -1,0 +1,14 @@
+# herdr launch_pending remainder after deliver
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ herdr_cmd agent list
+{"id":"cli:agent:list","result":{"agents":[{"agent":"pi","agent_session":{"agent":"pi","kind":"path","source":"herdr:pi","value":"/home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl"},"agent_status":"idle","cwd":"/tmp/duo-dpi01/ws","focused":true,"foreground_cwd":"/tmp/duo-dpi01/ws","interactive_ready":true,"name":"duo-main-lrr_31e270a5e33c7f552da","pane_id":"w1:p1","revision":1,"screen_detection_skipped":true,"state_change_seq":3,"tab_id":"w1:t1","terminal_id":"term_659fc8bcf9d981","terminal_title":"π - ws","terminal_title_stripped":"π - ws","workspace_id":"w1"}],"type":"agent_list"}}
+exit=0
+
+launch_pending=False
+agent_status=idle
+screen_detection_skipped=True
+Herdr still reporting launch_pending after deliver is the expected named remainder, not a fail.
+

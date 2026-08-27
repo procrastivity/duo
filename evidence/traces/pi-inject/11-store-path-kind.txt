@@ -1,0 +1,13 @@
+# store commands section (path_kind runtime vs host)
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ python3 /home/dev/Code/duo-vnext/evidence/traces/pi-inject/dump-store.py /tmp/duo-dpi01/xdg-data/duo/duo.db (commands section)
+{"kind":"command.accepted","command":{"id":"cmd_61e4f0d9179283ecfac340dce8a80769","state":"queued","path_kind":null,"attempt":{"id":null,"path_kind":null,"recorded_result":null}}}
+{"kind":"command.attempt_created","command":{"id":"cmd_61e4f0d9179283ecfac340dce8a80769","state":"attempting","path_kind":"runtime","attempt":{"id":"catt_420fe1e1944071cc2842dbb91e0ba667","path_kind":"runtime","recorded_result":null}}}
+{"kind":"command.delivered","command":{"id":"cmd_61e4f0d9179283ecfac340dce8a80769","state":"delivered","path_kind":null,"attempt":{"id":"catt_420fe1e1944071cc2842dbb91e0ba667","path_kind":"runtime","recorded_result":"delivered"}}}
+
+attempt path_kind=runtime kind=command.attempt_created recorded_result=None
+attempt path_kind=runtime kind=command.delivered recorded_result=delivered
+

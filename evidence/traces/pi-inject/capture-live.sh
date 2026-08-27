@@ -80,7 +80,7 @@ path = sys.argv[1]
 base = os.path.basename(path)
 if not base.endswith(".jsonl"):
     sys.exit(0)
-base = base[:-5]
+base = base.removesuffix(".jsonl") if hasattr(str, "removesuffix") else (base[:-6] if base.endswith(".jsonl") else base)
 i = base.rfind("_")
 if i < 0 or i == len(base) - 1:
     sys.exit(0)

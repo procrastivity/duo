@@ -1,0 +1,14 @@
+# store dump (correlations, commands, instance.state)
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ python3 /home/dev/Code/duo-vnext/evidence/traces/pi-inject/dump-store.py /tmp/duo-dpi01/xdg-data/duo/duo.db
+## correlations
+{"kind":"correlation.claimed","session_id":null,"instance_id":null,"correlation":{"id":"corr_e35167a2fdd006b8a81f1c1250a22d2c","target_kind":"instance","target_id":"ri_1143fd10ce027468d0c7b47ce464288b","external_kind":"agent.session","external_value":"/home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl","scope":"pi","source":"launch-plan","evidence":"attested agent-runtime report","first_verified_at":"2026-08-27T00:37:53.532Z","last_verified_at":"2026-08-27T00:37:53.532Z","status":"active"}}
+{"kind":"correlation.claimed","session_id":null,"instance_id":null,"correlation":{"id":"corr_5a09a682d87fac2edb158549f6c53a5e","target_kind":"instance","target_id":"ri_1143fd10ce027468d0c7b47ce464288b","external_kind":"transcript","external_value":"/home/dev/.pi/agent/sessions/--tmp-duo-dpi01-ws--/2026-08-27T00-37-52-897Z_01a040a6-de81-7e94-bf74-54b18552d075.jsonl","scope":"pi","source":"launch-plan","evidence":"reported with the attested agent-runtime session","first_verified_at":"2026-08-27T00:37:53.532Z","last_verified_at":"2026-08-27T00:37:53.532Z","status":"active"}}
+## commands
+## instance.state
+{"id":"fact_450b8e0db3c6da16573c831a7e18a65e","instance_id":"ri_1143fd10ce027468d0c7b47ce464288b","state":"live","reason":null,"evidence":"host reported agent-session identity and the runtime reports ready"}
+exit=0
+

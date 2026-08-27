@@ -1,0 +1,40 @@
+# herdr pane read (prompt text + extensions)
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ herdr_cmd pane read w1:p1
+$ pi --provider openai-codex --model gpt-5.6-luna -e /tmp/duo-dpi01/xdg-data/duo/harness/lrr_
+31e270a5e33c7f552da0afde3ef1976e/main/duo-inject.ts -e /tmp/duo-dpi01/xdg-data/duo/harness/lr
+r_31e270a5e33c7f552da0afde3ef1976e/main/duo-close-on-exit.ts
+
+ pi v0.84.3
+ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  ~/.pi/agent/AGENTS.md
+
+[Skills]
+  ste9-check, ste9-lookup, ste9-write, wip
+
+[Extensions]
+  duo-close-on-exit.ts, duo-inject.ts, herdr-agent-state.ts, moshi-hooks.ts, pi-effort
+
+
+ Reply with the single word pong.
+
+
+ pong
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+/tmp/duo-dpi01/ws
+↑2.4k ↓5 $0.000 (sub) 0.9%/272k (auto)                     (openai-codex) gpt-5.6-luna • high
+think:high
+exit=0
+

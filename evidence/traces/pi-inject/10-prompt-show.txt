@@ -1,0 +1,9 @@
+# duo prompt show after send
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ duo_cmd prompt show cmd_61e4f0d9179283ecfac340dce8a80769 --output json
+{"schema":"duo.external/v1","request_id":"req_6581dcd2cead8ca9","operation":"command.inspect","result":{"command_id":"cmd_61e4f0d9179283ecfac340dce8a80769","revision":"3","operation":"prompt.deliver","target":{"session_id":"ses_b5a7a3bb83710513333c7be523992d31","runtime_instance_id":"ri_1143fd10ce027468d0c7b47ce464288b"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-27T00:39:53.000Z","attempts":[{"attempt_id":"catt_420fe1e1944071cc2842dbb91e0ba667","realization":"native","started_at":"2026-08-27T00:38:02.521Z","recorded_result":"delivered"}],"milestones":{"accepted_at":"2026-08-27T00:37:53.820Z","delivered_at":"2026-08-27T00:38:02.537Z","activity_observed":false,"acknowledged":false},"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+

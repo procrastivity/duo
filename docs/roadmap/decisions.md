@@ -88,3 +88,25 @@ Limits recorded at gate time, not folded into a Stage 2 claim: live
 identity (JSONL existed; claim had no working directory); Pi stayed
 `launch_pending` and send expired `command.expired` rather than
 silent-pass; nested D1 remains a use-day. tmux + Codex remain deferred.
+
+## 2026-08-27 — duo-pi-inject Stage C live gate
+
+Evidence: `evidence/traces/pi-inject/` (gate.md maps every Stage C
+bullet). Binary `1678d2c`. Live set: herdr 0.8.2, pi 0.84.3,
+disposable server (`dpi01`), isolated XDG including `XDG_RUNTIME_DIR`,
+no live user session touched.
+
+This is duo-pi-inject Stage C, not Stage 2 and not a §3c rewrite.
+Herdr+Pi launch reached `live` via the Stage B idle-as-ready arm
+(inject connect-line `idle`; MarkLive evidence `the runtime reports
+ready`) while Herdr still reported `launch_pending` at bind.
+`duo prompt send` delivered on the runtime inject path (`path_kind`
+`runtime` on `command.attempt_created` / `command.delivered`; pane
+listed `duo-inject.ts` and showed `pong`). Fake pair, `make check`,
+and `contracts/` are green. Claude D3 is unchanged. notes/52 stays
+unsubmitted.
+
+Limits recorded at gate time: after deliver Herdr's Pi row had
+`launch_pending` cleared (`screen_detection_skipped` still true) —
+recorded honestly, not a Herdr-fix claim. Nested D1 remains a
+use-day. tmux + Codex remain deferred.

@@ -1,0 +1,9 @@
+# live Herdr+Pi launch (builder --require agent_runtime=pi)
+duo=duo version 1678d2c (commit 1678d2c, built 2026-08-27T00:37:26Z)
+2026-08-27T00:37:52Z
+isolation: HERDR_SESSION=dpi01 scratch=/tmp/duo-dpi01 host=herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock
+
+$ duo_cmd session launch builder --require agent_runtime=pi --host herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock --workspace /tmp/duo-dpi01/ws --output json
+{"schema":"duo.external/v1","request_id":"req_d47ee1482a53be88","operation":"session.launch","result":{"session_id":"ses_b5a7a3bb83710513333c7be523992d31","launch_resolution_id":"lrr_31e270a5e33c7f552da0afde3ef1976e","selection":"ordered","leaves":[{"name":"main","agent_runtime":"pi","model_line":"gpt-5.6-luna","model_family":"gpt","composition":{"name":"pi_openai_gpt56luna@herdr","variant":"pi_openai_gpt56luna","agent_runtime":"pi","model_line":"gpt-5.6-luna","model_family":"gpt","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-dpi01/xdg-config/herdr/sessions/dpi01/herdr.sock","host_source":"explicit-flag","outranked_evidence":[{"source":"ambient-env","captures":[{"name":"HERDR_SESSION","value":"terminal-multiplexers","captured_at":"2026-08-27T00:37:52.512Z"}],"detail":"outranked by explicit-flag"}]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0
+
