@@ -1,0 +1,19 @@
+=== 01-fake-pair ===
+HEAD: 728dbdd0d18e789898f2918de14690e395cc8a27
+UTC: 2026-08-27T07:38:33Z
+Covers: TestSessionInspectAndConversationList_FakePair, TestLaunchInspectAndConversationList_FakePair, TestPromptSend_DeliveredFakePair
+---
+>>> nix develop --command go test ./internal/cli/
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/cli	26.101s
+EXIT_CLI:0
+---
+>>> nix develop --command go test ./internal/host/fake ./internal/runtime/fake ./internal/conformance
+duo dev shell — run 'make check' to lint+test, 'make hooks' to install pre-commit.
+ok  	github.com/procrastivity/duo/internal/host/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/runtime/fake	(cached)
+ok  	github.com/procrastivity/duo/internal/conformance	(cached)
+EXIT_PACKAGES:0
+
+>>> ./bin/duo version (after nix develop --command make build)
+duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
