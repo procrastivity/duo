@@ -23,6 +23,15 @@ func snapshotClaude(t *testing.T, r *claude.Runtime, transcript string) runtime.
 	return got
 }
 
+func reasonsContain(got []string, want string) bool {
+	for _, r := range got {
+		if r == want {
+			return true
+		}
+	}
+	return false
+}
+
 func writeJSONLPrefix(t *testing.T, src string, n int) string {
 	t.Helper()
 	raw, err := os.ReadFile(src)
@@ -59,10 +68,11 @@ func TestObserveConditionTable(t *testing.T) {
 	forked := filepath.Join("testdata", "claude", "print-forked-session.jsonl")
 
 	tests := []struct {
-		name  string
-		path  string
-		want  runtime.ConditionValue
-		fresh runtime.ConditionFreshness
+		name        string
+		path        string
+		want        runtime.ConditionValue
+		fresh       runtime.ConditionFreshness
+		wantReasons []string
 	}{
 		{
 			name:  "print fixture settled via stop_reason end_turn",
@@ -101,16 +111,18 @@ func TestObserveConditionTable(t *testing.T) {
 			fresh: runtime.ConditionFreshnessUnknown,
 		},
 		{
-			name:  "missing transcript is unknown",
-			path:  filepath.Join(t.TempDir(), "does-not-exist.jsonl"),
-			want:  runtime.ConditionUnknown,
-			fresh: runtime.ConditionFreshnessUnknown,
+			name:        "missing transcript is unknown",
+			path:        filepath.Join(t.TempDir(), "does-not-exist.jsonl"),
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"missing transcript"},
 		},
 		{
-			name:  "empty TranscriptID is unknown",
-			path:  "",
-			want:  runtime.ConditionUnknown,
-			fresh: runtime.ConditionFreshnessUnknown,
+			name:        "empty TranscriptID is unknown",
+			path:        "",
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"missing transcript"},
 		},
 	}
 
@@ -136,6 +148,11 @@ func TestObserveConditionTable(t *testing.T) {
 			}
 			if got.Value == runtime.ConditionExited || got.Value == runtime.ConditionDone {
 				t.Fatalf("adapter emitted %s: done is unreachable from turn-end; exited is a caller mapping", got.Value)
+			}
+			for _, wantReason := range tc.wantReasons {
+				if !reasonsContain(got.Reasons, wantReason) {
+					t.Fatalf("Reasons %v does not contain %q", got.Reasons, wantReason)
+				}
 			}
 		})
 	}

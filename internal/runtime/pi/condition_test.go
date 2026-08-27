@@ -24,6 +24,15 @@ func snapshotPi(t *testing.T, r *runtimepi.Runtime, sessionID, transcript string
 	return got
 }
 
+func reasonsContain(got []string, want string) bool {
+	for _, r := range got {
+		if r == want {
+			return true
+		}
+	}
+	return false
+}
+
 func writePiPrefix(t *testing.T, src string, n int) string {
 	t.Helper()
 	raw, err := os.ReadFile(src)
@@ -55,11 +64,12 @@ func TestObserveConditionTable(t *testing.T) {
 	r := runtimepi.New("integration-1", runtimepi.WithSessionsRoot(t.TempDir()))
 
 	tests := []struct {
-		name    string
-		session string
-		path    string
-		want    runtime.ConditionValue
-		fresh   runtime.ConditionFreshness
+		name        string
+		session     string
+		path        string
+		want        runtime.ConditionValue
+		fresh       runtime.ConditionFreshness
+		wantReasons []string
 	}{
 		{
 			name:    "basic-with-resume settled (stopReason stop)",
@@ -104,18 +114,36 @@ func TestObserveConditionTable(t *testing.T) {
 			fresh:   runtime.ConditionFreshnessFresh,
 		},
 		{
-			name:    "missing transcript is unknown",
-			session: basicSession,
-			path:    filepath.Join(t.TempDir(), "missing.jsonl"),
-			want:    runtime.ConditionUnknown,
-			fresh:   runtime.ConditionFreshnessUnknown,
+			name:        "missing transcript is unknown",
+			session:     basicSession,
+			path:        filepath.Join(t.TempDir(), "missing.jsonl"),
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"missing transcript"},
 		},
 		{
-			name:    "empty TranscriptID under an empty sessions root is unknown",
-			session: basicSession,
-			path:    "",
-			want:    runtime.ConditionUnknown,
-			fresh:   runtime.ConditionFreshnessUnknown,
+			name:        "empty TranscriptID under an empty sessions root is unknown",
+			session:     basicSession,
+			path:        "",
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"missing transcript"},
+		},
+		{
+			name:        "transcript header session-id mismatch is unknown",
+			session:     "00000000-0000-0000-0000-000000000001",
+			path:        basicFixture,
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"transcript header does not match session"},
+		},
+		{
+			name:        "header-only transcript has no turn-boundary evidence",
+			session:     basicSession,
+			path:        writePiPrefix(t, basicFixture, 1),
+			want:        runtime.ConditionUnknown,
+			fresh:       runtime.ConditionFreshnessUnknown,
+			wantReasons: []string{"transcript has no turn-boundary evidence"},
 		},
 	}
 
@@ -133,6 +161,11 @@ func TestObserveConditionTable(t *testing.T) {
 			}
 			if got.Value == runtime.ConditionExited || got.Value == runtime.ConditionDone {
 				t.Fatalf("adapter emitted %s: done is unreachable from turn-end; exited is a caller mapping", got.Value)
+			}
+			for _, wantReason := range tc.wantReasons {
+				if !reasonsContain(got.Reasons, wantReason) {
+					t.Fatalf("Reasons %v does not contain %q", got.Reasons, wantReason)
+				}
 			}
 		})
 	}
