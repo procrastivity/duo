@@ -430,3 +430,20 @@ is `live`. Live may now be reached while the host still reports
 `idle`). Claude-shaped pending still stays `starting` until
 `launch_pending` clears. No `duo session settle` verb. Not Stage
 2.
+
+## 2026-08-27 — Blocking snapshot wait is not settle (notes/54)
+
+I-10 / handoff 26 still prefer implicit wait on **send**
+(`queue_until_safe`). `session.settle` stays parked for
+launch→`live`. That is not "until a reply."
+
+A dogfood orchestrator invented a 24-tick `session show` loop on the
+whole `condition` object (`notes/54-blocking-snapshot-wait.md` in
+the planning repo). The string is `result.condition.value`. Stage D
+of `duo-d2-observe` still ships skill-prose poll, not a wait verb.
+If that poll still invents loops, remainder-elevate a blocking
+snapshot (`conversation list --block-for=…`; planning-repo backlog
+`01M12BD7HAXVHXFARFMHWTTRTZ`), which is decision 03
+§9.3 Wait as a CLI snapshot — not `conversation.subscribe`, not
+settle. Do not add `--block` on every verb in this file until that
+remainder is a Matter.
