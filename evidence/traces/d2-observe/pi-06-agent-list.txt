@@ -1,0 +1,15 @@
+# herdr agent list (pi row fields)
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:40:32Z
+isolation: HERDR_SESSION=d2o01 scratch=/tmp/duo-d2o01 host=herdr:/tmp/duo-d2o01/xdg-config/herdr/sessions/d2o01/herdr.sock runtime=pi
+
+$ herdr_cmd agent list
+{"id":"cli:agent:list","result":{"agents":[{"agent":"pi","agent_session":{"agent":"pi","kind":"path","source":"herdr:pi","value":"/home/dev/.pi/agent/sessions/--tmp-duo-d2o01-ws--/2026-08-27T07-40-33-260Z_01a04229-d66b-7fd0-a933-cdb29d487a96.jsonl"},"agent_status":"idle","cwd":"/tmp/duo-d2o01/ws","focused":true,"foreground_cwd":"/tmp/duo-d2o01/ws","launch_pending":true,"name":"duo-main-lrr_0d955e03cd6696a4b02","pane_id":"w1:p1","revision":1,"screen_detection_skipped":true,"state_change_seq":1,"tab_id":"w1:t1","terminal_id":"term_65a027368861e1","terminal_title":"π - ws","terminal_title_stripped":"π - ws","workspace_id":"w1"}],"type":"agent_list"}}
+exit=0
+
+agent_session_value=/home/dev/.pi/agent/sessions/--tmp-duo-d2o01-ws--/2026-08-27T07-40-33-260Z_01a04229-d66b-7fd0-a933-cdb29d487a96.jsonl
+pane_id=w1:p1
+launch_pending=True
+agent_status=idle
+host_jsonl=/home/dev/.pi/agent/sessions/--tmp-duo-d2o01-ws--/2026-08-27T07-40-33-260Z_01a04229-d66b-7fd0-a933-cdb29d487a96.jsonl
+

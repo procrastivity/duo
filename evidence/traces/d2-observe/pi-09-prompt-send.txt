@@ -1,0 +1,9 @@
+# duo prompt send
+duo=duo version 728dbdd-dirty (commit 728dbdd, built 2026-08-27T07:38:37Z)
+2026-08-27T07:40:32Z
+isolation: HERDR_SESSION=d2o01 scratch=/tmp/duo-d2o01 host=herdr:/tmp/duo-d2o01/xdg-config/herdr/sessions/d2o01/herdr.sock runtime=pi
+
+$ duo_cmd prompt send ses_1c1fa196ceba2e8ea7b0668b404f717e --text 'Reply with the single word pong.' --idempotency-key key-d2o01-pi-1 --expires-at 2026-08-27T07:42:34.000Z --output json
+{"schema":"duo.external/v1","request_id":"req_e0610c5285122b78","operation":"prompt.deliver","result":{"command_id":"cmd_6fcbb6dd9742d1b219d08af470dd41ed","revision":"3","target":{"session_id":"ses_1c1fa196ceba2e8ea7b0668b404f717e","runtime_instance_id":"ri_d67bc77748c46be6719af295b8c2c81b"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-08-27T07:42:34.000Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
