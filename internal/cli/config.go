@@ -1,8 +1,9 @@
 // config.go is the composition root for the `duo config` verb family:
-// internal/registry's "config.migrate" operation (Step 07), CLI path
-// {"config", "migrate"}. It is a thin wrapper — every transform rule lives
-// in internal/config/migrate.go (MigrateV2ToV3), normative at
-// duo-vnext-installation-contract.md §1.3 "Migration to duo.config/v3".
+// internal/registry's "config.migrate" operation (CLI path
+// {"config", "migrate"}) and the show subcommand wired from
+// config_show.go. It is a thin wrapper — every transform rule lives in
+// internal/config (MigrateV2ToV3, LoadV3), normative at
+// duo-vnext-installation-contract.md §1.3.
 
 package cli
 
@@ -27,6 +28,7 @@ func configCommand(streams *iostreams.Streams) *cobra.Command {
 		Short: "inspect and migrate duo configuration documents",
 	}
 	cmd.AddCommand(configMigrateCommand(streams))
+	cmd.AddCommand(configShowCommand(streams))
 	return cmd
 }
 

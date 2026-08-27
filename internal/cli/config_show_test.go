@@ -64,16 +64,6 @@ launch_variants:
     model_family: claude
 `
 
-type configShowPreset struct {
-	Name   string   `json:"name"`
-	Leaves []string `json:"leaves"`
-}
-
-type configShowRuntime struct {
-	Name string `json:"name"`
-	Kind string `json:"kind"`
-}
-
 // writeConfigShowFixture writes configShowFixture to a temp duo.config.yaml
 // and returns its path.
 func writeConfigShowFixture(t *testing.T) string {
