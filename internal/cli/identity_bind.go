@@ -11,6 +11,7 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/runtime"
+	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
 
 // identityBindTimeout is how long launch waits for host identity and D3
@@ -176,6 +177,10 @@ func commitIdentityBind(
 			evidence, err := correlator.Correlate(ctx, claim)
 			if err == nil && evidence.Bound {
 				transcript = evidence.TranscriptID
+				// Bound evidence beats the raw host string (I-11).
+				if evidence.ExternalAgentSessionID != "" {
+					ref.SessionID = evidence.ExternalAgentSessionID
+				}
 			}
 		}
 	}
@@ -254,19 +259,29 @@ func runtimeReportsReady(ctx context.Context, runtimeID string, state host.Agent
 
 // claimFromHostIdentity maps a host-reported id or path onto a RuntimeClaim
 // and domain.AgentSessionRef. Path-shaped identity is still an
-// agent-session correlation; the value is the id/path. Correlate gets
-// TranscriptPath when kind is path so it does not scan a directory (I-6).
-// WorkingDirectory is the launched session's workspace root
+// agent-session correlation. For AgentSessionKindPath, peel a UUID from
+// the transcript file name via SessionIDFromTranscriptName (I-11); on
+// success ExternalAgentSessionID / AgentSessionRef.SessionID are the
+// UUID while TranscriptPath stays the host path. Empty peel keeps the
+// raw host value. Correlate gets TranscriptPath when kind is path so it
+// does not scan a directory (I-6). WorkingDirectory is the launched
+// session's workspace root
 // (Authority.Workspace(sess.Workspace).RootPath) so Claude can derive the
 // project-slug JSONL path from a host-named id (not a path).
 func claimFromHostIdentity(runtimeID string, ident host.AgentSessionIdentity, workingDirectory string) (runtime.RuntimeClaim, domain.AgentSessionRef) {
+	sessionID := ident.Value
+	if ident.Kind == host.AgentSessionKindPath {
+		if peeled := runtimepi.SessionIDFromTranscriptName(ident.Value); peeled != "" {
+			sessionID = peeled
+		}
+	}
 	ref := domain.AgentSessionRef{
 		IntegrationInstance: runtimeID,
-		SessionID:           ident.Value,
+		SessionID:           sessionID,
 	}
 	claim := runtime.RuntimeClaim{
 		IntegrationInstanceID:  runtimeID,
-		ExternalAgentSessionID: ident.Value,
+		ExternalAgentSessionID: sessionID,
 		WorkingDirectory:       workingDirectory,
 	}
 	if ident.Kind == host.AgentSessionKindPath {

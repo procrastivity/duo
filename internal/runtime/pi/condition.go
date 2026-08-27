@@ -39,9 +39,16 @@ func (r *Runtime) snapshotCondition(req runtime.ConditionObservationRequest) run
 		Reasons:    []string{"missing transcript"},
 	}
 
+	// Peel path-shaped ExternalAgentSessionID before checkHeader (I-12):
+	// adapters may still see today's live Herdr shape (path as session id).
+	sessionID := req.ExternalAgentSessionID
+	if peeled := SessionIDFromTranscriptName(sessionID); peeled != "" {
+		sessionID = peeled
+	}
+
 	path := req.TranscriptID
-	if path == "" && req.ExternalAgentSessionID != "" {
-		resolved, err := r.resolveTranscript(req.ExternalAgentSessionID, "", "")
+	if path == "" && sessionID != "" {
+		resolved, err := r.resolveTranscript(sessionID, "", "")
 		if err != nil || resolved == "" {
 			return unknown
 		}
@@ -51,7 +58,7 @@ func (r *Runtime) snapshotCondition(req runtime.ConditionObservationRequest) run
 		return unknown
 	}
 
-	obs, err := derivePiCondition(path, req.ExternalAgentSessionID)
+	obs, err := derivePiCondition(path, sessionID)
 	if err != nil {
 		return unknown
 	}

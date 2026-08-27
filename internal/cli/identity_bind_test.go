@@ -311,8 +311,8 @@ func TestPiLaunchPendingIdleMarksLive(t *testing.T) {
 		t.Fatalf("instance state = %s, want live while launch_pending and idle (test body did not call MarkLive)", inst.State)
 	}
 	bindings, ok := agentBindingsFor(h.authority, sess)
-	if !ok || bindings.ExternalAgentSessionID != ident.Value {
-		t.Fatalf("want named agent.session bound to path, got ok=%v %+v", ok, bindings)
+	if !ok || bindings.ExternalAgentSessionID != piInjectSessionID {
+		t.Fatalf("want named agent.session bound to peeled uuid, got ok=%v %+v", ok, bindings)
 	}
 }
 
@@ -343,8 +343,8 @@ func TestPiLaunchPendingNotIdleStaysStarting(t *testing.T) {
 		t.Fatalf("instance state = %s, want starting while launch_pending and not idle", inst.State)
 	}
 	bindings, ok := agentBindingsFor(h.authority, sess)
-	if !ok || bindings.ExternalAgentSessionID != ident.Value {
-		t.Fatalf("want named agent.session while still starting, got ok=%v %+v", ok, bindings)
+	if !ok || bindings.ExternalAgentSessionID != piInjectSessionID {
+		t.Fatalf("want named agent.session (peeled uuid) while still starting, got ok=%v %+v", ok, bindings)
 	}
 }
 
@@ -374,8 +374,8 @@ func TestPiLaunchPendingNoListenerStaysStarting(t *testing.T) {
 		t.Fatalf("instance state = %s, want starting with no inject listener", inst.State)
 	}
 	bindings, ok := agentBindingsFor(h.authority, sess)
-	if !ok || bindings.ExternalAgentSessionID != ident.Value {
-		t.Fatalf("want named agent.session while still starting, got ok=%v %+v", ok, bindings)
+	if !ok || bindings.ExternalAgentSessionID != piInjectSessionID {
+		t.Fatalf("want named agent.session (peeled uuid) while still starting, got ok=%v %+v", ok, bindings)
 	}
 }
 

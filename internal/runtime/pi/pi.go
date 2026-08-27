@@ -228,14 +228,22 @@ func (r *Runtime) Correlate(ctx context.Context, claim runtime.RuntimeClaim) (ru
 		confidence = ConfidenceExtensionExact
 	}
 
+	// Peel a path-shaped ExternalAgentSessionID before the named-id
+	// contradiction check so matching path/uuid evidence binds (Herdr
+	// stores the JSONL path as agent.session). Empty peel keeps raw.
+	externalID := claim.ExternalAgentSessionID
+	if peeled := SessionIDFromTranscriptName(externalID); peeled != "" {
+		externalID = peeled
+	}
+
 	if claim.TranscriptPath != "" {
 		named := SessionIDFromTranscriptName(claim.TranscriptPath)
-		if named != "" && named != claim.ExternalAgentSessionID {
+		if named != "" && named != externalID {
 			return unbound, nil
 		}
 	}
 
-	transcriptID, err := r.resolveTranscript(claim.ExternalAgentSessionID, claim.WorkingDirectory, claim.TranscriptPath)
+	transcriptID, err := r.resolveTranscript(externalID, claim.WorkingDirectory, claim.TranscriptPath)
 	if err != nil {
 		// Not locating a transcript weakens the evidence but does not
 		// unbind it; see the method comment.
@@ -243,7 +251,7 @@ func (r *Runtime) Correlate(ctx context.Context, claim runtime.RuntimeClaim) (ru
 	}
 
 	return runtime.RuntimeCorrelationEvidence{
-		ExternalAgentSessionID: claim.ExternalAgentSessionID,
+		ExternalAgentSessionID: externalID,
 		TranscriptID:           transcriptID,
 		Bound:                  true,
 		Confidence:             confidence,

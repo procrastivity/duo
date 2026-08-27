@@ -98,15 +98,21 @@ func (r *Runtime) ReadConversation(ctx context.Context, req runtime.Conversation
 		return runtime.ConversationBatch{}, err
 	}
 
+	// Peel path-shaped ExternalAgentSessionID before checkHeader (I-12).
+	sessionID := req.ExternalAgentSessionID
+	if peeled := SessionIDFromTranscriptName(sessionID); peeled != "" {
+		sessionID = peeled
+	}
+
 	path := req.TranscriptID
 	if path == "" {
-		path, err = r.resolveTranscript(req.ExternalAgentSessionID, "", "")
+		path, err = r.resolveTranscript(sessionID, "", "")
 		if err != nil {
 			return runtime.ConversationBatch{}, err
 		}
 	}
 
-	turns, totalLines, err := readTurns(ctx, path, req.ExternalAgentSessionID)
+	turns, totalLines, err := readTurns(ctx, path, sessionID)
 	if err != nil {
 		return runtime.ConversationBatch{}, err
 	}

@@ -1041,3 +1041,24 @@ contradiction is resolved beyond naming it.
 `ExternalAgentSessionID` (see Correlate above). Host identity on the
 claim is evidence for that field; `Correlate` does not discover an id
 from a pane on its own.
+
+## 2026-08-27 — duo-d2-observe Stage A (path-kind peel)
+
+Herdr path-kind identity stores the JSONL path as `agent.session`.
+Stage A peels a UUID from that already-named path via
+`SessionIDFromTranscriptName` (no directory-newest scan, I-6):
+
+- **I-11.** `claimFromHostIdentity` peels path-kind hosts so
+  `ExternalAgentSessionID` / `AgentSessionRef.SessionID` are the UUID
+  while `TranscriptPath` stays the host path. Empty peel keeps the
+  raw host value. `commitIdentityBind` stores Bound Correlate evidence
+  `ExternalAgentSessionID` as `AgentSession.SessionID` when present
+  (Bound evidence beats the raw host string). Path-kind empty
+  TranscriptID fallback still copies the host path.
+- **I-12.** Pi `Correlate` peels a path-shaped
+  `ExternalAgentSessionID` before the named-id contradiction check so
+  matching path/uuid binds. `ObserveCondition` and `ReadConversation`
+  peel before `checkHeader` so adapters called directly with today's
+  live shape (path as session id) do not lie as `unknown` /
+  `missing transcript`. Ready / `runtimeReportsReady` still pass
+  `state.Session.Value` (I-15); peel sites above do not change that.
