@@ -93,7 +93,7 @@ write_header "$EVIDENCE/03-duo-version.txt" "tool versions for Stage C live gate
 append_cmd "$EVIDENCE/03-duo-version.txt" 'duo_cmd version'
 append_cmd "$EVIDENCE/03-duo-version.txt" 'herdr --version'
 append_cmd "$EVIDENCE/03-duo-version.txt" 'pi --version'
-append_cmd "$EVIDENCE/03-duo-version.txt" 'git -C ~/Code/duo-vnext rev-parse HEAD'
+append_cmd "$EVIDENCE/03-duo-version.txt" 'git -C ~/Code/duo rev-parse HEAD'
 
 # 04-launch-pi.txt
 write_header "$EVIDENCE/04-launch-pi.txt" "live Herdr+Pi launch (builder --require agent_runtime=pi)"

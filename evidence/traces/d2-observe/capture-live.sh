@@ -102,7 +102,7 @@ fi
 if command -v claude >/dev/null 2>&1; then
   append_cmd "$EVIDENCE/${R}-03-version.txt" 'claude --version'
 fi
-append_cmd "$EVIDENCE/${R}-03-version.txt" 'git -C ~/Code/duo-vnext rev-parse HEAD'
+append_cmd "$EVIDENCE/${R}-03-version.txt" 'git -C ~/Code/duo rev-parse HEAD'
 
 # 04-launch.txt
 write_header "$EVIDENCE/${R}-04-launch.txt" "live Herdr+${R} launch (builder --require agent_runtime=${R})"
