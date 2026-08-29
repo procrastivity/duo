@@ -42,7 +42,7 @@ func startFakeACP(t *testing.T, handle func(method string) (json.RawMessage, *rp
 	stdinR, stdinW := io.Pipe()
 	stdoutR, stdoutW := io.Pipe()
 	go func() {
-		defer stdoutW.Close()
+		defer func() { _ = stdoutW.Close() }()
 		dec := json.NewDecoder(stdinR)
 		enc := json.NewEncoder(stdoutW)
 		for {

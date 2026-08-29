@@ -142,10 +142,10 @@ func TestConfigShow_JSONRoster(t *testing.T) {
 	var env struct {
 		Operation string `json:"operation"`
 		Result    struct {
-			Schema         string              `json:"schema"`
-			Path           string              `json:"path"`
-			Presets        []configShowPreset  `json:"presets"`
-			AgentRuntimes  []configShowRuntime `json:"agent_runtimes"`
+			Schema        string              `json:"schema"`
+			Path          string              `json:"path"`
+			Presets       []configShowPreset  `json:"presets"`
+			AgentRuntimes []configShowRuntime `json:"agent_runtimes"`
 		} `json:"result"`
 	}
 	if err := json.Unmarshal([]byte(out), &env); err != nil {
