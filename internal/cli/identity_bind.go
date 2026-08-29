@@ -11,6 +11,7 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/runtime"
+	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
 
@@ -184,6 +185,9 @@ func commitIdentityBind(
 			}
 		}
 	}
+	if transcript == "" && runtimeID == "devin" {
+		transcript = devinTranscriptLocator(a, sess)
+	}
 	if transcript == "" && state.Session.Kind == host.AgentSessionKindPath {
 		transcript = state.Session.Value
 	}
@@ -354,4 +358,25 @@ func runtimeIDForSession(a *domain.Authority, sess domain.Session) string {
 		return ""
 	}
 	return agentRuntimeIntegrationID(body.Assignment[0].Tuple.AgentRuntime)
+}
+
+// devinTranscriptLocator is the convention path stage1LeafAugmenter
+// passes as `devin --export`. Correlate leaves TranscriptID empty for
+// host kind id; bind fills this so conversation.list has a file to open.
+// Assignment[0] is Stage-1's single leaf. Missing record or path error
+// leaves the locator empty (honest miss, not a directory scan).
+func devinTranscriptLocator(a *domain.Authority, sess domain.Session) string {
+	rec, ok := a.SessionLaunchResolution(sess.ID)
+	if !ok {
+		return ""
+	}
+	var body launch.Record
+	if err := json.Unmarshal(rec.Body, &body); err != nil || len(body.Assignment) == 0 {
+		return ""
+	}
+	path, err := runtimedevin.ATIFPath(string(rec.ID), body.Assignment[0].Leaf)
+	if err != nil {
+		return ""
+	}
+	return path
 }

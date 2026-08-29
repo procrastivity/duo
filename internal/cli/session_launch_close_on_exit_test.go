@@ -13,6 +13,7 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/launchrecord"
+	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 )
 
 // capturingHosts is a launch.HostSet over the first-class fake host adapter
@@ -381,5 +382,103 @@ func TestCloseOnExitConfigFalseBehavesAsRemainForAPiLeaf(t *testing.T) {
 		if filepath.Base(path) == "duo-close-on-exit.ts" {
 			t.Errorf("leaf args = %v, want no duo-close-on-exit.ts -e flag", req.ResolvedLaunchTuple.Args)
 		}
+	}
+}
+
+const devinScenarioYAML = `
+schema: duo.config/v3
+session_hosts:
+  prefer: [herdr]
+agent_runtimes:
+  devin_default:
+    kind: devin
+    executable: devin
+launch_variants:
+  daily:
+    agent_runtime: devin_default
+    model_line: sonnet-5
+    model_family: claude
+presets:
+  daily:
+    selection: ordered
+    leaves:
+      primary:
+        candidates:
+          - variant: daily
+`
+
+func newDevinBindHarness(t *testing.T) *bindHarness {
+	t.Helper()
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	doc, err := config.ParseV3([]byte(devinScenarioYAML))
+	if err != nil {
+		t.Fatalf("ParseV3: %v", err)
+	}
+
+	a, store, err := openWriteAuthority(context.Background())
+	if err != nil {
+		t.Fatalf("openWriteAuthority: %v", err)
+	}
+
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	h := &bindHarness{
+		t:         t,
+		root:      t.TempDir(),
+		authority: a,
+		store:     store,
+		streams:   &iostreams.Streams{Out: out, Err: errOut},
+		out:       out,
+		err:       errOut,
+		doc:       doc,
+	}
+	t.Cleanup(h.close)
+	return h
+}
+
+func TestDevinExportAlwaysAppended(t *testing.T) {
+	h := newDevinBindHarness(t)
+	result, hosts := launchWithAugmenter(t, h, false)
+	if result.Report.LaunchResolutionID == "" {
+		t.Fatal("the launch was not recorded")
+	}
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	exportPath, present := findFlag(req.ResolvedLaunchTuple.Args, "--export")
+	if !present {
+		t.Fatalf("leaf args = %v, want a --export flag", req.ResolvedLaunchTuple.Args)
+	}
+	want, err := runtimedevin.ATIFPath(result.Report.LaunchResolutionID, "primary")
+	if err != nil {
+		t.Fatalf("ATIFPath: %v", err)
+	}
+	if exportPath != want {
+		t.Fatalf("--export = %q, want %q", exportPath, want)
+	}
+	if _, err := os.Stat(filepath.Dir(exportPath)); err != nil {
+		t.Errorf("export parent dir missing: %v", err)
+	}
+}
+
+func TestDevinExportStillAppendedOnRemainOnExit(t *testing.T) {
+	h := newDevinBindHarness(t)
+	result, hosts := launchWithAugmenter(t, h, true)
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	exportPath, present := findFlag(req.ResolvedLaunchTuple.Args, "--export")
+	if !present {
+		t.Fatalf("leaf args = %v, want --export even with --remain-on-exit", req.ResolvedLaunchTuple.Args)
+	}
+	want, err := runtimedevin.ATIFPath(result.Report.LaunchResolutionID, "primary")
+	if err != nil {
+		t.Fatalf("ATIFPath: %v", err)
+	}
+	if exportPath != want {
+		t.Fatalf("--export = %q, want %q", exportPath, want)
 	}
 }

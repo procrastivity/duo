@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/procrastivity/duo/internal/launch/materialize"
 	"github.com/procrastivity/duo/internal/launchrecord"
 	"github.com/procrastivity/duo/internal/runtime/claude"
+	"github.com/procrastivity/duo/internal/runtime/devin"
 	"github.com/procrastivity/duo/internal/runtime/pi"
 	"github.com/procrastivity/duo/internal/scrub"
 	"github.com/procrastivity/duo/internal/surface"
@@ -619,7 +621,9 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // (internal/runtime/pi/inject.go, I-14) and appends `-e <inject path>`,
 // and when close-on-exit is active appends a second `-e <close-on-exit
 // path>` plus DUO_CLOSE_PANE_ON_EXIT=1 (internal/runtime/pi/closeonexit.go,
-// deliberately separate from the shipped reporter extension).
+// deliberately separate from the shipped reporter extension). Devin always
+// appends `--export <ATIFPath>` so conversation.list has a file locator
+// (duo-devin-atif-locator); that leg is not gated on close-on-exit.
 //
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
@@ -646,7 +650,8 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // Close-on-exit is the product default (notes/51 record 7); --remain-on-exit
 // and config close_on_exit: false opt out of close-on-exit only. Claude
 // Augment is a no-op when closeOnExit is false. Pi Augment still materializes
-// inject. Every other agent runtime is untouched.
+// inject. Devin Augment always appends `--export`. Every other agent runtime
+// is untouched.
 type stage1LeafAugmenter struct{}
 
 // closePaneOnExitEnvVar is the exact key both
@@ -693,6 +698,15 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf s
 			env = map[string]string{closePaneOnExitEnvVar: "1"}
 		}
 		return launch.LeafAugmentation{Args: args, Env: env}, nil
+	case "devin":
+		path, err := devin.ATIFPath(launchResolutionID, leaf)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the Devin ATIF export path for leaf %s: %w", leaf, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: creating the Devin ATIF export directory for leaf %s: %w", leaf, err)
+		}
+		return launch.LeafAugmentation{Args: []string{"--export", path}}, nil
 	default:
 		return launch.LeafAugmentation{}, nil
 	}

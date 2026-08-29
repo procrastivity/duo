@@ -15,6 +15,7 @@ import (
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/runtime"
 	"github.com/procrastivity/duo/internal/runtime/claude"
+	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
@@ -642,6 +643,49 @@ func TestRuntimeIDForSessionUsesLaunchTupleWhenUnbound(t *testing.T) {
 	}
 	if got := paneIDForSession(h.authority, sess); got == "" {
 		t.Error("paneIDForSession empty; launch attachment should name the pane")
+	}
+}
+
+func TestLaunchDevinIDIdentityStoresATIFTranscript(t *testing.T) {
+	h := newDevinBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	ident := host.AgentSessionIdentity{
+		Source: "herdr:devin",
+		Agent:  "devin",
+		Kind:   host.AgentSessionKindID,
+		Value:  "brave-muskmelon",
+	}
+	report, err := h.launch(mat, newIdentityHosts(&host.AgentBindState{
+		Session:          &ident,
+		LaunchPending:    false,
+		InteractiveReady: true,
+	}), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok {
+		t.Fatal("agentBindingsFor failed after Devin id-kind launch bind")
+	}
+	if bindings.ExternalAgentSessionID != ident.Value {
+		t.Errorf("external agent session = %q, want %q", bindings.ExternalAgentSessionID, ident.Value)
+	}
+	lr, ok := h.authority.SessionLaunchResolution(sess.ID)
+	if !ok {
+		t.Fatal("SessionLaunchResolution missing")
+	}
+	want, err := runtimedevin.ATIFPath(string(lr.ID), "primary")
+	if err != nil {
+		t.Fatalf("ATIFPath: %v", err)
+	}
+	if bindings.TranscriptID != want {
+		t.Errorf("transcript = %q, want convention path %q", bindings.TranscriptID, want)
 	}
 }
 
