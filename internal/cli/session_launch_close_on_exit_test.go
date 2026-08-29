@@ -437,6 +437,58 @@ func newDevinBindHarness(t *testing.T) *bindHarness {
 	return h
 }
 
+func assertDevinPrintMintFlags(t *testing.T, result *launch.Result, req host.HostLaunchRequest) {
+	t.Helper()
+	exportPath, present := findFlag(req.ResolvedLaunchTuple.Args, "--export")
+	if !present {
+		t.Fatalf("leaf args = %v, want a --export flag", req.ResolvedLaunchTuple.Args)
+	}
+	wantExport, err := runtimedevin.ATIFPath(result.Report.LaunchResolutionID, "primary")
+	if err != nil {
+		t.Fatalf("ATIFPath: %v", err)
+	}
+	if exportPath != wantExport {
+		t.Fatalf("--export = %q, want %q", exportPath, wantExport)
+	}
+	printPrompt, present := findFlag(req.ResolvedLaunchTuple.Args, "--print")
+	if !present {
+		t.Fatalf("leaf args = %v, want a --print flag", req.ResolvedLaunchTuple.Args)
+	}
+	if printPrompt != runtimedevin.LaunchMintPrompt {
+		t.Fatalf("--print = %q, want %q", printPrompt, runtimedevin.LaunchMintPrompt)
+	}
+	for _, forbidden := range []string{"--permission-mode", "dangerous"} {
+		for _, arg := range req.ResolvedLaunchTuple.Args {
+			if arg == forbidden {
+				t.Fatalf("leaf args = %v, must not contain %q", req.ResolvedLaunchTuple.Args, forbidden)
+			}
+		}
+	}
+}
+
+func TestDevinPrintMintAppended(t *testing.T) {
+	h := newDevinBindHarness(t)
+	result, hosts := launchWithAugmenter(t, h, false)
+	if result.Report.LaunchResolutionID == "" {
+		t.Fatal("the launch was not recorded")
+	}
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	assertDevinPrintMintFlags(t, result, req)
+}
+
+func TestDevinPrintMintStillAppendedOnRemainOnExit(t *testing.T) {
+	h := newDevinBindHarness(t)
+	result, hosts := launchWithAugmenter(t, h, true)
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+	assertDevinPrintMintFlags(t, result, req)
+}
+
 func TestDevinExportAlwaysAppended(t *testing.T) {
 	h := newDevinBindHarness(t)
 	result, hosts := launchWithAugmenter(t, h, false)

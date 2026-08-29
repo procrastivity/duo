@@ -50,6 +50,9 @@ type Runtime struct {
 	// ACPDial, when set, replaces spawning ACPCommand. Tests inject a
 	// fake stdio server. Production leaves it nil.
 	ACPDial func(context.Context) (io.ReadWriteCloser, error)
+	// ResumeCommand is the argv for spawn-per-prompt delivery. Empty
+	// means {"devin"}. Tests point it at a fake executable.
+	ResumeCommand []string
 }
 
 var (

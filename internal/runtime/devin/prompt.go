@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/procrastivity/duo/internal/runtime"
 )
@@ -49,12 +50,17 @@ func (r *Runtime) PromptPath(_ context.Context, binding runtime.RuntimeBinding) 
 	}, nil
 }
 
-// DeliverPrompt implements runtime.RuntimePromptProvider over `devin acp`
-// stdio JSON-RPC: initialize, session/load, session/prompt. The spawned
-// child is killed on return so Duo does not keep the exclusive hold.
+// DeliverPrompt implements runtime.RuntimePromptProvider. Production
+// spawns `devin --resume [--export] -p` per prompt so ATIF updates.
+// When ACPDial is set, the ACP stdio JSON-RPC path is used instead
+// (tests). ComposerSafe stays false.
 func (r *Runtime) DeliverPrompt(ctx context.Context, req runtime.PromptDeliveryRequest) (runtime.PromptDeliveryResult, error) {
 	if req.Binding.ExternalAgentSessionID == "" {
 		return runtime.PromptDeliveryResult{}, fmt.Errorf("devin runtime %s: prompt requires an external agent-session id", r.integrationInstanceID)
+	}
+
+	if r.ACPDial == nil {
+		return r.deliverPromptResume(ctx, req)
 	}
 
 	conn, stop, err := r.openACP(ctx)
@@ -114,6 +120,60 @@ func (r *Runtime) DeliverPrompt(ctx context.Context, req runtime.PromptDeliveryR
 		return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectDelivered}, nil
 	}
 	return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectUnknownEffect}, nil
+}
+
+func (r *Runtime) deliverPromptResume(ctx context.Context, req runtime.PromptDeliveryRequest) (runtime.PromptDeliveryResult, error) {
+	argv := r.ResumeCommand
+	if len(argv) == 0 {
+		argv = []string{"devin"}
+	}
+	sess := req.Binding.ExternalAgentSessionID
+	args := append([]string(nil), argv...)
+	args = append(args, "--resume", sess)
+	if req.Binding.TranscriptID != "" {
+		args = append(args, "--export", req.Binding.TranscriptID)
+	}
+	args = append(args, "--respect-workspace-trust", "false", "-p", req.Text)
+
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	if req.Binding.WorkingDirectory != "" {
+		cmd.Dir = req.Binding.WorkingDirectory
+	}
+	out, err := cmd.CombinedOutput()
+	outStr := string(out)
+
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return runtime.PromptDeliveryResult{}, err
+		}
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectNoEffect}, nil
+		}
+	}
+
+	if resumeOutputSessionLocked(outStr) {
+		return runtime.PromptDeliveryResult{}, ErrSessionLocked
+	}
+	if resumeOutputSessionNotFound(outStr) {
+		return runtime.PromptDeliveryResult{}, ErrSessionNotFound
+	}
+	if err == nil {
+		return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectDelivered}, nil
+	}
+	return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectUnknownEffect}, nil
+}
+
+func resumeOutputSessionLocked(out string) bool {
+	lower := strings.ToLower(out)
+	return strings.Contains(lower, "failed to start acp agent session") ||
+		strings.Contains(lower, "already open in another process")
+}
+
+func resumeOutputSessionNotFound(out string) bool {
+	lower := strings.ToLower(out)
+	return strings.Contains(lower, "session_not_found") ||
+		strings.Contains(lower, "session not found")
 }
 
 func initializeParams() map[string]any {

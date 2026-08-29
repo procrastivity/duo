@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/runtime"
@@ -194,9 +197,25 @@ func TestDeliverPromptSessionNotFound(t *testing.T) {
 	}
 }
 
+func writeResumeScript(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "fake-devin")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	return path
+}
+
+func runtimeWithResumeScript(t *testing.T, body string) *devin.Runtime {
+	t.Helper()
+	r := devin.New(testIntegrationInstanceID)
+	r.ResumeCommand = []string{writeResumeScript(t, body)}
+	return r
+}
+
 func TestDeliverPromptSpawnFailIsNoEffect(t *testing.T) {
 	r := devin.New(testIntegrationInstanceID)
-	r.ACPCommand = []string{filepath.Join(t.TempDir(), "no-such-devin-acp"), "acp"}
+	r.ResumeCommand = []string{filepath.Join(t.TempDir(), "no-such-devin-resume")}
 
 	result, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
 		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "lace-pegasus"},
@@ -207,5 +226,58 @@ func TestDeliverPromptSpawnFailIsNoEffect(t *testing.T) {
 	}
 	if result.Effect != runtime.PromptEffectNoEffect {
 		t.Fatalf("Effect = %q, want no_effect", result.Effect)
+	}
+}
+
+func TestDeliverPromptResumeLockEvenOnExitZero(t *testing.T) {
+	r := runtimeWithResumeScript(t, `echo "Error: failed to start ACP agent session" >&2
+exit 0`)
+
+	_, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
+		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "dark-carnation"},
+		Text:    "hello",
+	})
+	if !errors.Is(err, devin.ErrSessionLocked) {
+		t.Fatalf("err = %v, want ErrSessionLocked", err)
+	}
+}
+
+func TestDeliverPromptResumePassesExportAndPrint(t *testing.T) {
+	argvFile := filepath.Join(t.TempDir(), "argv.txt")
+	r := runtimeWithResumeScript(t, `printf '%s\n' "$@" > `+argvFile+`
+exit 0`)
+
+	result, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
+		Binding: runtime.RuntimeBinding{
+			ExternalAgentSessionID: "dark-carnation",
+			TranscriptID:           "/tmp/atif.json",
+		},
+		Text: "hello",
+	})
+	if err != nil {
+		t.Fatalf("DeliverPrompt: %v", err)
+	}
+	if result.Effect != runtime.PromptEffectDelivered {
+		t.Fatalf("Effect = %q, want delivered", result.Effect)
+	}
+
+	raw, err := os.ReadFile(argvFile)
+	if err != nil {
+		t.Fatalf("read argv file: %v", err)
+	}
+	argv := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	want := []string{
+		"--resume", "dark-carnation",
+		"--export", "/tmp/atif.json",
+		"--respect-workspace-trust", "false",
+		"-p", "hello",
+	}
+	for _, w := range want {
+		if !slices.Contains(argv, w) {
+			t.Fatalf("argv %v missing %q", argv, w)
+		}
+	}
+	if slices.Contains(argv, "--permission-mode") {
+		t.Fatalf("argv must not contain --permission-mode: %v", argv)
 	}
 }
