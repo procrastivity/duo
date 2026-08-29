@@ -1,0 +1,43 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "session_id": "special-platinum",
+  "agent": {
+    "name": "devin",
+    "version": "3000.6.7",
+    "model_name": "Claude Sonnet 5 Medium",
+    "extra": {
+      "backend": "Windsurf"
+    }
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "source": "system",
+      "timestamp": "2026-08-29T05:00:00Z",
+      "message": "system prompt must not become a turn"
+    },
+    {
+      "step_id": 2,
+      "source": "user",
+      "timestamp": "2026-08-29T05:00:01.000000000Z",
+      "message": "Reply with exactly: LOOP-C-OK"
+    },
+    {
+      "step_id": 3,
+      "source": "agent",
+      "timestamp": "2026-08-29T05:00:02.000000000Z",
+      "message": "LOOP-C-OK",
+      "reasoning_content": "thinking must not become a turn",
+      "extra": {
+        "generation_model": "claude-sonnet-5-medium"
+      },
+      "tool_calls": [
+        {
+          "tool_call_id": "tc-1",
+          "function_name": "write",
+          "arguments": {"path": "probe.txt"}
+        }
+      ]
+    }
+  ]
+}

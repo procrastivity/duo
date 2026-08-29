@@ -1,7 +1,8 @@
 // Package devin is the candidate Devin CLI agent-runtime adapter.
-// Stage A shipped RuntimeCorrelator. Stage B (duo-devin-loop/prompt)
-// adds RuntimePromptProvider over ACP stdio. ConversationProvider and
-// RuntimeReadyProvider stay out (ATIF is Stage C). See
+// Stage A shipped RuntimeCorrelator. Stage B adds RuntimePromptProvider
+// over ACP stdio. Stage C (duo-devin-loop/observe) adds
+// ConversationProvider and ConditionProvider from an ATIF-v1.7
+// document path. RuntimeReadyProvider stays out. See
 // terminal-multiplexers/notes/59-devin-full-sweep.md and
 // notes/60-devin-launch-first-pass.md.
 //
@@ -27,9 +28,9 @@ import (
 // it never claims Supported against a live binary.
 const PinnedExternalVersion = "3000.6.7"
 
-// SessionIDFormatIdentity names the identity channel this stage binds:
-// a Herdr-reported agent-session id (kind=id, hyphenated name), not an
-// on-disk transcript. Stage C will name ATIF separately.
+// SessionIDFormatIdentity names the identity channel Correlate binds:
+// a Herdr-reported agent-session id (kind=id, hyphenated name). ATIF is
+// a separate TranscriptID path; Correlate still leaves it empty.
 const SessionIDFormatIdentity = "devin-session-id"
 
 // ConfidenceInferred is the only label this adapter returns. Host-named
@@ -38,8 +39,8 @@ const SessionIDFormatIdentity = "devin-session-id"
 const ConfidenceInferred = "inferred"
 
 // Runtime is the Devin CLI agent-runtime adapter for one integration
-// instance. Stage A holds only that instance id — session identity lives
-// on the host record, and the transcript is unresolved until Stage C.
+// instance. Session identity lives on the host record. TranscriptID is
+// an ATIF document path when a caller has one; Correlate does not fill it.
 type Runtime struct {
 	integrationInstanceID string
 	// ACPCommand is the argv for the ACP stdio server. Empty means
@@ -54,6 +55,8 @@ type Runtime struct {
 var (
 	_ runtime.RuntimeCorrelator     = (*Runtime)(nil)
 	_ runtime.RuntimePromptProvider = (*Runtime)(nil)
+	_ runtime.ConversationProvider  = (*Runtime)(nil)
+	_ runtime.ConditionProvider     = (*Runtime)(nil)
 	_ adapter.Factory[*Runtime]     = Factory{}
 )
 

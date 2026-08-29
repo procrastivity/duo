@@ -18,8 +18,11 @@ func TestOpenKnownAgentRuntimeDevin(t *testing.T) {
 	if _, ok := rt.(runtime.RuntimeCorrelator); !ok {
 		t.Fatal("devin runtime does not implement RuntimeCorrelator")
 	}
-	if _, ok := rt.(runtime.ConversationProvider); ok {
-		t.Fatal("devin runtime implements ConversationProvider; Stage C owns that")
+	if _, ok := rt.(runtime.ConversationProvider); !ok {
+		t.Fatal("devin runtime does not implement ConversationProvider")
+	}
+	if _, ok := rt.(runtime.ConditionProvider); !ok {
+		t.Fatal("devin runtime does not implement ConditionProvider")
 	}
 	if _, ok := rt.(runtime.RuntimePromptProvider); !ok {
 		t.Fatal("devin runtime does not implement RuntimePromptProvider")
