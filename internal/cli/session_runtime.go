@@ -13,6 +13,7 @@ import (
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
 	"github.com/procrastivity/duo/internal/runtime/claude"
+	"github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
@@ -98,7 +99,7 @@ func UnregisterAgentRuntime(integrationInstanceID string) {
 // openAgentRuntime returns the agent-runtime adapter for one integration
 // instance. Prefer an explicitly registered handle; otherwise construct a
 // Stage-1 adapter whose AdapterID equals the integration instance ID
-// (claude-code, pi, fake-runtime). Unknown IDs fail — no invented kind
+// (claude-code, pi, devin, fake-runtime). Unknown IDs fail — no invented kind
 // heuristics.
 func openAgentRuntime(integrationInstanceID string) (any, error) {
 	if integrationInstanceID == "" {
@@ -118,6 +119,8 @@ func openKnownAgentRuntime(integrationInstanceID string) (any, error) {
 		return claude.New(integrationInstanceID, "", "")
 	case "pi":
 		return runtimepi.New(integrationInstanceID), nil
+	case "devin":
+		return devin.New(integrationInstanceID), nil
 	default:
 		return nil, fmt.Errorf("cli: no agent-runtime adapter for integration instance %q", integrationInstanceID)
 	}

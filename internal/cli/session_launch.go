@@ -519,12 +519,14 @@ func writeDeducedHostLines(b *strings.Builder, host *launch.WireHost) {
 
 // stage1Support is the CLI's launch.Support: an installation-evidence
 // lookup over the adapter factories this build carries real conformance
-// records for (Herdr as the only supported session host, Claude Code and
-// Pi as the only supported agent runtimes — the dogfood milestone's
-// narrowed Stage 1, roadmap Stage E). It performs no I/O and no live probe:
-// every digest it cites comes from a factory's static Descriptor(), never
-// from Probe(), which is what keeps it on §7.1's accepted "configuration
-// plus installed evidence" rung.
+// records for (Herdr as the only supported session host; Claude Code and
+// Pi as the dogfood agent runtimes; Devin as a candidate launch runtime
+// — notes/59, matter duo-devin-launch). Candidate is not a supported
+// roster claim. It performs no I/O and no live probe: every digest it
+// cites comes from a factory's static Descriptor() (or a notes/ pin
+// for Devin until a conformance record exists), never from Probe(),
+// which is what keeps it on §7.1's accepted "configuration plus installed
+// evidence" rung.
 //
 // duo-config-v3 step 12 re-keyed it: the lookup is on
 // launch.Tuple.SupportKey() — (host kind, host version, agent-runtime
@@ -539,6 +541,10 @@ var (
 	herdrDigest  = herdr.Factory{}.Descriptor().ConformanceRecordDigest
 	claudeDigest = claude.Factory{}.Descriptor().ConformanceRecordDigest
 	piDigest     = pi.Factory{}.Descriptor().ConformanceRecordDigest
+	// devinDigest names the Tier C evidence until a conformance-record
+	// digest scheme exists for this candidate (same pattern as
+	// notes16-claude-2.1.240).
+	devinDigest = "notes59-devin-3000.6.7"
 )
 
 // stage1HostVersions is the pinned-version table launch.Options.HostVersions
@@ -565,6 +571,8 @@ func (stage1Support) Supported(t launch.Tuple) launch.Verdict {
 		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + claudeDigest}
 	case "pi":
 		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + piDigest}
+	case "devin":
+		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + devinDigest}
 	default:
 		return launch.Verdict{OK: false}
 	}
