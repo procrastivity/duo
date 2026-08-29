@@ -21,7 +21,7 @@ func TestOpenKnownAgentRuntimeDevin(t *testing.T) {
 	if _, ok := rt.(runtime.ConversationProvider); ok {
 		t.Fatal("devin runtime implements ConversationProvider; Stage C owns that")
 	}
-	if _, ok := rt.(runtime.RuntimePromptProvider); ok {
-		t.Fatal("devin runtime implements RuntimePromptProvider; Stage B owns that")
+	if _, ok := rt.(runtime.RuntimePromptProvider); !ok {
+		t.Fatal("devin runtime does not implement RuntimePromptProvider")
 	}
 }

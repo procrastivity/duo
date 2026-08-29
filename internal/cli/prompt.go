@@ -19,6 +19,7 @@ import (
 	"github.com/procrastivity/duo/internal/host"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
+	"github.com/procrastivity/duo/internal/runtime/devin"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
@@ -577,6 +578,26 @@ func mapPromptReleaseError(streams *iostreams.Streams, mode, op string, cmd doma
 			Retry:   promptRetryAdvice{Safe: false, Action: "submit_new_command"},
 			Effect:  "no_effect",
 			Details: details,
+		})
+	}
+	if errors.Is(err, devin.ErrSessionLocked) {
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "operation.temporarily_unavailable",
+			Message: "The Devin session is already open in another process (ACP session_locked).",
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: true, Action: "retry_after_holder_release"},
+			Effect:  "unknown_effect",
+			Details: map[string]any{"error_kind": "session_locked"},
+		})
+	}
+	if errors.Is(err, devin.ErrSessionNotFound) {
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "object.not_found",
+			Message: "The Devin session is not in the CLI store (ACP session_not_found).",
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: false, Action: "wait_for_store_row_or_use_print_session"},
+			Effect:  "unknown_effect",
+			Details: map[string]any{"error_kind": "session_not_found"},
 		})
 	}
 	return duoerr.New("internal.prompt_deliver_failed", err.Error())

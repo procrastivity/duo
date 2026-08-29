@@ -11,6 +11,11 @@ import "context"
 type RuntimeBinding struct {
 	ExternalAgentSessionID string
 	TranscriptID           string
+	// WorkingDirectory is the Duo session's workspace root. Empty when
+	// unknown. Claude and Pi ignore it; Devin ACP session/load needs it
+	// (notes/59). It is not a bind key — Correlate still requires an
+	// ExternalAgentSessionID.
+	WorkingDirectory string
 }
 
 // PromptPathCandidate is one runtime prompt path the composer can select

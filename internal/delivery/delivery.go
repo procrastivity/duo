@@ -274,7 +274,10 @@ func (c *Composer) snapshotCondition(ctx context.Context, session domain.Session
 		return runtime.ConditionUnknown
 	}
 	binding := runtimeBinding(c.Authority, session)
-	obs, err := runtime.SnapshotCondition(ctx, provider, runtime.ConditionObservationRequest(binding))
+	obs, err := runtime.SnapshotCondition(ctx, provider, runtime.ConditionObservationRequest{
+		ExternalAgentSessionID: binding.ExternalAgentSessionID,
+		TranscriptID:           binding.TranscriptID,
+	})
 	if err != nil {
 		return runtime.ConditionUnknown
 	}
@@ -358,6 +361,9 @@ func runtimeBinding(a *domain.Authority, session domain.SessionID) runtime.Runti
 		return runtime.RuntimeBinding{}
 	}
 	var out runtime.RuntimeBinding
+	if ws, ok := a.Workspace(s.Workspace); ok {
+		out.WorkingDirectory = ws.RootPath
+	}
 	for _, c := range a.Correlations(domain.TargetInstance, string(s.Current)) {
 		if c.Status != domain.CorrelationActive {
 			continue

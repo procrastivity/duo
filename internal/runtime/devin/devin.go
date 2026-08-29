@@ -1,9 +1,9 @@
 // Package devin is the candidate Devin CLI agent-runtime adapter.
-// Stage A (duo-devin-loop/correlate) ships RuntimeCorrelator and a
-// §5.1 factory only. ConversationProvider, RuntimePromptProvider, and
-// RuntimeReadyProvider stay out: prompt is Stage B (ACP), conversation
-// is Stage C (ATIF). See terminal-multiplexers/notes/59-devin-full-sweep.md
-// and notes/60-devin-launch-first-pass.md.
+// Stage A shipped RuntimeCorrelator. Stage B (duo-devin-loop/prompt)
+// adds RuntimePromptProvider over ACP stdio. ConversationProvider and
+// RuntimeReadyProvider stay out (ATIF is Stage C). See
+// terminal-multiplexers/notes/59-devin-full-sweep.md and
+// notes/60-devin-launch-first-pass.md.
 //
 // AdapterID is "devin", matching launch-tuple kind and
 // agentRuntimeIntegrationID's identity map. notes/59's draft
@@ -14,6 +14,7 @@ package devin
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 
 	"github.com/procrastivity/duo/internal/adapter"
@@ -41,11 +42,19 @@ const ConfidenceInferred = "inferred"
 // on the host record, and the transcript is unresolved until Stage C.
 type Runtime struct {
 	integrationInstanceID string
+	// ACPCommand is the argv for the ACP stdio server. Empty means
+	// {"devin", "acp"}. Tests point it at a missing path to prove
+	// spawn-fail is no_effect.
+	ACPCommand []string
+	// ACPDial, when set, replaces spawning ACPCommand. Tests inject a
+	// fake stdio server. Production leaves it nil.
+	ACPDial func(context.Context) (io.ReadWriteCloser, error)
 }
 
 var (
-	_ runtime.RuntimeCorrelator = (*Runtime)(nil)
-	_ adapter.Factory[*Runtime] = Factory{}
+	_ runtime.RuntimeCorrelator     = (*Runtime)(nil)
+	_ runtime.RuntimePromptProvider = (*Runtime)(nil)
+	_ adapter.Factory[*Runtime]     = Factory{}
 )
 
 // New returns a Devin runtime adapter for one integration instance.
