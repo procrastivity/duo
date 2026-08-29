@@ -457,11 +457,23 @@ func assertDevinPrintMintFlags(t *testing.T, result *launch.Result, req host.Hos
 	if printPrompt != runtimedevin.LaunchMintPrompt {
 		t.Fatalf("--print = %q, want %q", printPrompt, runtimedevin.LaunchMintPrompt)
 	}
-	for _, forbidden := range []string{"--permission-mode", "dangerous"} {
-		for _, arg := range req.ResolvedLaunchTuple.Args {
-			if arg == forbidden {
-				t.Fatalf("leaf args = %v, must not contain %q", req.ResolvedLaunchTuple.Args, forbidden)
-			}
+	mode, present := findFlag(req.ResolvedLaunchTuple.Args, "--permission-mode")
+	if !present {
+		t.Fatalf("leaf args = %v, want a --permission-mode flag", req.ResolvedLaunchTuple.Args)
+	}
+	if mode != "smart" {
+		t.Fatalf("--permission-mode = %q, want %q", mode, "smart")
+	}
+	trust, present := findFlag(req.ResolvedLaunchTuple.Args, "--respect-workspace-trust")
+	if !present {
+		t.Fatalf("leaf args = %v, want a --respect-workspace-trust flag", req.ResolvedLaunchTuple.Args)
+	}
+	if trust != "false" {
+		t.Fatalf("--respect-workspace-trust = %q, want %q", trust, "false")
+	}
+	for _, arg := range req.ResolvedLaunchTuple.Args {
+		if arg == "dangerous" {
+			t.Fatalf("leaf args = %v, must not contain %q", req.ResolvedLaunchTuple.Args, "dangerous")
 		}
 	}
 }
