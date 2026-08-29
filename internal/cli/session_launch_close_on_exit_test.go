@@ -461,8 +461,8 @@ func assertDevinPrintMintFlags(t *testing.T, result *launch.Result, req host.Hos
 	if !present {
 		t.Fatalf("leaf args = %v, want a --permission-mode flag", req.ResolvedLaunchTuple.Args)
 	}
-	if mode != "smart" {
-		t.Fatalf("--permission-mode = %q, want %q", mode, "smart")
+	if mode != "accept-edits" {
+		t.Fatalf("--permission-mode = %q, want %q", mode, "accept-edits")
 	}
 	trust, present := findFlag(req.ResolvedLaunchTuple.Args, "--respect-workspace-trust")
 	if !present {
@@ -472,8 +472,8 @@ func assertDevinPrintMintFlags(t *testing.T, result *launch.Result, req host.Hos
 		t.Fatalf("--respect-workspace-trust = %q, want %q", trust, "false")
 	}
 	for _, arg := range req.ResolvedLaunchTuple.Args {
-		if arg == "dangerous" {
-			t.Fatalf("leaf args = %v, must not contain %q", req.ResolvedLaunchTuple.Args, "dangerous")
+		if arg == "dangerous" || arg == "smart" {
+			t.Fatalf("leaf args = %v, must not contain %q", req.ResolvedLaunchTuple.Args, arg)
 		}
 	}
 }

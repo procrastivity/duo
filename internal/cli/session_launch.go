@@ -622,7 +622,7 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // and when close-on-exit is active appends a second `-e <close-on-exit
 // path>` plus DUO_CLOSE_PANE_ON_EXIT=1 (internal/runtime/pi/closeonexit.go,
 // deliberately separate from the shipped reporter extension). Devin always
-// appends `--export <ATIFPath>`, `--permission-mode smart`,
+// appends `--export <ATIFPath>`, `--permission-mode accept-edits`,
 // `--respect-workspace-trust false`, and `--print` LaunchMintPrompt
 // (print-mint; the process is not a long-lived TUI) so conversation.list
 // has a file
@@ -653,8 +653,10 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // Close-on-exit is the product default (notes/51 record 7); --remain-on-exit
 // and config close_on_exit: false opt out of close-on-exit only. Claude
 // Augment is a no-op when closeOnExit is false. Pi Augment still materializes
-// inject. Devin Augment always appends `--export`, `--permission-mode smart`,
-// `--respect-workspace-trust false`, and `--print` LaunchMintPrompt. Every
+// inject. Devin Augment always appends `--export`, `--permission-mode
+// accept-edits` (3000.6.7 rejects smart; I-D3 forbids dangerous; exec is
+// the operator Devin permissions.allow list), `--respect-workspace-trust
+// false`, and `--print` LaunchMintPrompt. Every
 // other agent runtime is untouched.
 type stage1LeafAugmenter struct{}
 
@@ -710,7 +712,7 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf s
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return launch.LeafAugmentation{}, fmt.Errorf("cli: creating the Devin ATIF export directory for leaf %s: %w", leaf, err)
 		}
-		return launch.LeafAugmentation{Args: []string{"--export", path, "--permission-mode", "smart", "--respect-workspace-trust", "false", "--print", devin.LaunchMintPrompt}}, nil
+		return launch.LeafAugmentation{Args: []string{"--export", path, "--permission-mode", "accept-edits", "--respect-workspace-trust", "false", "--print", devin.LaunchMintPrompt}}, nil
 	default:
 		return launch.LeafAugmentation{}, nil
 	}
