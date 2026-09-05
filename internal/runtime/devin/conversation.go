@@ -13,8 +13,8 @@ import (
 
 // atifDoc is the ATIF-v1.7 export envelope (notes/59). The file is one
 // JSON document, not JSONL. ConversationProvider projects user and
-// assistant text only; thinking, system steps, and tool calls are
-// dropped (I-D11; ConversationTurn has no tool or thinking field).
+// assistant text plus tool calls. ATIF has no tool-result steps; results are
+// enriched separately from Devin's read-only session store.
 type atifDoc struct {
 	SchemaVersion string     `json:"schema_version"`
 	SessionID     string     `json:"session_id"`
@@ -43,13 +43,16 @@ type atifToolCall struct {
 // (that flag is turn-side-effect, not a dump; `--resume` opens the TUI).
 // Empty TranscriptID is a hard error. Pagination matches Claude: After is
 // a decimal offset into the projected turn slice.
-func (r *Runtime) ReadConversation(_ context.Context, req runtime.ConversationReadRequest) (runtime.ConversationBatch, error) {
+func (r *Runtime) ReadConversation(ctx context.Context, req runtime.ConversationReadRequest) (runtime.ConversationBatch, error) {
 	if req.TranscriptID == "" {
 		return runtime.ConversationBatch{}, fmt.Errorf("devin runtime: opening transcript: missing transcript")
 	}
 	all, err := parseATIFTurns(req.TranscriptID)
 	if err != nil {
 		return runtime.ConversationBatch{}, err
+	}
+	if store, ok := r.readStoreConversation(ctx, req.ExternalAgentSessionID); ok {
+		all = mergeStoreResults(all, store)
 	}
 
 	offset, err := cursorOffset(req.After)
@@ -93,9 +96,7 @@ func parseATIFTurns(path string) ([]runtime.ConversationTurn, error) {
 	}
 	var turns []runtime.ConversationTurn
 	for _, step := range doc.Steps {
-		if turn, ok := projectATIFStep(step); ok {
-			turns = append(turns, turn)
-		}
+		turns = append(turns, projectATIFStep(step)...)
 	}
 	return turns, nil
 }
@@ -115,7 +116,7 @@ func readATIF(path string) (atifDoc, error) {
 	return doc, nil
 }
 
-func projectATIFStep(step atifStep) (runtime.ConversationTurn, bool) {
+func projectATIFStep(step atifStep) []runtime.ConversationTurn {
 	var role string
 	switch step.Source {
 	case "user":
@@ -123,18 +124,30 @@ func projectATIFStep(step atifStep) (runtime.ConversationTurn, bool) {
 	case "agent":
 		role = "assistant"
 	default:
-		return runtime.ConversationTurn{}, false
-	}
-	if step.Message == "" {
-		return runtime.ConversationTurn{}, false
+		return nil
 	}
 	at, _ := parseATIFTime(step.Timestamp)
-	return runtime.ConversationTurn{
-		ID:   strconv.Itoa(step.StepID),
-		Role: role,
-		Text: step.Message,
-		At:   at,
-	}, true
+	var turns []runtime.ConversationTurn
+	if step.Message != "" {
+		turns = append(turns, runtime.ConversationTurn{
+			ID: strconv.Itoa(step.StepID), Role: role, Text: step.Message, At: at,
+		})
+	}
+	if step.Source != "agent" {
+		return turns
+	}
+	for i, call := range step.ToolCalls {
+		turns = append(turns, runtime.ConversationTurn{
+			ID:         fmt.Sprintf("%d.tool.%d", step.StepID, i),
+			Role:       "assistant",
+			At:         at,
+			Kind:       "tool_call",
+			ToolCallID: call.ToolCallID,
+			ToolName:   call.FunctionName,
+			Arguments:  append([]byte(nil), call.Arguments...),
+		})
+	}
+	return turns
 }
 
 func parseATIFTime(s string) (time.Time, error) {
