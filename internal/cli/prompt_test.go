@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os/exec"
@@ -18,9 +19,54 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
+	"github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	"github.com/procrastivity/duo/internal/store"
 )
+
+func TestMapPromptReleaseDevinLockJSON(t *testing.T) {
+	for _, tc := range []struct {
+		name, title string
+	}{
+		{name: "without title"},
+		{name: "with title", title: "Reply with exactly: LOCKED"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stderr bytes.Buffer
+			streams := &iostreams.Streams{Err: &stderr}
+			err := mapPromptReleaseError(streams, "json", "prompt.deliver", domain.PromptCommand{ID: "cmd_lock"}, &devin.SessionLockedError{
+				SessionID: "dark-carnation", Title: tc.title,
+			})
+			if err == nil {
+				t.Fatal("expected written failure marker")
+			}
+			assertValidExternalV1(t, stderr.Bytes())
+			var env struct {
+				Error struct {
+					Code, Message, Effect string
+					Retry                 promptRetryAdvice
+					Details               map[string]any
+				} `json:"error"`
+			}
+			if json.Unmarshal(stderr.Bytes(), &env) != nil {
+				t.Fatalf("invalid JSON: %s", stderr.String())
+			}
+			if env.Error.Code != "operation.temporarily_unavailable" || env.Error.Effect != "unknown_effect" || !env.Error.Retry.Safe || env.Error.Retry.Action != "retry_after_holder_release" {
+				t.Fatalf("error mapping = %+v", env.Error)
+			}
+			if env.Error.Details["error_kind"] != "session_locked" || env.Error.Details["devin_session_id"] != "dark-carnation" {
+				t.Fatalf("details = %#v", env.Error.Details)
+			}
+			gotTitle, hasTitle := env.Error.Details["devin_session_title"]
+			if hasTitle != (tc.title != "") || (hasTitle && gotTitle != tc.title) {
+				t.Fatalf("devin_session_title = %#v, present %v", gotTitle, hasTitle)
+			}
+			if !strings.Contains(env.Error.Message, "dark-carnation") || strings.Contains(strings.ToLower(env.Error.Message), "process") || strings.Contains(strings.ToLower(env.Error.Message), "pane") {
+				t.Fatalf("unsafe or incomplete message: %q", env.Error.Message)
+			}
+		})
+	}
+}
 
 func TestPromptSendAndShow_FakePairQueuedThenInspect(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())

@@ -18,6 +18,22 @@ import (
 // not delivered. Callers may errors.Is this value.
 var ErrSessionLocked = errors.New("devin: session_locked")
 
+// SessionLockedError identifies the exact bound session that Devin refused
+// to load. Title is present only when an exact-id `devin list` row supplied it.
+type SessionLockedError struct {
+	SessionID string
+	Title     string
+}
+
+func (e *SessionLockedError) Error() string {
+	if e.Title != "" {
+		return fmt.Sprintf("devin: session %q (%q) is locked", e.SessionID, e.Title)
+	}
+	return fmt.Sprintf("devin: session %q is locked", e.SessionID)
+}
+
+func (e *SessionLockedError) Unwrap() error { return ErrSessionLocked }
+
 // ErrSessionNotFound is ACP session/load -32016: the id is not in the
 // CLI store. A Herdr-named TUI pane can bind before a store row exists
 // (live finding, duo-devin-loop/prompt). Not retryable.
@@ -86,7 +102,10 @@ func (r *Runtime) DeliverPrompt(ctx context.Context, req runtime.PromptDeliveryR
 		"mcpServers": []any{},
 	}
 	if err := r.rpcCall(ctx, conn, acpLoadID, "session/load", loadParams); err != nil {
-		if errors.Is(err, ErrSessionLocked) || errors.Is(err, ErrSessionNotFound) {
+		if errors.Is(err, ErrSessionLocked) {
+			return runtime.PromptDeliveryResult{}, r.sessionLocked(ctx, req.Binding)
+		}
+		if errors.Is(err, ErrSessionNotFound) {
 			return runtime.PromptDeliveryResult{}, err
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -101,6 +120,9 @@ func (r *Runtime) DeliverPrompt(ctx context.Context, req runtime.PromptDeliveryR
 	}
 	raw, err := r.rpcCallResult(ctx, conn, acpPromptID, "session/prompt", promptParams)
 	if err != nil {
+		if errors.Is(err, ErrSessionLocked) {
+			return runtime.PromptDeliveryResult{}, r.sessionLocked(ctx, req.Binding)
+		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return runtime.PromptDeliveryResult{}, err
 		}
@@ -153,7 +175,7 @@ func (r *Runtime) deliverPromptResume(ctx context.Context, req runtime.PromptDel
 	}
 
 	if resumeOutputSessionLocked(outStr) {
-		return runtime.PromptDeliveryResult{}, ErrSessionLocked
+		return runtime.PromptDeliveryResult{}, r.sessionLocked(ctx, req.Binding)
 	}
 	if resumeOutputSessionNotFound(outStr) {
 		return runtime.PromptDeliveryResult{}, ErrSessionNotFound
@@ -162,6 +184,42 @@ func (r *Runtime) deliverPromptResume(ctx context.Context, req runtime.PromptDel
 		return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectDelivered}, nil
 	}
 	return runtime.PromptDeliveryResult{Effect: runtime.PromptEffectUnknownEffect}, nil
+}
+
+func (r *Runtime) sessionLocked(ctx context.Context, binding runtime.RuntimeBinding) error {
+	locked := &SessionLockedError{SessionID: binding.ExternalAgentSessionID}
+	out, err := r.listSessions(ctx, binding.WorkingDirectory)
+	if err != nil {
+		return locked
+	}
+	var rows []struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	if json.Unmarshal(out, &rows) != nil {
+		return locked
+	}
+	var matches []string
+	for _, row := range rows {
+		if row.ID == locked.SessionID {
+			matches = append(matches, row.Title)
+		}
+	}
+	if len(matches) == 1 {
+		locked.Title = matches[0]
+	}
+	return locked
+}
+
+func (r *Runtime) listSessions(ctx context.Context, cwd string) ([]byte, error) {
+	if r.ListSessions != nil {
+		return r.ListSessions(ctx, cwd)
+	}
+	cmd := exec.CommandContext(ctx, "devin", "list", "--format", "json")
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+	return cmd.Output()
 }
 
 func resumeOutputSessionLocked(out string) bool {
