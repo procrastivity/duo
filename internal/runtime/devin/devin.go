@@ -56,6 +56,9 @@ type Runtime struct {
 	// ListSessions, when set, replaces `devin list --format json` for
 	// best-effort lock title enrichment. The cwd is the bound workspace.
 	ListSessions func(context.Context, string) ([]byte, error)
+	// SessionsDBPath overrides Devin's sessions.db location. Production uses
+	// the XDG data directory; tests point this at a temporary read-only forest.
+	SessionsDBPath string
 }
 
 var (
