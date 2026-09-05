@@ -99,12 +99,13 @@ func TestPaneCommandActuallyScrubsAtExecTime(t *testing.T) {
 	cmd := exec.CommandContext(ctx, "sh", "-c", line)
 	cmd.Env = []string{
 		"PATH=" + mustLookPathDir(t, "env") + ":" + mustLookPathDir(t, "sh") + ":" + mustLookPathDir(t, "sed"),
-		"CLAUDECODE=1",
-		"AI_AGENT=1",
-		"CLAUDE_CODE_CHILD_SESSION=abc",
 		"CLAUDE_CODE_ENTRYPOINT=duo",
 		"CLAUDE_CONFIG_DIR=/x",
+		"DEVIN_ID=reported-session",
 		"HARMLESS=keep-me",
+	}
+	for _, marker := range Markers {
+		cmd.Env = append(cmd.Env, marker+"=1")
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -117,10 +118,13 @@ func TestPaneCommandActuallyScrubsAtExecTime(t *testing.T) {
 	if !strings.Contains(got, "HARMLESS=keep-me") {
 		t.Errorf("the wrapped command lost an unrelated variable; output:\n%s", got)
 	}
-	for _, marker := range []string{"CLAUDECODE", "AI_AGENT", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR"} {
+	for _, marker := range append(append([]string(nil), Markers...), "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CONFIG_DIR") {
 		if strings.Contains(got, marker+"=") {
 			t.Errorf("marker %s survived into the wrapped command's environment; output:\n%s", marker, got)
 		}
+	}
+	if !strings.Contains(got, "DEVIN_ID=reported-session") {
+		t.Errorf("reported Devin id was scrubbed from the wrapped command's environment; output:\n%s", got)
 	}
 }
 

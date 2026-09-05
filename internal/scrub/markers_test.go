@@ -10,6 +10,9 @@ func TestIsMarker(t *testing.T) {
 		{"CLAUDE_CODE_CHILD_SESSION", true},
 		{"CLAUDECODE", true},
 		{"AI_AGENT", true},
+		{"DEVIN_PERMISSION_MODE", true},
+		{"DEVIN_MODEL", true},
+		{"DEVIN_SANDBOX", true},
 		{"CLAUDE_CODE_ENTRYPOINT", true},      // wildcard
 		{"CLAUDE_CONFIG_DIR", true},           // wildcard
 		{"CLAUDE_CODE_MESSAGING_TOKEN", true}, // wildcard, decisions.md G-24 candidate
@@ -18,6 +21,7 @@ func TestIsMarker(t *testing.T) {
 		{"PATH", false},
 		{"HOME", false},
 		{"DUO_SESSION", false},
+		{"DEVIN_ID", false}, // reported identity, not a spawn marker
 		{"AI_AGENT_X", false}, // AI_AGENT is exact-name only; see TestAIAgentExactNameOnly
 		{"NOT_CLAUDE_", false},
 		{"CLAUDE", false}, // no trailing underscore: does not match the CLAUDE_ prefix

@@ -10,10 +10,13 @@ this package.
 
 ## One deny list, in `markers.go`
 
-`Markers` (`CLAUDE_CODE_CHILD_SESSION`, `CLAUDECODE`, `AI_AGENT`) and
-`WildcardPrefixes` (`CLAUDE_`) are the entire scrub policy. Everything else
-in this package — `Environ`, `Verify`, `Guard`, `PaneCommand` — is derived
-from those two slices, never a second copy of a name.
+`Markers` (`CLAUDE_CODE_CHILD_SESSION`, `CLAUDECODE`, `AI_AGENT`,
+`DEVIN_PERMISSION_MODE`, `DEVIN_MODEL`, `DEVIN_SANDBOX`) and
+`WildcardPrefixes` (`CLAUDE_`) are the entire scrub policy. `DEVIN_ID` is
+intentionally not a marker: it is a reported Devin session identity, not a
+spawn-control flag. Everything else in this package — `Environ`, `Verify`,
+`Guard`, `PaneCommand` — is derived from those two slices, never a second
+copy of a name.
 `TestNoDuplicateMarkerLiteralsOutsideScrub` (`singlesource_test.go`) is
 `internal/registry`'s `TestNoDuplicateOperationTableOutsideRegistry`
 tripwire pattern applied here: it walks every `.go` file outside
@@ -21,9 +24,9 @@ tripwire pattern applied here: it walks every `.go` file outside
 build on any match. Unlike registry's operation names (which tolerate one
 or two legitimate call-site mentions before they read as a duplicate
 inventory), this tripwire is zero-tolerance — nothing outside this package
-has a legitimate reason to spell `"CLAUDECODE"`, `"AI_AGENT"`, or
-`"CLAUDE_"` as a literal, so any occurrence at all is a duplicate of the
-one place this policy lives.
+has a legitimate reason to spell a marker literal such as `"CLAUDECODE"`,
+`"AI_AGENT"`, or `"DEVIN_MODEL"` outside this package, so any occurrence at
+all is a duplicate of the one place this policy lives.
 
 `AI_AGENT` is deliberately an *exact-name* marker, not a wildcard prefix:
 `AI_AGENT_FOO` is not scrubbed unless a future change adds an `AI_AGENT_`
