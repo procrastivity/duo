@@ -53,6 +53,9 @@ type Runtime struct {
 	// ResumeCommand is the argv for spawn-per-prompt delivery. Empty
 	// means {"devin"}. Tests point it at a fake executable.
 	ResumeCommand []string
+	// ListSessions, when set, replaces `devin list --format json` for
+	// best-effort lock title enrichment. The cwd is the bound workspace.
+	ListSessions func(context.Context, string) ([]byte, error)
 }
 
 var (

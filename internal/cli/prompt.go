@@ -581,13 +581,25 @@ func mapPromptReleaseError(streams *iostreams.Streams, mode, op string, cmd doma
 		})
 	}
 	if errors.Is(err, devin.ErrSessionLocked) {
+		message := "The bound Devin session is locked. Close that Devin session before retrying."
+		details := map[string]any{"error_kind": "session_locked"}
+		var locked *devin.SessionLockedError
+		if errors.As(err, &locked) {
+			details["devin_session_id"] = locked.SessionID
+			if locked.Title != "" {
+				details["devin_session_title"] = locked.Title
+				message = fmt.Sprintf("The Devin session %q (%q) is locked. Close that Devin session before retrying.", locked.SessionID, locked.Title)
+			} else {
+				message = fmt.Sprintf("The Devin session %q is locked. Close that Devin session before retrying.", locked.SessionID)
+			}
+		}
 		return writePromptFailure(streams, mode, op, promptFailure{
 			Code:    "operation.temporarily_unavailable",
-			Message: "The Devin session is already open in another process (ACP session_locked).",
+			Message: message,
 			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
 			Retry:   promptRetryAdvice{Safe: true, Action: "retry_after_holder_release"},
 			Effect:  "unknown_effect",
-			Details: map[string]any{"error_kind": "session_locked"},
+			Details: details,
 		})
 	}
 	if errors.Is(err, devin.ErrSessionNotFound) {
