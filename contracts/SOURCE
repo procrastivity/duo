@@ -47,4 +47,4 @@ d1a2fd1be5339c5699a21cf65616a4d09ff932a5495111d02a422b7656086842  schemas/duo-co
 8b055ff60f0ca5f3da46302671591aa0dae61185cd9f1f15fcceb36d841e7497  schemas/duo-external-v1.schema.json
 0e580adec7e8ad7e75b8c103ab8eebbc27beff934f6747cc9bda983ab90cb73f  schemas/duo-manifest-v1.schema.json
 388e3918e7b1421e341317c81f2c1754bd06d594b946d045a3a68e18adaf6acb  schemas/duo-projection-conformance-v1.schema.json
-c91e691f42302c78f95efb5d2e36004d33f08935495cc044351438c33aced85f  schemas/duo-projection-stamp-v1.schema.json
+238c56beae5fe97dfc774f9c54229ac9f26f964a1b9c42c59d0f66f37f8bdf91  schemas/duo-projection-stamp-v1.schema.json

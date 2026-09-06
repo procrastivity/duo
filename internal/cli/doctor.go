@@ -21,6 +21,7 @@ import (
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/iostreams"
+	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/launch/materialize"
 	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
@@ -148,6 +149,7 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 				RecoveringInstances: len(a.Recovering()),
 				ScrubGate:           doctorScrubGate(deduction),
 				HarnessSweep:        sweep,
+				DevinProjection:     doctorDevinProjection(a, root),
 			}
 
 			if flags.JSON() {
@@ -215,6 +217,7 @@ func humanReport(report doctorReport) string {
 	writeScrubGateSection(&b, report.ScrubGate)
 	writeProvidersSection(&b, report.Providers)
 	writeConfigSection(&b, report.Config)
+	writeDevinProjectionSection(&b, report.DevinProjection)
 
 	if report.RecoveringInstances > 0 {
 		noun := "instances"
@@ -279,6 +282,10 @@ type doctorReport struct {
 	// matching live (non-terminal) runtime instance, including dirs whose
 	// launch never committed a record. Filesystem-only; no socket dial.
 	HarnessSweep doctor.HarnessSweep `json:"harness_sweep"`
+	// DevinProjection is the launch-workspace hook projection and its
+	// session-start drift status. It is additive so existing doctor readers
+	// keep their store/adapters and visibility sections unchanged.
+	DevinProjection runtimedevin.ProjectionInspection `json:"devin_projection"`
 }
 
 // doctorHostDeductionSection is what M1 would deduce right now for the
@@ -463,6 +470,17 @@ func writeConfigSection(b *strings.Builder, c doctorConfigSection) {
 	}
 }
 
+func writeDevinProjectionSection(b *strings.Builder, p runtimedevin.ProjectionInspection) {
+	fmt.Fprintf(b, "  devin hooks:     %s\n", p.Status)
+	fmt.Fprintf(b, "    file:          %s\n", p.HooksPath)
+	if p.ActiveLaunches > 0 {
+		fmt.Fprintf(b, "    active launches: %d\n", p.ActiveLaunches)
+	}
+	if p.Detail != "" {
+		fmt.Fprintf(b, "    detail:        %s\n", p.Detail)
+	}
+}
+
 // doctorHostBinding builds the current workspace↔host correlation section
 // for root, reusing workspace.go's own hostView/hostProvenance helpers
 // (unexported, same package) so this can never drift from what
@@ -488,6 +506,42 @@ func doctorHostBinding(a *domain.Authority, root string) workspaceHostShowResult
 		result.Previous = hostView(*c.Previous)
 	}
 	return result
+}
+
+// doctorDevinProjection reads the launch-owned projection in the same
+// workspace doctor is already inspecting. Active Devin launches are derived
+// from the durable session/launch records; if a later launch regenerated the
+// file, an older still-running session makes the projection stale because
+// Devin loaded its earlier file only at session start.
+func doctorDevinProjection(a *domain.Authority, root string) runtimedevin.ProjectionInspection {
+	active := make([]runtimedevin.ProjectionActiveLaunch, 0)
+	workspace, ok := a.WorkspaceForRoot(root)
+	if ok {
+		for _, session := range a.Sessions() {
+			if session.Workspace != workspace.ID || session.Current == "" {
+				continue
+			}
+			instance, ok := a.Instance(session.Current)
+			if !ok || instance.State.Terminal() {
+				continue
+			}
+			resolution, ok := a.SessionLaunchResolution(session.ID)
+			if !ok {
+				continue
+			}
+			var record launch.Record
+			if err := json.Unmarshal(resolution.Body, &record); err != nil {
+				continue
+			}
+			for _, assignment := range record.Assignment {
+				if assignment.Tuple.AgentRuntime == "devin" {
+					active = append(active, runtimedevin.ProjectionActiveLaunch{InstallationID: string(resolution.ID)})
+					break
+				}
+			}
+		}
+	}
+	return runtimedevin.InspectProjection(root, active)
 }
 
 // doctorHostDeduction runs Materialize read-only against the real

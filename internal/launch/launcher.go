@@ -89,7 +89,7 @@ type LeafAugmentation struct {
 // returns Args `["-e", <path>]` plus Env `{"DUO_CLOSE_PANE_ON_EXIT": "1"}`.
 // See host.ResolvedLaunchTuple.CloseOnExit.
 type LeafAugmenter interface {
-	Augment(ctx context.Context, launchResolutionID, leaf string, t Tuple, closeOnExit bool) (LeafAugmentation, error)
+	Augment(ctx context.Context, launchResolutionID, leaf, workspacePath string, t Tuple, closeOnExit bool) (LeafAugmentation, error)
 }
 
 // Launcher is the ordering guarantee: it resolves, commits the
@@ -301,7 +301,7 @@ func (l *Launcher) spawn(ctx context.Context, c *committed, req SpawnRequest) (*
 		args := assignment.Tuple.Arguments
 		env := req.Env
 		if l.augmenter != nil {
-			aug, err := l.augmenter.Augment(ctx, c.record.ID, assignment.Leaf, assignment.Tuple, closeOnExit)
+			aug, err := l.augmenter.Augment(ctx, c.record.ID, assignment.Leaf, req.WorkspacePath, assignment.Tuple, closeOnExit)
 			if err != nil {
 				return out, fmt.Errorf("launch: leaf %s: augmenting launch: %w", assignment.Leaf, err)
 			}
