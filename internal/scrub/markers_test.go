@@ -21,7 +21,7 @@ func TestIsMarker(t *testing.T) {
 		{"PATH", false},
 		{"HOME", false},
 		{"DUO_SESSION", false},
-		{"DEVIN_ID", false}, // reported identity, not a spawn marker
+		{"DEVIN_ID", false},   // reported identity, not a spawn marker
 		{"AI_AGENT_X", false}, // AI_AGENT is exact-name only; see TestAIAgentExactNameOnly
 		{"NOT_CLAUDE_", false},
 		{"CLAUDE", false}, // no trailing underscore: does not match the CLAUDE_ prefix

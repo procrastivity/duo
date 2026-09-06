@@ -6,10 +6,8 @@
 #
 # A commit-msg hook enforces conventional commits from commit one.
 #
-# Bootstrap once: `make hooks` (runs `pre-commit install`). This only
-# installs the pre-commit stage by default; the commit-msg hook also needs
-# `pre-commit install --hook-type commit-msg` (run once, alongside `make
-# hooks`). Run on demand: `pre-commit run --all-files`.
+# Bootstrap once: `make hooks` installs both the pre-commit and commit-msg
+# stages. Run on demand: `pre-commit run --all-files`.
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

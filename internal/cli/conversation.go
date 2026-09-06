@@ -160,13 +160,14 @@ func conversationItemFromTurn(sessionID, runtimeInstanceID string, turn runtime.
 		blockType = "text"
 	}
 	content := conversationBlockContent{Text: turn.Text}
-	if blockType == "tool_call" {
+	switch blockType {
+	case "tool_call":
 		content = conversationBlockContent{
 			ToolCallID: turn.ToolCallID,
 			Name:       turn.ToolName,
 			Arguments:  append(json.RawMessage(nil), turn.Arguments...),
 		}
-	} else if blockType == "tool_result" {
+	case "tool_result":
 		content.ToolCallID = turn.ToolCallID
 		content.Status = turn.Status
 	}
