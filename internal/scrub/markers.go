@@ -9,8 +9,8 @@ import "strings"
 // and responds to by silently disabling its own transcript writing
 // (conformance §8; notes/19-herdr-probes.md §0).
 //
-// This is the single source for these three names. Nothing outside this
-// package may hardcode one of them; TestNoDuplicateMarkerLiteralsOutsideScrub
+// This is the single source for these exact-name markers. Nothing outside
+// this package may hardcode one of them; TestNoDuplicateMarkerLiteralsOutsideScrub
 // enforces that mechanically.
 var Markers = []string{
 	// CLAUDE_CODE_CHILD_SESSION is the specific marker conformance §8
@@ -26,6 +26,11 @@ var Markers = []string{
 	// AI_AGENT is a generic cross-tool "an agent harness owns this
 	// process" flag some runtimes set and others read.
 	"AI_AGENT",
+	// Devin's launch controls are inherited by child processes and must
+	// not leak into an independent Duo-spawned Devin session.
+	"DEVIN_PERMISSION_MODE",
+	"DEVIN_MODEL",
+	"DEVIN_SANDBOX",
 }
 
 // WildcardPrefixes lists environment-variable name prefixes scrubbed in

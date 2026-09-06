@@ -40,6 +40,7 @@ import (
 // PaneCommand returns:
 //
 //	env -u CLAUDECODE -u AI_AGENT -u CLAUDE_CODE_CHILD_SESSION \
+//	  -u DEVIN_PERMISSION_MODE -u DEVIN_MODEL -u DEVIN_SANDBOX \
 //	  sh -c '<wildcard sweep>; exec "$@"' duo-scrub 'command' 'args...'
 //
 // with every token after the outer `env -u ...` individually

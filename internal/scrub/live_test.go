@@ -169,8 +169,8 @@ func startDisposableHerdrServer(t *testing.T, env []string) disposableHerdrServe
 	session := "dsl-" + strconv.FormatUint(wireSeq.Add(1), 36)
 
 	// env may still carry ambient HERDR_SESSION / HERDR_SOCKET_PATH /
-	// XDG_CONFIG_HOME (Guard only scrubs the CLAUDE_*/CLAUDECODE/AI_AGENT
-	// markers, not these) — this process itself runs inside a live Herdr
+	// XDG_CONFIG_HOME (Guard only scrubs the configured markers, not these)
+	// — this process itself runs inside a live Herdr
 	// pane, so os.Environ() already has real values for all three.
 	// Duplicate entries in an exec.Cmd.Env are implementation-defined
 	// (observed live: the ambient HERDR_SESSION won, and the "disposable"

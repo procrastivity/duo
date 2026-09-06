@@ -14,12 +14,17 @@ func TestEnvironRemovesAllMarkersIncludingWildcard(t *testing.T) {
 		"CLAUDE_CODE_CHILD_SESSION=abc123",
 		"CLAUDE_CODE_ENTRYPOINT=duo", // wildcard
 		"CLAUDE_CONFIG_DIR=/x",       // wildcard
+		"DEVIN_PERMISSION_MODE=accept-edits",
+		"DEVIN_MODEL=swe-1.7",
+		"DEVIN_SANDBOX=1",
+		"DEVIN_ID=reported-session",
 		"HOME=/home/dev",
 		"DUO_SESSION=s1",
 	}
 	got := Environ(in)
 	want := []string{
 		"PATH=/usr/bin",
+		"DEVIN_ID=reported-session",
 		"HOME=/home/dev",
 		"DUO_SESSION=s1",
 	}
@@ -45,7 +50,7 @@ func TestEnvironOnEmptyAndAllMarkers(t *testing.T) {
 	if got := Environ(nil); len(got) != 0 {
 		t.Errorf("Environ(nil) = %v, want empty", got)
 	}
-	all := []string{"CLAUDECODE=1", "AI_AGENT=1", "CLAUDE_CODE_CHILD_SESSION=1", "CLAUDE_FOO=1"}
+	all := []string{"CLAUDECODE=1", "AI_AGENT=1", "CLAUDE_CODE_CHILD_SESSION=1", "CLAUDE_FOO=1", "DEVIN_PERMISSION_MODE=1", "DEVIN_MODEL=1", "DEVIN_SANDBOX=1"}
 	if got := Environ(all); len(got) != 0 {
 		t.Errorf("Environ(%v) = %v, want empty", all, got)
 	}
@@ -85,6 +90,9 @@ func TestVerifyFailsClosedWhenAMarkerSurvives(t *testing.T) {
 		{"CLAUDECODE=1"},
 		{"AI_AGENT=1"},
 		{"CLAUDE_CODE_CHILD_SESSION=x"},
+		{"DEVIN_PERMISSION_MODE=1"},
+		{"DEVIN_MODEL=1"},
+		{"DEVIN_SANDBOX=1"},
 		{"CLAUDE_ANYTHING=x"}, // wildcard survivor
 		{"PATH=/bin", "CLAUDECODE=1"},
 	}
@@ -110,7 +118,7 @@ func TestVerifyCleanEnvironPasses(t *testing.T) {
 }
 
 func TestGuardScrubsAndPasses(t *testing.T) {
-	in := []string{"PATH=/bin", "CLAUDECODE=1", "CLAUDE_FOO=1", "AI_AGENT=1"}
+	in := []string{"PATH=/bin", "CLAUDECODE=1", "CLAUDE_FOO=1", "AI_AGENT=1", "DEVIN_MODEL=1"}
 	got, err := Guard(in)
 	if err != nil {
 		t.Fatalf("Guard(%v) returned error %v, want a scrubbed environ", in, err)

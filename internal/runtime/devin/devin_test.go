@@ -18,6 +18,9 @@ func TestFactoryDescriptor(t *testing.T) {
 	if d.ConformanceRecordDigest != "notes59-devin-3000.6.7" {
 		t.Fatalf("ConformanceRecordDigest = %q, want notes59-devin-3000.6.7", d.ConformanceRecordDigest)
 	}
+	if len(d.SupportedExternalVersions) != 2 || d.SupportedExternalVersions[0] != "3000.6.2" || d.SupportedExternalVersions[1] != devin.PinnedExternalVersion {
+		t.Fatalf("SupportedExternalVersions = %v, want [3000.6.2 %s]", d.SupportedExternalVersions, devin.PinnedExternalVersion)
+	}
 	if d.DiagnosticRedactionPolicy == "" {
 		t.Fatal("descriptor missing DiagnosticRedactionPolicy")
 	}

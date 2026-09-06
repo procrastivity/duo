@@ -22,34 +22,38 @@ import (
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch/materialize"
+	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	"github.com/procrastivity/duo/internal/scrub"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
 // registeredAdapters reports the adapter factories this composition root
-// registers, probed for their compatibility verdict. Stage 0 registers the
-// permanent fake pair (the cross-composition gate adapters); real host and
-// runtime adapters join this list in Stage 1. A probe error reports the
-// adapter as unavailable rather than dropping the row — doctor's job is to
-// show what is registered, not only what is healthy.
+// registers, probed for their compatibility verdict. A probe error reports
+// the adapter as unavailable rather than dropping the row — doctor's job is
+// to show what is registered, not only what is healthy. Devin's pin is kept
+// separate from its supported-version list because the list intentionally
+// retains the earlier 3000.6.2 evidence.
 func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 	hostFactory := hostfake.Factory{}
 	runtimeFactory := runtimefake.Factory{}
+	devinFactory := runtimedevin.Factory{}
 
-	out := make([]doctor.Adapter, 0, 2)
-	for _, probe := range []struct {
+	out := make([]doctor.Adapter, 0, 3)
+	for _, registered := range []struct {
 		descriptor func() adapter.Descriptor
 		probe      func(context.Context) (adapter.Probe, error)
+		pinned     string
 	}{
-		{hostFactory.Descriptor, hostFactory.Probe},
-		{runtimeFactory.Descriptor, runtimeFactory.Probe},
+		{descriptor: hostFactory.Descriptor, probe: hostFactory.Probe},
+		{descriptor: runtimeFactory.Descriptor, probe: runtimeFactory.Probe},
+		{descriptor: devinFactory.Descriptor, probe: devinFactory.Probe, pinned: runtimedevin.PinnedExternalVersion},
 	} {
-		compatibility := adapter.CompatibilityUnavailable
-		if p, err := probe.probe(cmd.Context()); err == nil {
-			compatibility = p.Compatibility
+		p := adapter.Probe{Compatibility: adapter.CompatibilityUnavailable}
+		if probed, err := registered.probe(cmd.Context()); err == nil {
+			p = probed
 		}
-		out = append(out, doctor.FromDescriptor(probe.descriptor(), compatibility))
+		out = append(out, doctor.FromProbe(registered.descriptor(), p, registered.pinned))
 	}
 	return out
 }
@@ -196,6 +200,14 @@ func humanReport(report doctorReport) string {
 	}
 	for _, a := range report.Adapters.Registered {
 		fmt.Fprintf(&b, "    %s (%s): %s\n", a.Name, a.Kind, a.Status)
+		if a.PinnedExternalVersion != "" {
+			detected := a.DetectedExternalVersion
+			if detected == "" {
+				detected = "not probed"
+			}
+			fmt.Fprintf(&b, "      external version: detected=%s, pinned=%s, supported=%s\n",
+				detected, a.PinnedExternalVersion, strings.Join(a.SupportedExternalVersions, ", "))
+		}
 	}
 
 	writeHostBindingSection(&b, report.HostBinding)

@@ -36,9 +36,12 @@ func TestDoctorCommand_JSON(t *testing.T) {
 		} `json:"store"`
 		Adapters struct {
 			Registered []struct {
-				Name   string `json:"name"`
-				Kind   string `json:"kind"`
-				Status string `json:"status"`
+				Name                      string   `json:"name"`
+				Kind                      string   `json:"kind"`
+				Status                    string   `json:"status"`
+				SupportedExternalVersions []string `json:"supportedExternalVersions"`
+				DetectedExternalVersion   string   `json:"detectedExternalVersion"`
+				PinnedExternalVersion     string   `json:"pinnedExternalVersion"`
 			} `json:"registered"`
 		} `json:"adapters"`
 	}
@@ -51,16 +54,30 @@ func TestDoctorCommand_JSON(t *testing.T) {
 	if !report.Store.Healthy {
 		t.Error("Store.Healthy = false for a merely-missing store")
 	}
-	if len(report.Adapters.Registered) != 2 {
-		t.Fatalf("Adapters.Registered has %d rows, want the fake pair", len(report.Adapters.Registered))
+	if len(report.Adapters.Registered) != 3 {
+		t.Fatalf("Adapters.Registered has %d rows, want the fake pair plus Devin", len(report.Adapters.Registered))
 	}
-	want := map[string]string{"fake-host": "session_host", "fake-runtime": "agent_runtime"}
+	want := map[string]string{"fake-host": "session_host", "fake-runtime": "agent_runtime", "devin": "agent_runtime"}
 	for _, a := range report.Adapters.Registered {
 		if want[a.Name] != a.Kind {
 			t.Errorf("adapter %q has kind %q, want %q", a.Name, a.Kind, want[a.Name])
 		}
-		if a.Status != "supported" {
+		if a.Name != "devin" && a.Status != "supported" {
 			t.Errorf("adapter %q has status %q, want \"supported\"", a.Name, a.Status)
+		}
+		if a.Name == "devin" {
+			if a.Status != "unverified" && a.Status != "unavailable" {
+				t.Errorf("Devin status = %q, want unverified or unavailable", a.Status)
+			}
+			if a.DetectedExternalVersion != "" {
+				t.Errorf("Devin detected version = %q, want empty because Probe does not execute --version", a.DetectedExternalVersion)
+			}
+			if a.PinnedExternalVersion != "3000.6.7" {
+				t.Errorf("Devin pinned version = %q, want 3000.6.7", a.PinnedExternalVersion)
+			}
+			if len(a.SupportedExternalVersions) != 2 || a.SupportedExternalVersions[0] != "3000.6.2" || a.SupportedExternalVersions[1] != "3000.6.7" {
+				t.Errorf("Devin supported versions = %v, want [3000.6.2 3000.6.7]", a.SupportedExternalVersions)
+			}
 		}
 	}
 }
@@ -83,6 +100,16 @@ func TestDoctorCommand_Human(t *testing.T) {
 	}
 	if out.Len() == 0 {
 		t.Error("human-mode output is empty")
+	}
+	for _, want := range []string{
+		"devin (agent_runtime):",
+		"external version: detected=not probed",
+		"pinned=3000.6.7",
+		"supported=3000.6.2, 3000.6.7",
+	} {
+		if !bytes.Contains(out.Bytes(), []byte(want)) {
+			t.Errorf("human-mode output missing %q:\n%s", want, out.String())
+		}
 	}
 }
 

@@ -71,11 +71,14 @@ type AdaptersStatus struct {
 
 // Adapter describes one registered session-host or agent-runtime adapter.
 type Adapter struct {
-	Name              string `json:"name"`
-	Kind              string `json:"kind"` // "session_host" | "agent_runtime"
-	Version           string `json:"version,omitempty"`
-	ConformanceDigest string `json:"conformanceDigest,omitempty"`
-	Status            string `json:"status,omitempty"`
+	Name                      string   `json:"name"`
+	Kind                      string   `json:"kind"` // "session_host" | "agent_runtime"
+	Version                   string   `json:"version,omitempty"`
+	ConformanceDigest         string   `json:"conformanceDigest,omitempty"`
+	Status                    string   `json:"status,omitempty"`
+	SupportedExternalVersions []string `json:"supportedExternalVersions,omitempty"`
+	DetectedExternalVersion   string   `json:"detectedExternalVersion"`
+	PinnedExternalVersion     string   `json:"pinnedExternalVersion,omitempty"`
 }
 
 // FromDescriptor maps one §5.1 adapter descriptor plus its probe's
@@ -92,12 +95,24 @@ func FromDescriptor(d adapter.Descriptor, compatibility adapter.CompatibilitySta
 		kind = "agent_runtime"
 	}
 	return Adapter{
-		Name:              d.AdapterID,
-		Kind:              kind,
-		Version:           d.BuildVersion,
-		ConformanceDigest: d.ConformanceRecordDigest,
-		Status:            string(compatibility),
+		Name:                      d.AdapterID,
+		Kind:                      kind,
+		Version:                   d.BuildVersion,
+		ConformanceDigest:         d.ConformanceRecordDigest,
+		Status:                    string(compatibility),
+		SupportedExternalVersions: append([]string(nil), d.SupportedExternalVersions...),
 	}
+}
+
+// FromProbe adds the external-version evidence a composition root gathered
+// for one descriptor. pinned is supplied separately because a descriptor may
+// support more than one external version while the build still pins one
+// version for its evidence.
+func FromProbe(d adapter.Descriptor, p adapter.Probe, pinned string) Adapter {
+	report := FromDescriptor(d, p.Compatibility)
+	report.DetectedExternalVersion = p.DetectedVersion
+	report.PinnedExternalVersion = pinned
+	return report
 }
 
 // xdgDataHome resolves the XDG data root: $XDG_DATA_HOME, falling back to

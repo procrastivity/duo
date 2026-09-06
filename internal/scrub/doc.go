@@ -7,8 +7,9 @@
 // 2026-08-23 amendment) makes the scrubbed spawn a hard Stage-1 gate: a
 // Duo-launched runtime that still carries an inherited agent-harness
 // marker (CLAUDECODE, CLAUDE_CODE_CHILD_SESSION, a CLAUDE_-prefixed
-// variable a wrapping Claude Code session set, or a generic AI_AGENT
-// flag) silently disables its own transcript. The P7 probe session
+// variable a wrapping Claude Code session set, a generic AI_AGENT flag, or
+// a Devin launch-control variable) silently disables its own transcript.
+// The P7 probe session
 // reproduced the failure signature live, through a Herdr pane that
 // inherited its server's environment (notes/19-herdr-probes.md §0;
 // review/05-close-report.md §1; docs/adapters/decisions.md, Herdr
