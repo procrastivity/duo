@@ -16,7 +16,9 @@ var errHeaderMismatch = errors.New("transcript header does not match session")
 
 // ObserveCondition implements runtime.ConditionProvider. The stream
 // emits one ATIF-derived snapshot and stays open until Close — no file
-// watch, no hooks (I-D13). Confidence is always inferred. A missing or
+// watch and no hook consumption (I-D13). The launch projection records
+// hook edges for a later consumer; it does not make them condition truth.
+// Confidence is always inferred. A missing or
 // unreadable document degrades to unknown; it is not an error.
 // SessionEnd reason "other" is not consumed here; do not treat it as
 // crash if a later hook consumer lands.

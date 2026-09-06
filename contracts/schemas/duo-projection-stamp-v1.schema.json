@@ -13,7 +13,7 @@
       "type": "object",
       "required": ["harness", "tested_version_range"],
       "properties": {
-        "harness": {"enum": ["claude_code", "codex", "opencode", "pi"]},
+        "harness": {"enum": ["claude_code", "codex", "devin", "opencode", "pi"]},
         "tested_version_range": {"type": "string", "minLength": 1}
       },
       "additionalProperties": true

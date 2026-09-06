@@ -627,6 +627,11 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // (print-mint; the process is not a long-lived TUI) so conversation.list
 // has a file
 // locator (duo-devin-atif-locator); that leg is not gated on close-on-exit.
+// It also materializes Devin's Duo-owned narrow hooks projection into the
+// launch workspace. Devin reads `.devin/hooks.v1.json` at session start,
+// so the projection carries an installation stamp that doctor can compare
+// with active launches and report as stale when a later launch regenerates
+// it without restarting the earlier Devin process.
 //
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
@@ -669,7 +674,7 @@ type stage1LeafAugmenter struct{}
 // not a convention this package chose.
 const closePaneOnExitEnvVar = "DUO_CLOSE_PANE_ON_EXIT"
 
-func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf string, t launch.Tuple, closeOnExit bool) (launch.LeafAugmentation, error) {
+func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf, workspacePath string, t launch.Tuple, closeOnExit bool) (launch.LeafAugmentation, error) {
 	switch t.AgentRuntime {
 	case "claude":
 		if !closeOnExit {
@@ -705,6 +710,12 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf s
 		}
 		return launch.LeafAugmentation{Args: args, Env: env}, nil
 	case "devin":
+		if workspacePath == "" {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: Devin hook projection for leaf %s needs a workspace path", leaf)
+		}
+		if _, err := devin.MaterializeHooks(workspacePath, launchResolutionID); err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the Devin hook projection for leaf %s: %w", leaf, err)
+		}
 		path, err := devin.ATIFPath(launchResolutionID, leaf)
 		if err != nil {
 			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the Devin ATIF export path for leaf %s: %w", leaf, err)

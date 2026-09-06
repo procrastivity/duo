@@ -546,3 +546,29 @@ func TestDevinExportStillAppendedOnRemainOnExit(t *testing.T) {
 		t.Fatalf("--export = %q, want %q", exportPath, want)
 	}
 }
+
+func TestDevinLaunchMaterializesNarrowHooksProjection(t *testing.T) {
+	h := newDevinBindHarness(t)
+	_, hosts := launchWithAugmenter(t, h, false)
+	req, ok := hosts.captured["primary"]
+	if !ok {
+		t.Fatal("leaf \"primary\" never reached PrepareLaunch")
+	}
+
+	hooksPath := filepath.Join(req.ResolvedLaunchTuple.WorkspacePath, ".devin", "hooks.v1.json")
+	b, err := os.ReadFile(hooksPath)
+	if err != nil {
+		t.Fatalf("read generated Devin hooks: %v", err)
+	}
+	if bytes.Contains(b, []byte("PermissionRequest")) {
+		t.Fatalf("generated hooks contain PermissionRequest: %s", b)
+	}
+	for _, event := range runtimedevin.DuoHookEvents {
+		if !bytes.Contains(b, []byte(`"`+event+`"`)) {
+			t.Errorf("generated hooks missing %q: %s", event, b)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(req.ResolvedLaunchTuple.WorkspacePath, ".devin", ".duo-generated.json")); err != nil {
+		t.Fatalf("generated Devin hook stamp missing: %v", err)
+	}
+}
