@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/procrastivity/duo/internal/runtime"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // pure-Go SQLite driver, registered as "sqlite"
 )
 
 type storeConversation struct {
@@ -212,7 +212,7 @@ func enrichToolState(ctx context.Context, tx *sql.Tx, sessionID string, out *sto
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id string

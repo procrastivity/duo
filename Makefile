@@ -23,7 +23,7 @@ test:
 check: lint test
 
 hooks:
-	pre-commit install
+	pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 # CGO_ENABLED=0 everywhere in this file (and in CI, and in the Nix package) is
 # load-bearing, not a default we happened to keep: it's what makes the

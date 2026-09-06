@@ -54,11 +54,19 @@ type ProjectionActiveLaunch struct {
 type ProjectionStatus string
 
 const (
-	ProjectionCurrent         ProjectionStatus = "current"
-	ProjectionMissing         ProjectionStatus = "missing"
-	ProjectionStale           ProjectionStatus = "stale"
-	ProjectionModified        ProjectionStatus = "modified"
-	ProjectionIncompatible    ProjectionStatus = "incompatible"
+	// ProjectionCurrent means the generated hook projection matches Duo's
+	// expected ownership stamp and contents.
+	ProjectionCurrent ProjectionStatus = "current"
+	// ProjectionMissing means no generated hook projection is present.
+	ProjectionMissing ProjectionStatus = "missing"
+	// ProjectionStale means the generated projection comes from an older
+	// Duo or hook-projection version.
+	ProjectionStale ProjectionStatus = "stale"
+	// ProjectionModified means a Duo-owned projection was changed in place.
+	ProjectionModified ProjectionStatus = "modified"
+	// ProjectionIncompatible means the projection shape is not supported.
+	ProjectionIncompatible ProjectionStatus = "incompatible"
+	// ProjectionUnownedConflict means existing files are not Duo-owned.
 	ProjectionUnownedConflict ProjectionStatus = "unowned_conflict"
 )
 
