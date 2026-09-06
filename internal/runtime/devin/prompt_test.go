@@ -143,6 +143,12 @@ func TestDeliverPromptEndTurnIsDeliveredAndReleases(t *testing.T) {
 
 func TestDeliverPromptSessionLocked(t *testing.T) {
 	r := devin.New(testIntegrationInstanceID)
+	r.ListSessions = func(_ context.Context, cwd string) ([]byte, error) {
+		if cwd != "/tmp/duo-ws" {
+			t.Fatalf("list cwd = %q", cwd)
+		}
+		return []byte(`[{"id":"other-session","title":"newest but wrong"},{"id":"grass-tangelo","title":"Exact title"}]`), nil
+	}
 	r.ACPDial = func(context.Context) (io.ReadWriteCloser, error) {
 		return startFakeACP(t, func(method string) (json.RawMessage, *rpcErr) {
 			switch method {
@@ -161,11 +167,15 @@ func TestDeliverPromptSessionLocked(t *testing.T) {
 	}
 
 	_, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
-		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "grass-tangelo"},
+		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "grass-tangelo", WorkingDirectory: "/tmp/duo-ws"},
 		Text:    "hello",
 	})
 	if !errors.Is(err, devin.ErrSessionLocked) {
 		t.Fatalf("err = %v, want ErrSessionLocked", err)
+	}
+	var locked *devin.SessionLockedError
+	if !errors.As(err, &locked) || locked.SessionID != "grass-tangelo" || locked.Title != "Exact title" {
+		t.Fatalf("lock = %#v, want exact identity and title", locked)
 	}
 }
 
@@ -232,6 +242,7 @@ func TestDeliverPromptSpawnFailIsNoEffect(t *testing.T) {
 func TestDeliverPromptResumeLockEvenOnExitZero(t *testing.T) {
 	r := runtimeWithResumeScript(t, `echo "Error: failed to start ACP agent session" >&2
 exit 0`)
+	r.ListSessions = func(context.Context, string) ([]byte, error) { return []byte(`[]`), nil }
 
 	_, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
 		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "dark-carnation"},
@@ -239,6 +250,63 @@ exit 0`)
 	})
 	if !errors.Is(err, devin.ErrSessionLocked) {
 		t.Fatalf("err = %v, want ErrSessionLocked", err)
+	}
+	var locked *devin.SessionLockedError
+	if !errors.As(err, &locked) || locked.SessionID != "dark-carnation" || locked.Title != "" {
+		t.Fatalf("lock = %#v, want bound id without title", locked)
+	}
+}
+
+func TestDeliverPromptLockTitleLookupDegrades(t *testing.T) {
+	tests := map[string]func(context.Context, string) ([]byte, error){
+		"no exact match": func(context.Context, string) ([]byte, error) {
+			return []byte(`[{"id":"someone-else","title":"Wrong"}]`), nil
+		},
+		"duplicate exact match": func(context.Context, string) ([]byte, error) {
+			return []byte(`[{"id":"dark-carnation","title":"First"},{"id":"dark-carnation","title":"Second"}]`), nil
+		},
+		"malformed": func(context.Context, string) ([]byte, error) { return []byte(`not json`), nil },
+		"command failure": func(context.Context, string) ([]byte, error) {
+			return nil, errors.New("list failed")
+		},
+	}
+	for name, list := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := runtimeWithResumeScript(t, `echo "already open in another process" >&2
+exit 1`)
+			r.ListSessions = list
+			_, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
+				Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "dark-carnation"}, Text: "hello",
+			})
+			var locked *devin.SessionLockedError
+			if !errors.Is(err, devin.ErrSessionLocked) || !errors.As(err, &locked) || locked.SessionID != "dark-carnation" || locked.Title != "" {
+				t.Fatalf("err = %#v, lock = %#v", err, locked)
+			}
+		})
+	}
+}
+
+func TestDeliverPromptACPPromptLockCarriesIdentity(t *testing.T) {
+	r := devin.New(testIntegrationInstanceID)
+	r.ListSessions = func(context.Context, string) ([]byte, error) { return []byte(`[]`), nil }
+	r.ACPDial = func(context.Context) (io.ReadWriteCloser, error) {
+		return startFakeACP(t, func(method string) (json.RawMessage, *rpcErr) {
+			switch method {
+			case "initialize", "session/load":
+				return json.RawMessage(`{}`), nil
+			case "session/prompt":
+				return nil, &rpcErr{Code: -32015, Data: map[string]any{"cognition.ai/errorKind": "session_locked"}}
+			default:
+				return nil, nil
+			}
+		}), nil
+	}
+	_, err := r.DeliverPrompt(context.Background(), runtime.PromptDeliveryRequest{
+		Binding: runtime.RuntimeBinding{ExternalAgentSessionID: "prompt-lock-id"}, Text: "hello",
+	})
+	var locked *devin.SessionLockedError
+	if !errors.Is(err, devin.ErrSessionLocked) || !errors.As(err, &locked) || locked.SessionID != "prompt-lock-id" {
+		t.Fatalf("err = %#v, lock = %#v", err, locked)
 	}
 }
 
