@@ -28,17 +28,24 @@ func TestReadConversationProjectsUserAndAssistant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadConversation: %v", err)
 	}
-	if len(batch.Turns) != 2 {
-		t.Fatalf("turns = %d, want 2 (system/thinking/tools dropped): %+v", len(batch.Turns), batch.Turns)
+	if len(batch.Turns) != 3 {
+		t.Fatalf("turns = %d, want 3 (system/thinking dropped, tool call retained): %+v", len(batch.Turns), batch.Turns)
 	}
 	if batch.Turns[0].Role != "user" || batch.Turns[0].Text != "Reply with exactly: LOOP-C-OK" {
 		t.Fatalf("user turn: %+v", batch.Turns[0])
 	}
-	if batch.Turns[1].Role != "assistant" || batch.Turns[1].Text != "LOOP-C-OK" {
+	if batch.Turns[1].Role != "assistant" || batch.Turns[1].Text != "LOOP-C-OK" || batch.Turns[1].Kind != "" {
 		t.Fatalf("assistant turn: %+v", batch.Turns[1])
 	}
 	if batch.Turns[1].Text == "thinking must not become a turn" {
 		t.Fatal("reasoning_content leaked as assistant text")
+	}
+	tool := batch.Turns[2]
+	if tool.Role != "assistant" || tool.Kind != "tool_call" || tool.ToolCallID != "tc-1" || tool.ToolName != "write" {
+		t.Fatalf("tool call: %+v", tool)
+	}
+	if string(tool.Arguments) != `{"path": "probe.txt"}` {
+		t.Fatalf("tool arguments = %s, want original JSON", tool.Arguments)
 	}
 	for _, turn := range batch.Turns {
 		if turn.Text == "system prompt must not become a turn" {
@@ -46,6 +53,9 @@ func TestReadConversationProjectsUserAndAssistant(t *testing.T) {
 		}
 		if turn.Text == "thinking must not become a turn" {
 			t.Fatal("thinking leaked as a turn")
+		}
+		if turn.Kind == "tool_result" {
+			t.Fatal("ATIF adapter invented a tool result")
 		}
 	}
 	if !batch.Complete {
@@ -104,8 +114,19 @@ func TestReadConversationPaginates(t *testing.T) {
 	if len(second.Turns) != 1 || second.Turns[0].Role != "assistant" {
 		t.Fatalf("second page: %+v", second.Turns)
 	}
-	if !second.Complete {
-		t.Fatal("second page: want Complete true")
+	if second.Complete {
+		t.Fatal("second page: want Complete false before the tool call")
+	}
+	third, err := r.ReadConversation(context.Background(), runtime.ConversationReadRequest{
+		TranscriptID: path,
+		After:        second.NextCursor,
+		Limit:        1,
+	})
+	if err != nil {
+		t.Fatalf("ReadConversation third page: %v", err)
+	}
+	if len(third.Turns) != 1 || third.Turns[0].Kind != "tool_call" || !third.Complete {
+		t.Fatalf("third page: %+v, want final tool call and Complete true", third)
 	}
 }
 

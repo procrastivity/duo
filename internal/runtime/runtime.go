@@ -101,6 +101,13 @@ type ConversationTurn struct {
 	Text       string
 	At         time.Time
 	OriginKind string // empty when the runtime did not name origin provenance
+	// Kind is empty for the original text-turn shape. Tool-aware adapters use
+	// "tool_call" and "tool_result"; the zero value remains backward compatible.
+	Kind       string
+	ToolCallID string
+	ToolName   string
+	Arguments  []byte
+	Status     string
 }
 
 // ConversationBatch is ReadConversation's result.

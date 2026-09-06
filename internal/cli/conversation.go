@@ -28,28 +28,32 @@ type conversationListResult struct {
 // conversationListItem is one wire conversation record projected from a
 // runtime.ConversationTurn.
 type conversationListItem struct {
-	RecordID          string                  `json:"record_id"`
-	SessionID         string                  `json:"session_id"`
-	RuntimeInstanceID string                  `json:"runtime_instance_id,omitempty"`
-	AuthorRole        string                  `json:"author_role"`
-	Origin            *conversationOrigin     `json:"origin,omitempty"`
-	Blocks            []conversationTextBlock `json:"blocks"`
-	Completion        string                  `json:"completion,omitempty"`
-	ReceivedAt        string                  `json:"received_at,omitempty"`
+	RecordID          string              `json:"record_id"`
+	SessionID         string              `json:"session_id"`
+	RuntimeInstanceID string              `json:"runtime_instance_id,omitempty"`
+	AuthorRole        string              `json:"author_role"`
+	Origin            *conversationOrigin `json:"origin,omitempty"`
+	Blocks            []conversationBlock `json:"blocks"`
+	Completion        string              `json:"completion,omitempty"`
+	ReceivedAt        string              `json:"received_at,omitempty"`
 }
 
 type conversationOrigin struct {
 	Kind string `json:"kind"`
 }
 
-type conversationTextBlock struct {
-	Position string                       `json:"position"`
-	Type     string                       `json:"type"`
-	Content  conversationTextBlockContent `json:"content"`
+type conversationBlock struct {
+	Position string                   `json:"position"`
+	Type     string                   `json:"type"`
+	Content  conversationBlockContent `json:"content"`
 }
 
-type conversationTextBlockContent struct {
-	Text string `json:"text"`
+type conversationBlockContent struct {
+	Text       string          `json:"text,omitempty"`
+	ToolCallID string          `json:"tool_call_id,omitempty"`
+	Name       string          `json:"name,omitempty"`
+	Arguments  json.RawMessage `json:"arguments,omitempty"`
+	Status     string          `json:"status,omitempty"`
 }
 
 // conversationCommand builds the `duo conversation` parent verb.
@@ -151,15 +155,30 @@ func conversationListFor(ctx context.Context, a *domain.Authority, s domain.Sess
 }
 
 func conversationItemFromTurn(sessionID, runtimeInstanceID string, turn runtime.ConversationTurn, batchComplete bool) conversationListItem {
+	blockType := turn.Kind
+	if blockType == "" {
+		blockType = "text"
+	}
+	content := conversationBlockContent{Text: turn.Text}
+	if blockType == "tool_call" {
+		content = conversationBlockContent{
+			ToolCallID: turn.ToolCallID,
+			Name:       turn.ToolName,
+			Arguments:  append(json.RawMessage(nil), turn.Arguments...),
+		}
+	} else if blockType == "tool_result" {
+		content.ToolCallID = turn.ToolCallID
+		content.Status = turn.Status
+	}
 	item := conversationListItem{
 		RecordID:          turn.ID,
 		SessionID:         sessionID,
 		RuntimeInstanceID: runtimeInstanceID,
 		AuthorRole:        turn.Role,
-		Blocks: []conversationTextBlock{{
+		Blocks: []conversationBlock{{
 			Position: "0",
-			Type:     "text",
-			Content:  conversationTextBlockContent{Text: turn.Text},
+			Type:     blockType,
+			Content:  content,
 		}},
 	}
 	if batchComplete {
@@ -181,10 +200,21 @@ func renderConversationListText(streams *iostreams.Streams, r conversationListRe
 	}
 	for i, item := range r.Items {
 		text := ""
+		role := item.AuthorRole
 		if len(item.Blocks) > 0 {
-			text = item.Blocks[0].Content.Text
+			block := item.Blocks[0]
+			switch block.Type {
+			case "tool_call":
+				role = "tool_call"
+				text = fmt.Sprintf("%s\t%s\t%s", block.Content.ToolCallID, block.Content.Name, string(block.Content.Arguments))
+			case "tool_result":
+				role = "tool_result"
+				text = fmt.Sprintf("%s\t%s\t%s", block.Content.ToolCallID, block.Content.Status, block.Content.Text)
+			default:
+				text = block.Content.Text
+			}
 		}
-		if _, err := fmt.Fprintf(streams.Out, "%s\t%s\t%s\n", item.RecordID, item.AuthorRole, text); err != nil {
+		if _, err := fmt.Fprintf(streams.Out, "%s\t%s\t%s\n", item.RecordID, role, text); err != nil {
 			return err
 		}
 		if i == len(r.Items)-1 && r.NextPage != nil {
