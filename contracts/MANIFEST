@@ -1,5 +1,5 @@
-# contracts/SOURCE — written by contrib/sync-contracts; do not edit.
-source-sha: 71625725946c3df3bfd554e47e0738c32fc90f5d
+# contracts/MANIFEST — sha256 per contract file, authored in this repo.
+# Regenerate with contrib/gen-contracts-manifest; do not edit by hand.
 88e05c597bd0dea8baeea34a221463af01b63e6aa86152b0c625db9279662894  fixtures/duo-external-v1/README.md
 562e3625dde7a2fc19b83e0c94fc037c109ef8937aae02d3dfd4780ad439b9f0  fixtures/duo-external-v1/command-inspect.json
 57afbee93eaf6c3e0e16ca795b0eb85fdcb4f678e2e90804c0069d34aeb37f7d  fixtures/duo-external-v1/command-result-stream-item.json

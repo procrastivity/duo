@@ -6,15 +6,12 @@ import (
 )
 
 // TestLoadContracts holds the manifest's contracts block to the embedded
-// SOURCE manifest: a source SHA, schema rows, and the conformance
-// projection-cases fixture must all be present with sha256 digests.
+// MANIFEST: schema rows and the conformance projection-cases fixture must
+// all be present with sha256 digests.
 func TestLoadContracts(t *testing.T) {
 	c, err := loadContracts()
 	if err != nil {
 		t.Fatalf("loadContracts: %v", err)
-	}
-	if len(c.SourceSHA) != 40 {
-		t.Errorf("SourceSHA = %q, want a 40-hex git SHA", c.SourceSHA)
 	}
 	var schemaRows, projectionCases int
 	for _, f := range c.Files {
