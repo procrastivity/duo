@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# contrib/gen-contracts-manifest — hash the contract set authored in this
+# repo and write contracts/MANIFEST.
+#
+# Hashes:
+#   contracts/schemas/                    -> schemas/...
+#   contracts/fixtures/duo-external-v1/   -> fixtures/duo-external-v1/...
+#
+# and writes contracts/MANIFEST: one "sha256  path" line per file (paths
+# relative to contracts/), sorted, so the output is deterministic and a
+# re-run over an unchanged tree is a no-op (git diff --exit-code contracts/
+# stays clean).
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+dst="$repo_root/contracts"
+
+{
+	echo "# contracts/MANIFEST — sha256 per contract file, authored in this repo."
+	echo "# Regenerate with contrib/gen-contracts-manifest; do not edit by hand."
+	(
+		cd "$dst"
+		find schemas fixtures/duo-external-v1 -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+	)
+} > "$dst/MANIFEST"
+
+count="$(($(wc -l < "$dst/MANIFEST") - 2))"
+echo "gen-contracts-manifest: $count files -> contracts/MANIFEST"

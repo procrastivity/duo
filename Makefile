@@ -9,7 +9,7 @@ COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: fmt lint test check hooks build cross-compile changelog release-notes sync-contracts
+.PHONY: fmt lint test check hooks build cross-compile changelog release-notes contracts-manifest
 
 fmt:
 	gofumpt -w .
@@ -59,8 +59,8 @@ release-notes:
 		git-cliff --unreleased --tag "$(TAG)" --strip header --output dist/RELEASE_NOTES.md; \
 	fi
 
-# Pull the contract set (JSON Schemas + duo-external-v1 fixtures) from the
-# planning repo and record provenance in contracts/SOURCE. Override the
-# source checkout with DUO_CONTRACTS_SRC.
-sync-contracts:
-	contrib/sync-contracts
+# The contract set (JSON Schemas + duo-external-v1 fixtures) is authored in
+# this repo. Regenerate the digest manifest after editing a schema or
+# fixture.
+contracts-manifest:
+	contrib/gen-contracts-manifest

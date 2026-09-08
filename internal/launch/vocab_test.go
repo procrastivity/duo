@@ -23,8 +23,9 @@ import (
 //
 // This test compares against contracts/schemas/duo-external-v1.schema.json
 // as embedded in this binary — step 10 patched only these three enum lists
-// by hand; `make sync-contracts` (step 16) has since replaced the whole
-// file with the normative one.
+// by hand; contracts are now authored in this repo, and step 16 has since
+// replaced the whole file with the normative one (digest manifest:
+// contracts/MANIFEST).
 func TestVocabulariesMatchExternalV1Schema(t *testing.T) {
 	schema := loadExternalV1Schema(t)
 
