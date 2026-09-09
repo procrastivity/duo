@@ -489,3 +489,49 @@ adapters that do not implement the helper leave D3 as host
 `!launch_pending` only. Do not MarkLive from `settledBirth` /
 process handover (notes/46). Do not treat host `agent_status` as
 this arm. This is not Stage 2.
+
+## 2026-09-08 — Release-without-exit on host exit evidence
+
+A Devin "print-mint" launch spawns a short-lived process that mints an
+agent session and exits. The pane fingerprint claim it seized at bind
+(`b.hold(ref, ..., "bind")`, `lifecycle.go`) was never released, because
+the only release path was `exitInstance`, and nothing calls it: the
+runtime instance is bound to the minted agent session and stays live, so
+recording exit would be wrong, not merely unwanted.
+
+`Authority.ReleaseAttachmentClaim(ctx, session, actor, evidence)` adds the
+missing release path. It rebuilds the attachment's live-runtime claim ref
+from the fingerprint fields `HostAttachment` stores, releases it through
+the same `changeBuilder.release` exit uses (so generation bookkeeping is
+identical — the freed key is claimable again, at generation + 1), and
+folds the attachment to `detached` via the existing `attachment.state`
+fact. It touches nothing else: the instance's state and the session's
+state are left exactly where they were, so a live instance stays live and
+a starting one stays starting. It commits through `CommitObservation`,
+the same boundary `Exit` and `MarkLive` use, because this is process
+evidence, not a request.
+
+**Why `Detach` does not cover this.** `Detach` disables Duo's attachment
+while deliberately keeping the claim reservation — §5.2's "the external
+runtime continues," which is a statement about unobserved but presumed-live
+execution. This verb's evidence says the opposite: the process the claim
+was about is *proved* gone. Keeping the claim here would mean the pane
+fingerprint can never be claimed again, by this session or any other,
+which is the exact failure this step exists to close. The two verbs are
+mirrors, not variants of one another, and the doc comment on
+`ReleaseAttachmentClaim` says so explicitly.
+
+**This stretches a reading, and is flagged for review.** decision-01 §5.1
+treats "accepted process evidence" as evidence about a runtime instance's
+own state (starting/live/exited) — the transitions `MarkLive` and `Exit`
+record. Here the evidence is about the same process, but the fact it
+justifies is scoped to the *attachment's* claim, not the instance's state,
+specifically so the instance can stay live. That is a new shape for
+"accepted process evidence" that §5.1 does not enumerate, and it is being
+taken on the strength of the print-mint case rather than a documented
+decision to generalize it. The next owner of §5.1 should decide whether
+this is a new accepted-evidence category worth naming, or a narrow
+exception that should stay unnamed.
+
+No store migration: the verb rides the existing `attachment.state` and
+`claim.released` facts and the existing `CommitObservation` boundary.

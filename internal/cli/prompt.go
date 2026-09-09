@@ -296,6 +296,18 @@ func waitPromptReady(
 	}
 	out := waitPromptIdentity(ctx, streams, a, hostAd, sess, actor, deadline)
 	if !out.Live {
+		if out.Exited {
+			// The identity wait itself observed host-proved process exit
+			// (never a signal Duo sent) and already drove the runtime
+			// instance to Authority.Exit — no recoverable agent-session
+			// id, so this is the generic exit leg, not the Devin recovery
+			// leg (which returns Live: true). Skip the expires_at sleep
+			// entirely and fall through to the normal Release call below:
+			// it hits delivery.go's terminal-instance path and fails with
+			// domain.ErrInstanceExited, which mapPromptReleaseError
+			// translates into a typed session.target_exited failure.
+			return nil
+		}
 		return expireUnboundPrompt(ctx, streams, mode, op, a, cmd, actor, deadline)
 	}
 
@@ -576,6 +588,22 @@ func mapPromptReleaseError(streams *iostreams.Streams, mode, op string, cmd doma
 			Message: "The queued command passed its expires_at without an attempt.",
 			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
 			Retry:   promptRetryAdvice{Safe: false, Action: "submit_new_command"},
+			Effect:  "no_effect",
+			Details: details,
+		})
+	}
+	if errors.Is(err, domain.ErrInstanceExited) {
+		details := map[string]any{
+			"command_id":           string(cmd.ID),
+			"responsibility_state": string(cmd.State),
+			"expires_at":           cmd.ExpiresAt,
+			"queue_policy":         string(cmd.QueuePolicy),
+		}
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "session.target_exited",
+			Message: "The bound runtime instance exited before the prompt could be delivered.",
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: false, Action: "resume_session"},
 			Effect:  "no_effect",
 			Details: details,
 		})

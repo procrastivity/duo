@@ -56,12 +56,33 @@ const (
 // --- host set doubles ------------------------------------------------------
 
 // spawningHosts is launch.HostSet over the first-class fake host adapter,
-// built per tuple so the fake's own integration-instance check passes
-// whatever ID the deduction produced.
-type spawningHosts struct{ failStart bool }
+// cached per integration instance (like identityHosts in
+// identity_bind_test.go) so a leaf's spawn and this package's later
+// identity/continuity probes (bindLaunchIdentities) see the same pane
+// state. A real Herdr adapter gets this for free — each LauncherFor call
+// is a stateless client dialing the same live session — but the in-memory
+// fake has to be told to keep the same *hostfake.Host across calls, or a
+// second call (mint-exit's ValidateAttachment included) finds an empty
+// session and misreads it as pane-absent.
+type spawningHosts struct {
+	failStart bool
+	hosts     map[string]*hostfake.Host
+}
+
+// newSpawningHosts returns a ready-to-use spawningHosts. Its host cache is
+// preallocated so it survives being copied by value into launch.HostSet
+// call sites: a Go map value is a header shared across copies, so every
+// copy of the returned struct still writes into the same underlying cache.
+func newSpawningHosts(failStart bool) spawningHosts {
+	return spawningHosts{failStart: failStart, hosts: map[string]*hostfake.Host{}}
+}
 
 func (h spawningHosts) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
-	fake := hostfake.New(t.IntegrationInstanceID)
+	fake, ok := h.hosts[t.IntegrationInstanceID]
+	if !ok {
+		fake = hostfake.New(t.IntegrationInstanceID)
+		h.hosts[t.IntegrationInstanceID] = fake
+	}
 	if h.failStart {
 		return refusingStart{fake}, nil
 	}
@@ -231,7 +252,7 @@ func TestBindIsWrittenOnlyAfterStartSucceeds(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
 
-	if _, err := h.launch(mat, spawningHosts{failStart: true}, false); err == nil {
+	if _, err := h.launch(mat, newSpawningHosts(true), false); err == nil {
 		t.Fatal("launch succeeded, want the host's Start refusal")
 	}
 	if c, bound := h.correlation(); bound {
@@ -247,7 +268,7 @@ func TestExplicitFlagBindWritesWithLoudOutput(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
 
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 
@@ -283,7 +304,7 @@ func TestAmbientBindIsRefusedWithoutConfirmation(t *testing.T) {
 		t.Fatalf("host_source = %q, want %q", mat.Host().Source, domain.HostSourceAmbientEnv)
 	}
 
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 	if c, bound := h.correlation(); bound {
@@ -327,7 +348,7 @@ func TestCwdCorrelationBindIsRefusedWithoutConfirmation(t *testing.T) {
 		t.Fatalf("host_source = %q, want %q", mat.Host().Source, domain.HostSourceCwdCorrelation)
 	}
 
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 	if c, bound := h.correlation(); bound {
@@ -352,7 +373,7 @@ func TestAmbientBindIsWrittenWhenConfirmed(t *testing.T) {
 	h := newBindHarness(t, interactive("y\n"))
 	mat := h.materializeWith("", ambientEnv())
 
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 
@@ -380,7 +401,7 @@ func TestAmbientBindIsRefusedWhenDeclined(t *testing.T) {
 	h := newBindHarness(t, interactive("\n"))
 	mat := h.materializeWith("", ambientEnv())
 
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 	if c, bound := h.correlation(); bound {
@@ -395,7 +416,7 @@ func TestDryRunWritesNoRecordAndNoBind(t *testing.T) {
 	h := newBindHarness(t, interactive("y\n")) // even with a yes waiting
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
 
-	report, err := h.launch(mat, spawningHosts{}, true)
+	report, err := h.launch(mat, newSpawningHosts(false), true)
 	if err != nil {
 		t.Fatalf("launch --dry-run: %v", err)
 	}
@@ -426,7 +447,7 @@ func TestDryRunWritesNoRecordAndNoBind(t *testing.T) {
 func TestASecondLaunchDoesNotRebind(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("first launch: %v", err)
 	}
 	first, bound := h.correlation()
@@ -443,7 +464,7 @@ func TestASecondLaunchDoesNotRebind(t *testing.T) {
 	if second.Host().Source != domain.HostSourceWorkspaceCorrelation {
 		t.Fatalf("host_source = %q, want %q", second.Host().Source, domain.HostSourceWorkspaceCorrelation)
 	}
-	if _, err := h.launch(second, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(second, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("second launch: %v", err)
 	}
 
@@ -462,7 +483,7 @@ func TestASecondLaunchDoesNotRebind(t *testing.T) {
 func TestCorrelationNoteNamesTheOutrankedPaneAndTheRebindPath(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("first launch: %v", err)
 	}
 	h.err.Reset()
@@ -472,7 +493,7 @@ func TestCorrelationNoteNamesTheOutrankedPaneAndTheRebindPath(t *testing.T) {
 		"HERDR_SOCKET_PATH": otherSocket,
 		"HERDR_SESSION":     "other",
 	})
-	report, err := h.launch(second, spawningHosts{}, false)
+	report, err := h.launch(second, newSpawningHosts(false), false)
 	if err != nil {
 		t.Fatalf("second launch: %v", err)
 	}
@@ -492,13 +513,13 @@ func TestCorrelationNoteNamesTheOutrankedPaneAndTheRebindPath(t *testing.T) {
 func TestNoCorrelationNoteWhenNothingWasOutranked(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("first launch: %v", err)
 	}
 	h.err.Reset()
 
 	second := h.materializeWith("", nil)
-	report, err := h.launch(second, spawningHosts{}, false)
+	report, err := h.launch(second, newSpawningHosts(false), false)
 	if err != nil {
 		t.Fatalf("second launch: %v", err)
 	}

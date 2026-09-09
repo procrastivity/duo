@@ -115,7 +115,7 @@ func TestExhaustionNamesTheHostAndThePointerSet(t *testing.T) {
 	// rung — the one case where rebinding is a genuine way out, and so the
 	// one where the pointer set carries the audited verb.
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
-	if _, err := h.launch(mat, spawningHosts{}, false); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), false); err != nil {
 		t.Fatalf("seeding launch: %v", err)
 	}
 	h.err.Reset()

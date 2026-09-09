@@ -1,0 +1,13 @@
+# session show after send: claim release + non-starting state
+duo=duo version dev (commit unknown, built unknown)
+2026-09-08T23:54:46Z
+isolation: HERDR_SESSION=dmcrl01 scratch=/tmp/duo-dmcrl01 host=herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock runtime=devin
+
+$ duo_cmd session show ses_464ffa899905fb4602a15fd23dba9284 --output json
+{"schema":"duo.external/v1","request_id":"req_7103b6cdb63e61a2","operation":"session.inspect","result":{"session_id":"ses_464ffa899905fb4602a15fd23dba9284","workspace_id":"ws_0400fcc217f3d536941f409ded3ab991","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_0f4edb6712a589782c4deb014513fb9a","runtime_instance_state":"live","owner":"cli","creator":"cli","condition":{"value":"idle","confidence":"inferred","freshness":"fresh","runtime_instance_id":"ri_0f4edb6712a589782c4deb014513fb9a","effective_at":"2026-09-08T23:54:59.176581667Z","computed_at":"2026-09-08T23:54:59.617892925Z","determining_observations":["11"],"reasons":["inferred from ATIF agent step"]},"operations":[{"operation":"prompt.deliver","availability":"available"},{"operation":"conversation.list","availability":"available"}],"attachments":[{"attachment_id":"att_15a4990cb7c116a3137ed2831b9868bb","state":"detached","integration_instance":"herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_65b01759d11891","scope":"pane"},"container":"w1:p1","process_birth":{"pid":1354310,"started_at":"2026-09-08T23:54:45.900Z"},"claim_held":false}]},"warnings":[],"features":[]}
+exit=0
+
+runtime_instance_state=live
+claim_held=False
+stuck_starting=false
+claim_released=true

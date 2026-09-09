@@ -2,10 +2,12 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -696,4 +698,313 @@ func correlationSource(a *domain.Authority, instance domain.InstanceID, kind str
 		}
 	}
 	return ""
+}
+
+// --- mint-exit test doubles -------------------------------------------------
+
+// setMintExitTiming overrides identityBindTimeout, identityBindPoll, and
+// mintExitProbeInterval for one test, restoring TestMain's defaults
+// (identityBindTimeout = 0) on cleanup. The mint-exit scenarios need more
+// than TestMain's single poll: confirming a two-consecutive-probe streak,
+// or proving an unreachable probe never confirms, both need several loop
+// iterations to elapse before the deadline.
+func setMintExitTiming(t *testing.T, timeout, poll, probeInterval time.Duration) {
+	t.Helper()
+	prevTimeout, prevPoll, prevProbe := identityBindTimeout, identityBindPoll, mintExitProbeInterval
+	identityBindTimeout, identityBindPoll, mintExitProbeInterval = timeout, poll, probeInterval
+	t.Cleanup(func() {
+		identityBindTimeout, identityBindPoll, mintExitProbeInterval = prevTimeout, prevPoll, prevProbe
+	})
+}
+
+// devinPrintMintHosts wraps identityHosts for a print-mint Devin launch
+// test double: Start seeds the ATIF export the mint process would have
+// written (when seedATIF is true) and then kills the pane synchronously —
+// the same way `devin ... --export <path> --print <prompt>` exits right
+// after minting, before bindLaunchIdentities' first AgentOnPane poll ever
+// runs.
+type devinPrintMintHosts struct {
+	inner     *identityHosts
+	seedATIF  bool
+	sessionID string
+}
+
+func (h *devinPrintMintHosts) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
+	inner, err := h.inner.LauncherFor(t)
+	if err != nil {
+		return nil, err
+	}
+	return &devinPrintMintLauncher{Host: inner.(*hostfake.Host), hosts: h}, nil
+}
+
+type devinPrintMintLauncher struct {
+	*hostfake.Host
+	hosts *devinPrintMintHosts
+}
+
+func (h *devinPrintMintLauncher) Start(ctx context.Context, prepared host.PreparedHostLaunch) (host.HostLaunchEvidence, error) {
+	ev, err := h.Host.Start(ctx, prepared)
+	if err != nil {
+		return ev, err
+	}
+	if h.hosts.seedATIF {
+		tuple, _ := prepared.Opaque.(host.ResolvedLaunchTuple)
+		path, perr := runtimedevin.ATIFPath(prepared.LaunchResolutionID, tuple.Leaf)
+		if perr != nil {
+			return host.HostLaunchEvidence{}, perr
+		}
+		if mkErr := os.MkdirAll(filepath.Dir(path), 0o755); mkErr != nil {
+			return host.HostLaunchEvidence{}, mkErr
+		}
+		doc := fmt.Sprintf(`{"schema_version":"1.7","session_id":%q,"steps":[]}`, h.hosts.sessionID)
+		if wErr := os.WriteFile(path, []byte(doc), 0o644); wErr != nil {
+			return host.HostLaunchEvidence{}, wErr
+		}
+	}
+	h.Kill(host.Attachment{
+		IntegrationInstanceID: ev.Evidence.IntegrationInstanceID,
+		PaneID:                ev.Evidence.PaneID,
+		HostContainerID:       ev.Evidence.HostContainerID,
+	})
+	return ev, nil
+}
+
+// scriptedValidatorHosts wraps identityHosts so its host's ValidateAttachment
+// replays a scripted sequence of continuity classes (looping on the final
+// entry once exhausted) instead of the fake host's own claim-driven state
+// machine. It drives bindStartingIdentity's mint-exit probe through exact
+// sequences — a lone process_replaced probe, a run of unreachable probes —
+// without choreographing Kill/ReplaceProcess calls timed against the probe
+// cadence. An empty ContinuityClass entry is this file's sentinel for "the
+// call fails with host.ErrUnreachable".
+type scriptedValidatorHosts struct {
+	inner   *identityHosts
+	classes []host.ContinuityClass
+}
+
+func (h *scriptedValidatorHosts) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
+	inner, err := h.inner.LauncherFor(t)
+	if err != nil {
+		return nil, err
+	}
+	return &scriptedValidatorHost{Host: inner.(*hostfake.Host), classes: h.classes}, nil
+}
+
+type scriptedValidatorHost struct {
+	*hostfake.Host
+	mu      sync.Mutex
+	classes []host.ContinuityClass
+	calls   int
+}
+
+func (h *scriptedValidatorHost) ValidateAttachment(context.Context, host.HostAttachmentClaim) (host.HostContinuityEvidence, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	idx := h.calls
+	if idx >= len(h.classes) {
+		idx = len(h.classes) - 1
+	}
+	h.calls++
+	class := h.classes[idx]
+	if class == "" {
+		return host.HostContinuityEvidence{}, host.Unreachable(nil)
+	}
+	return host.ContinuityEvidence(class, host.Evidence{}), nil
+}
+
+// heldClaim reports whether the fingerprint the session's current host
+// attachment was bound under is still held. It rebuilds the fingerprint
+// via fingerprintFromAttachment (session_reconcile.go) so the test does not
+// duplicate that mapping.
+func heldClaim(t *testing.T, h *bindHarness, sess domain.Session) bool {
+	t.Helper()
+	att, ok := h.authority.Attachment(sess.Attachment)
+	if !ok {
+		t.Fatal("no host attachment recorded")
+	}
+	fp := fingerprintFromAttachment(att)
+	_, held := h.authority.ActiveClaim(fp.ClaimRef())
+	return held
+}
+
+// --- mint-exit scenarios -----------------------------------------------------
+
+// TestPrintMintExitDevinPaneAbsentRecoversIdentity is scenario (a): the
+// print-mint process exits (pane_absent) before AgentOnPane ever reports
+// identity, but it left the ATIF export behind. bindStartingIdentity
+// recovers the minted agent-session id from that export, binds and marks
+// the instance live exactly as an on-time identity report would have, and
+// releases the launch fingerprint claim the exited mint process held.
+func TestPrintMintExitDevinPaneAbsentRecoversIdentity(t *testing.T) {
+	setMintExitTiming(t, 200*time.Millisecond, 5*time.Millisecond, 5*time.Millisecond)
+
+	h := newDevinBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	const mintedID = "brave-muskmelon"
+	hosts := &devinPrintMintHosts{
+		inner:     newIdentityHosts(nil),
+		seedATIF:  true,
+		sessionID: mintedID,
+	}
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s, want live after Devin mint-exit recovery", inst.State)
+	}
+	bindings, ok := agentBindingsFor(h.authority, sess)
+	if !ok || bindings.ExternalAgentSessionID != mintedID {
+		t.Fatalf("want agent-session bound to minted id %q, got ok=%v %+v", mintedID, ok, bindings)
+	}
+	if heldClaim(t, h, sess) {
+		t.Error("fingerprint claim still held after mint-exit release")
+	}
+}
+
+// TestPrintMintExitDevinNoATIFTakesGenericExitLeg is scenario (b): the same
+// pane_absent exit, but the mint process never wrote an ATIF export (or it
+// never landed). No agent-session id can be recovered, so the generic exit
+// leg runs: Authority.Exit releases every claim through exitInstance, and
+// the launch path's loud stderr note fires (the command still succeeds).
+func TestPrintMintExitDevinNoATIFTakesGenericExitLeg(t *testing.T) {
+	setMintExitTiming(t, 200*time.Millisecond, 5*time.Millisecond, 5*time.Millisecond)
+
+	h := newDevinBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	hosts := &devinPrintMintHosts{inner: newIdentityHosts(nil), seedATIF: false}
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceExited {
+		t.Fatalf("instance state = %s, want exited when no ATIF id could be recovered", inst.State)
+	}
+	if heldClaim(t, h, sess) {
+		t.Error("fingerprint claim still held after Authority.Exit")
+	}
+	if !strings.Contains(h.err.String(), "mint process exit observed") {
+		t.Errorf("no loud stderr note about the mint-process exit:\n%s", h.err.String())
+	}
+}
+
+// TestPrintMintExitPaneAliveWithoutIdentityIsNotExit is scenario (c): the
+// pane is alive and untouched, only the agent row is simply absent (the
+// ordinary "still starting" case every earlier test already covers). A
+// missing AgentOnPane row alone must never read as exit —
+// internal/host/herdr/agent_bind.go's rule that only ValidateAttachment is
+// exit evidence has to hold under repeated continuity probing too, not
+// just on a single poll.
+func TestPrintMintExitPaneAliveWithoutIdentityIsNotExit(t *testing.T) {
+	setMintExitTiming(t, 80*time.Millisecond, 5*time.Millisecond, 10*time.Millisecond)
+
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	report, err := h.launch(mat, newIdentityHosts(nil), false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting: a missing AgentOnPane row alone is not exit evidence", inst.State)
+	}
+	if !heldClaim(t, h, sess) {
+		t.Error("fingerprint claim released though the pane never proved exit")
+	}
+}
+
+// TestPrintMintExitSingleProcessReplacedProbeDoesNotConfirmExit is scenario
+// (d): one process_replaced probe, then the pane reads intact again — the
+// spawn-handover window the two-consecutive-agree rule exists to guard.
+// A lone probe must never confirm exit.
+func TestPrintMintExitSingleProcessReplacedProbeDoesNotConfirmExit(t *testing.T) {
+	setMintExitTiming(t, 80*time.Millisecond, 5*time.Millisecond, 10*time.Millisecond)
+
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	hosts := &scriptedValidatorHosts{
+		inner:   newIdentityHosts(nil),
+		classes: []host.ContinuityClass{host.ContinuityProcessReplaced, host.ContinuitySameLive},
+	}
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting: a single process_replaced probe must not confirm exit", inst.State)
+	}
+}
+
+// TestPrintMintExitUnreachableProbeKeepsPolling is scenario (e): every
+// continuity probe fails with host.ErrUnreachable. That is a call error,
+// never pane-absence, so it must never confirm exit — the wait keeps
+// polling to the ordinary deadline exactly as if no prober were wired up.
+func TestPrintMintExitUnreachableProbeKeepsPolling(t *testing.T) {
+	setMintExitTiming(t, 80*time.Millisecond, 5*time.Millisecond, 10*time.Millisecond)
+
+	h := newBindHarness(t, nil)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	hosts := &scriptedValidatorHosts{
+		inner:   newIdentityHosts(nil),
+		classes: []host.ContinuityClass{""},
+	}
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok {
+		t.Fatal("no current runtime instance")
+	}
+	if inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting: an unreachable probe must not confirm exit", inst.State)
+	}
+	if !heldClaim(t, h, sess) {
+		t.Error("fingerprint claim released though every probe was unreachable")
+	}
 }
