@@ -23,6 +23,7 @@ import (
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/launch/materialize"
 	"github.com/procrastivity/duo/internal/launchrecord"
+	"github.com/procrastivity/duo/internal/runtime/amp"
 	"github.com/procrastivity/duo/internal/runtime/claude"
 	"github.com/procrastivity/duo/internal/runtime/devin"
 	"github.com/procrastivity/duo/internal/runtime/pi"
@@ -547,6 +548,11 @@ var (
 	// digest scheme exists for this candidate (same pattern as
 	// notes16-claude-2.1.240).
 	devinDigest = "notes59-devin-3000.6.7"
+	// ampDigest names the Tier C evidence until a conformance-record
+	// digest scheme exists for this candidate (same pattern as
+	// notes59-devin-3000.6.7). Must equal
+	// amp.Factory{}.Descriptor().ConformanceRecordDigest.
+	ampDigest = "notes63-amp-0.0.1788048110-g570348"
 )
 
 // stage1HostVersions is the pinned-version table launch.Options.HostVersions
@@ -575,6 +581,8 @@ func (stage1Support) Supported(t launch.Tuple) launch.Verdict {
 		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + piDigest}
 	case "devin":
 		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + devinDigest}
+	case "amp":
+		return launch.Verdict{OK: true, RecordDigest: herdrDigest + "+" + ampDigest}
 	default:
 		return launch.Verdict{OK: false}
 	}
@@ -631,7 +639,21 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // launch workspace. Devin reads `.devin/hooks.v1.json` at session start,
 // so the projection carries an installation stamp that doctor can compare
 // with active launches and report as stale when a later launch regenerates
-// it without restarting the earlier Devin process.
+// it without restarting the earlier Devin process. Amp always
+// materializes a Duo-owned mint wrapper script (MaterializeMintScript)
+// alongside a generated settings file (MaterializeSettings) and appends
+// the wrapper's own path as the leaf's sole argument, plus
+// DUO_AMP_MINT_PROMPT in the environment; that leg is not gated on
+// close-on-exit either. `amp -x` takes its mint prompt on stdin, not
+// argv, and this seam can only append args and env — never change
+// argv[0] or write to stdin (docs/cli/decisions.md, 2026-09-09, "Amp
+// mint delivery needs a Duo-materialized wrapper script") — so the
+// wrapper script is what actually carries the prompt and tees `amp -x`'s
+// stream output to the mint log the recovery leg reads later. Because
+// the appended argument is the wrapper's path rather than an `amp` flag,
+// the operator's agent-runtime declaration for an Amp leaf has to name a
+// shell able to run it (e.g. `executable: bash`), not `amp` itself —
+// this leg cannot substitute the wrapper for the declared executable.
 //
 // internal/launch stays agnostic of Claude Code, Pi, Herdr, or any other
 // adapter by name (Augment there receives only a launch.Tuple, never a
@@ -661,7 +683,9 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // inject. Devin Augment always appends `--export`, `--permission-mode
 // accept-edits` (3000.6.7 rejects smart; I-D3 forbids dangerous; exec is
 // the operator Devin permissions.allow list), `--respect-workspace-trust
-// false`, and `--print` LaunchMintPrompt. Every
+// false`, and `--print` LaunchMintPrompt. Amp Augment always materializes
+// the mint wrapper script and settings file and appends the wrapper's
+// path plus DUO_AMP_MINT_PROMPT, whatever closeOnExit is. Every
 // other agent runtime is untouched.
 type stage1LeafAugmenter struct{}
 
@@ -724,6 +748,30 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf, 
 			return launch.LeafAugmentation{}, fmt.Errorf("cli: creating the Devin ATIF export directory for leaf %s: %w", leaf, err)
 		}
 		return launch.LeafAugmentation{Args: []string{"--export", path, "--permission-mode", "accept-edits", "--respect-workspace-trust", "false", "--print", devin.LaunchMintPrompt}}, nil
+	case "amp":
+		dir, err := amp.DefaultHarnessDir(launchResolutionID, leaf)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the Amp mint harness directory for leaf %s: %w", leaf, err)
+		}
+		settingsPath, err := amp.MaterializeSettings(dir)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the Amp settings file for leaf %s: %w", leaf, err)
+		}
+		mintLogPath, err := amp.MintLogPath(launchResolutionID, leaf)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: resolving the Amp mint log path for leaf %s: %w", leaf, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(mintLogPath), 0o700); err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: creating the Amp mint log directory for leaf %s: %w", leaf, err)
+		}
+		scriptPath, err := amp.MaterializeMintScript(dir, settingsPath, mintLogPath)
+		if err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the Amp mint script for leaf %s: %w", leaf, err)
+		}
+		return launch.LeafAugmentation{
+			Args: []string{scriptPath},
+			Env:  map[string]string{amp.MintPromptEnvVar: amp.LaunchMintPrompt},
+		}, nil
 	default:
 		return launch.LeafAugmentation{}, nil
 	}

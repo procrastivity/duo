@@ -19,6 +19,7 @@ import (
 	"github.com/procrastivity/duo/internal/host"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
+	"github.com/procrastivity/duo/internal/runtime/amp"
 	"github.com/procrastivity/duo/internal/runtime/devin"
 	"github.com/procrastivity/duo/internal/surface"
 )
@@ -638,6 +639,43 @@ func mapPromptReleaseError(streams *iostreams.Streams, mode, op string, cmd doma
 			Retry:   promptRetryAdvice{Safe: false, Action: "wait_for_store_row_or_use_print_session"},
 			Effect:  "unknown_effect",
 			Details: map[string]any{"error_kind": "session_not_found"},
+		})
+	}
+	if errors.Is(err, amp.ErrThreadLocked) {
+		message := "The bound Amp thread is locked by another executor. Retry after the holder releases it."
+		details := map[string]any{"error_kind": "thread_locked"}
+		var locked *amp.ThreadLockedError
+		if errors.As(err, &locked) {
+			details["amp_thread_id"] = locked.ThreadID
+			message = fmt.Sprintf("The Amp thread %q is locked by another executor. Retry after the holder releases it.", locked.ThreadID)
+		}
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "operation.temporarily_unavailable",
+			Message: message,
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: true, Action: "retry_after_holder_release"},
+			Effect:  "unknown_effect",
+			Details: details,
+		})
+	}
+	if errors.Is(err, amp.ErrThreadNotFound) {
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "object.not_found",
+			Message: "The Amp thread does not exist on the server (Amp CLI \"does not exist\" error).",
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: false, Action: "verify_thread_id"},
+			Effect:  "unknown_effect",
+			Details: map[string]any{"error_kind": "thread_not_found"},
+		})
+	}
+	if errors.Is(err, amp.ErrThreadArchived) {
+		return writePromptFailure(streams, mode, op, promptFailure{
+			Code:    "object.not_found",
+			Message: "The Amp thread is archived and cannot be continued.",
+			Target:  map[string]string{"kind": "prompt_command", "id": string(cmd.ID)},
+			Retry:   promptRetryAdvice{Safe: false, Action: "unarchive_or_use_new_thread"},
+			Effect:  "unknown_effect",
+			Details: map[string]any{"error_kind": "thread_archived"},
 		})
 	}
 	return duoerr.New("internal.prompt_deliver_failed", err.Error())

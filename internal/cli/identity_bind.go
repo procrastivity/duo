@@ -11,6 +11,7 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/runtime"
+	runtimeamp "github.com/procrastivity/duo/internal/runtime/amp"
 	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimepi "github.com/procrastivity/duo/internal/runtime/pi"
 )
@@ -62,8 +63,9 @@ type identityBindOutcome struct {
 	// print-mint launch's process exit through host continuity evidence
 	// (never a signal Duo sent) and drove the runtime instance to a
 	// terminal outcome: Authority.Exit on the generic leg, or
-	// Authority.ReleaseAttachmentClaim after a recovered Devin
-	// agent-session bind. Step 4 (typed prompt-send return) reads this;
+	// Authority.ReleaseAttachmentClaim after a recovered agent-session
+	// bind (mintRecoveries: Devin, Amp). Step 4 (typed prompt-send return)
+	// reads this;
 	// expireUnboundPrompt does not consume it yet.
 	Exited bool
 	// ExitEvidence names the continuity class that confirmed the exit
@@ -206,10 +208,11 @@ func sessionAttachmentClaim(a *domain.Authority, sess domain.Session) (host.Host
 
 // mintExitNote is bindLaunchIdentities' loud note for the generic exit leg:
 // identitySkipped's "stays starting" message would be wrong here — the
-// print-mint process exited, no agent-session id could be recovered (or
-// the runtime is not Devin), and Authority.Exit already ran, so the
-// instance is exited, not starting. The launch command still succeeds
-// (matches today's leaves-starting behavior for the ordinary timeout).
+// print-mint process exited, no agent-session id could be recovered (no
+// mintRecoveries entry for this runtime, or its locator/extract came up
+// empty), and Authority.Exit already ran, so the instance is exited, not
+// starting. The launch command still succeeds (matches today's
+// leaves-starting behavior for the ordinary timeout).
 func mintExitNote(streams *iostreams.Streams, session domain.SessionID, evidence string) {
 	if streams == nil {
 		return
@@ -288,16 +291,46 @@ func bindStartingIdentity(
 	return finishIdentityWait(ctx, streams, a, sess, instance, runtimeID, actor, last, sawIdentity)
 }
 
+// mintRecovery is one runtime's mint-exit recovery leg: how a print-mint
+// launch's dead-drop is found (locator) and how an agent-session id is
+// read back out of it once host continuity evidence proves the mint
+// process is gone (extract). Both mirror the contract Devin's own pair
+// already kept before this table existed: locator returns "" for an
+// honest miss (no record, or a path the runtime itself refuses to name —
+// never a directory scan, I-6); extract returns ("", nil) for an honest
+// miss (the dead-drop names nothing yet), a non-nil error for "found
+// something but must not recover it" (e.g. amp.ErrMintIncomplete — the
+// mint never visibly finished), and a non-empty id for a recovered mint.
+type mintRecovery struct {
+	locator func(a *domain.Authority, sess domain.Session) string
+	extract func(path string) (string, error)
+}
+
+// mintRecoveries is the per-runtime recovery table handleMintExit
+// consults. Devin's entry is exactly the pair this function inlined
+// before the table existed (devinTranscriptLocator plus
+// devin.SessionIDFromExport against the ATIF export); Amp's mirrors it
+// against the mint log MintLogPath computes (docs/cli/decisions.md,
+// 2026-09-09, "Amp mint delivery needs a Duo-materialized wrapper
+// script"). A runtime absent from this table always takes the generic
+// exit leg.
+var mintRecoveries = map[string]mintRecovery{
+	"devin": {locator: devinTranscriptLocator, extract: runtimedevin.SessionIDFromExport},
+	"amp":   {locator: ampMintLogLocator, extract: runtimeamp.ThreadIDFromMintLog},
+}
+
 // handleMintExit is bindStartingIdentity's confirmed-exit leg: host
 // continuity evidence proved the print-mint process is gone (never a
-// signal Duo sent). Devin is special-cased because a print-mint launch's
-// whole job is to leave behind an agent-session id nothing else observed:
-// read it from the ATIF export the process wrote before it exited, and if
-// one is there, bind and mark the instance live exactly as an on-time
-// AgentOnPane row would have, then release the claim the exited mint
-// process held — ReleaseAttachmentClaim, not Exit, because the runtime
-// instance is now bound to a live agent-runtime session and must stay
-// live. Every other case — no recoverable id, or a non-Devin runtime —
+// signal Duo sent). A runtime listed in mintRecoveries gets a recovery
+// attempt first, because a print-mint launch's whole job is to leave
+// behind an agent-session id nothing else observed: locate that
+// runtime's dead-drop and, when it names a recovered id, bind and mark
+// the instance live exactly as an on-time AgentOnPane row would have,
+// then release the claim the exited mint process held —
+// ReleaseAttachmentClaim, not Exit, because the runtime instance is now
+// bound to a live agent-runtime session and must stay live. Every other
+// case — no table entry for this runtime, an empty locator, an honest
+// extract miss, or an extract error (the mint never visibly finished) —
 // takes the generic leg: Authority.Exit, which releases every claim
 // through exitInstance.
 func handleMintExit(
@@ -309,9 +342,9 @@ func handleMintExit(
 	runtimeID, actor, class string,
 ) identityBindOutcome {
 	evidence := "mint process exit observed: " + class
-	if runtimeID == "devin" {
-		if path := devinTranscriptLocator(a, sess); path != "" {
-			if id, err := runtimedevin.SessionIDFromExport(path); err == nil && id != "" {
+	if recovery, ok := mintRecoveries[runtimeID]; ok {
+		if path := recovery.locator(a, sess); path != "" {
+			if id, err := recovery.extract(path); err == nil && id != "" {
 				state := host.AgentBindState{
 					Session: &host.AgentSessionIdentity{
 						Kind:  host.AgentSessionKindID,
@@ -579,6 +612,30 @@ func devinTranscriptLocator(a *domain.Authority, sess domain.Session) string {
 		return ""
 	}
 	path, err := runtimedevin.ATIFPath(string(rec.ID), body.Assignment[0].Leaf)
+	if err != nil {
+		return ""
+	}
+	return path
+}
+
+// ampMintLogLocator is the convention path stage1LeafAugmenter's Amp leg
+// bakes into the materialized mint wrapper script as its tee target
+// (amp.MintLogPath). It resolves launchResolutionID and leaf off the
+// session's launch record exactly the way devinTranscriptLocator does —
+// Assignment[0] is Stage-1's single leaf — because both loci are the same
+// launch-resolution fields, just fed to a different runtime's path
+// convention. Missing record or path error leaves the locator empty
+// (honest miss, not a directory scan).
+func ampMintLogLocator(a *domain.Authority, sess domain.Session) string {
+	rec, ok := a.SessionLaunchResolution(sess.ID)
+	if !ok {
+		return ""
+	}
+	var body launch.Record
+	if err := json.Unmarshal(rec.Body, &body); err != nil || len(body.Assignment) == 0 {
+		return ""
+	}
+	path, err := runtimeamp.MintLogPath(string(rec.ID), body.Assignment[0].Leaf)
 	if err != nil {
 		return ""
 	}

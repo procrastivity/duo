@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","session_id":"T-loop-c-open"}
+{"type":"assistant","session_id":"T-loop-c-open","message":{"role":"assistant","content":[{"type":"text","text":"DUO-AMP-READY"}]}}

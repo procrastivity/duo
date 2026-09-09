@@ -532,3 +532,49 @@ reads as caller error (the session it targeted is over), while the more
 accurate story is "the identity you launched never showed up, and now
 never will." The next owner of this error's mapping should decide which
 frame prompt send's callers are meant to build retry logic against.
+
+## 2026-09-09 — Amp mint delivery needs a Duo-materialized wrapper script
+
+The Amp mint launch cannot use the shape Devin's print-mint or Claude's
+`--settings` file use: `amp -x` takes its prompt on stdin, not argv, and
+the launch leaf augmenter (`internal/launch.LeafAugmenter.Augment`, wired
+as `stage1LeafAugmenter` in `internal/cli/session_launch.go`) only ever
+appends args and env to a leaf's own command — no argv[0] change, no
+stdin, by the seam's own contract. Feeding Amp's mint prompt through that
+seam is not possible without breaking the contract every other runtime
+already relies on.
+
+The mint instead runs via a Duo-materialized wrapper script: the leaf
+augmenter's Amp leg writes a small script that pipes the mint prompt on
+stdin into `amp -x --no-archive-after-execute --settings-file <path>
+--stream-json` (the verified thread-creation recipe; per-turn delivery to
+the minted thread is the separate `amp threads continue` recipe —
+`docs/adapters/decisions.md`, 2026-09-09, "Amp exclusive-writer scope is
+per-turn, not per-session") and tees that command's stream-JSON output to
+a mint log — it is the wrapper's own path, not `amp`, that the leaf's
+command names.
+
+**Mint log locator.** The wrapper writes its tee to
+`$XDG_DATA_HOME/duo/amp-mint/<launch-resolution-id>/<leaf>.jsonl`, computed
+the same way Devin's ATIF path and Pi's harness directory already are —
+keyed by launch-resolution ID and leaf, not discovered. This mint log is
+the dead-drop the mint-exit recovery leg reads once host continuity
+evidence proves the mint process exited (2026-09-08, "Mint-process exit is
+observed, not waited for"): the recovery leg opens the log at its computed
+locator and never scans a directory for the newest file (invariant I-6) —
+the same discipline Devin's `SessionIDFromExport` already keeps against its
+own ATIF path.
+
+**Recovery-leg shape.** `handleMintExit` (`internal/cli/identity_bind.go`)
+currently special-cases Devin by runtime name inside one function body.
+This decision generalizes that into a per-runtime recovery table — one
+entry per runtime naming how to recover an agent-session id from that
+runtime's own dead-drop (Devin: `devinTranscriptLocator` plus
+`SessionIDFromExport` against the ATIF path; Amp: the mint-log locator
+above, reading the thread id from the stream-JSON `session_id` field and
+trusting it only when a `result` record with subtype `success` closed the
+mint) — with
+every other runtime's behavior, and Devin's own recovery behavior,
+unchanged. Building the table and Amp's decode of the `result` record are
+later steps; this step only records that the branch generalizes rather than
+growing a second special case beside Devin's.
