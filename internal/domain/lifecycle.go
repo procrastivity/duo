@@ -383,6 +383,65 @@ func (a *Authority) Detach(ctx context.Context, id SessionID, actor, reason stri
 	return a.setAttachment(ctx, id, Detached, actor, reason, nil)
 }
 
+// ReleaseAttachmentClaim releases a session's host-attachment live-runtime
+// claim on host-proved process exit, without recording instance exit.
+//
+// It is Detach's mirror, not its twin: Detach disables Duo's attachment while
+// deliberately keeping the active-claim reservation, because §5.2 lets "the
+// external runtime continue" unobserved. This verb exists for the opposite
+// evidence — a host has proved the process that held the claim is gone, but
+// the runtime instance is bound to a live agent-runtime session and must
+// stay live (the print-mint recovery path: a short-lived mint process exits
+// after minting the agent session, and the pane fingerprint claim it held at
+// bind would otherwise never be released, since exitInstance is the only
+// other release path and it also retires the instance and its session).
+//
+// Because it exists only to record host-proved process exit — not a request,
+// not an inference — it demands non-empty evidence, and it is a no-op when
+// the claim it would release is not currently held, matching setAttachment's
+// idempotent-call style.
+func (a *Authority) ReleaseAttachmentClaim(ctx context.Context, id SessionID, actor, evidence string) error {
+	if evidence == "" {
+		return fmt.Errorf("%w: release-attachment-claim needs host-proved process exit", ErrEvidenceRequired)
+	}
+	session, err := a.requireSession(id)
+	if err != nil {
+		return err
+	}
+	attachment, ok := a.attachments[session.Attachment]
+	if !ok {
+		return fmt.Errorf("%w: session %s has no host attachment", ErrUnknownObject, id)
+	}
+	ref := attachmentFingerprint(*attachment).ClaimRef()
+	if _, held := a.claims[ref]; !held {
+		return nil
+	}
+	b := a.change(actor)
+	b.release(ref, "attachment claim released on host-proved exit").
+		fact(FactAttachmentState, Fact{
+			SessionID: id, AttachmentID: attachment.ID, State: string(Detached), Evidence: evidence,
+			Reason: "release-attachment-claim",
+		}).
+		auditEntry(AuditEntry{Target: string(id), Reason: "release-attachment-claim", Detail: evidence})
+	change, err := b.build()
+	if err != nil {
+		return err
+	}
+	return a.commit(ctx, a.repo.CommitObservation, change)
+}
+
+// attachmentFingerprint rebuilds the fingerprint a host attachment was bound
+// with from its stored fields, so a verb that only has the attachment can
+// still recompute the claim ref it was seized under.
+func attachmentFingerprint(at HostAttachment) Fingerprint {
+	return Fingerprint{
+		IntegrationInstance: at.IntegrationInstance,
+		Epoch:               at.Epoch,
+		Container:           at.Container,
+		Process:             at.Process,
+	}
+}
+
 // Reattach revalidates a detached host and restores observation without
 // changing a still-live runtime-instance ID (§5.2).
 //

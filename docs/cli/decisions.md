@@ -447,3 +447,88 @@ snapshot (`conversation list --block-for=…`; planning-repo backlog
 §9.3 Wait as a CLI snapshot — not `conversation.subscribe`, not
 settle. Do not add `--block` on every verb in this file until that
 remainder is a Matter.
+
+## 2026-09-08 — Mint-process exit is observed, not waited for
+
+A Devin "print-mint" launch (`devin … --export <path> --print <prompt>`)
+spawns a process that mints an agent session, writes the ATIF export, and
+exits on its own — nothing sends it a signal, and nothing else calls it
+in. Before this step, that exit was invisible to Duo: a missing
+`AgentOnPane` row is not exit evidence by itself
+(`internal/host/herdr/agent_bind.go`), so the shared identity wait
+(`bindStartingIdentity`, `identity_bind.go`) just kept polling until its
+own deadline and left the runtime instance `starting` forever, still
+holding the launch's pane fingerprint claim.
+
+`bindStartingIdentity` now folds a continuity probe into that same wait:
+while no agent row has appeared yet, it calls `HostAttachmentValidator
+.ValidateAttachment` on the session's launch claim at most once a second
+(`mintExitProbeInterval`), each call bounded to a 2s timeout
+(`mintExitProbeCallTimeout`, mirroring `session.reconcile`'s own call
+budget). `pane_absent` confirms exit on the first probe;
+`process_replaced` / `terminal_replaced` need two consecutive *agreeing*
+probes before they confirm, because the print-mint spawn-handover window
+can briefly report the pane's foreground as the shell — one such probe
+proves nothing (`mintExitTracker`, `identity_bind.go`). `host.ErrUnreachable`
+or any other call error is not exit; it just resets the streak and the
+wait keeps polling. This adds no new outer wait: launch still bounds the
+whole wait at `identityBindTimeout`, and `duo prompt send` still bounds it
+at the command's own `expires_at`. The probe only ever fires inside a wait
+that was already running for another reason.
+
+A confirmed exit takes one of two legs (`handleMintExit`,
+`identity_bind.go`):
+
+- **Devin recovery.** If the runtime is Devin and its ATIF export names a
+  session id (`devin.SessionIDFromExport`), that id is bound exactly as an
+  on-time `AgentOnPane` report would have been, the instance is marked
+  live, and `Authority.ReleaseAttachmentClaim` releases the claim the now-
+  dead mint process held — without exiting the instance, since it is
+  live and bound to a real agent session (docs/domain/decisions.md,
+  2026-09-08, "Release-without-exit on host exit evidence"). `duo session
+  launch` reports success as it already did; `duo prompt send` proceeds to
+  deliver against the newly-live instance.
+- **Generic.** No recoverable id (wrong runtime, or no ATIF row) takes
+  `Authority.Exit`, which releases every claim through `exitInstance`.
+  `duo session launch` still succeeds — the pane did launch — but prints a
+  loud stderr note naming the continuity class so the operator is not left
+  wondering why the session shows exited. `duo prompt send` skips the
+  `expires_at` sleep entirely (there is nothing left to wait for) and
+  falls through to `Composer.Release`, which then fails against the
+  terminal instance with `domain.ErrInstanceExited`; `mapPromptReleaseError`
+  maps that to `session.target_exited`, `retry {safe:false,
+  action:"resume_session"}`, `effect:"no_effect"`.
+
+**Why `duo session show` stays read-only.** Nothing about this step gives
+show a reason to dial anything: the exit is recorded by whichever
+observing write verb next runs the shared identity wait (a launch's own
+post-spawn bind, or a `prompt send`), never by show itself. Invariant I-3
+holds exactly as it already did for reconcile and inspect — a session left
+untouched after its mint pane dies keeps reporting `claim_held: true` and
+`runtime_instance_state: "starting"` for as long as nothing observes it,
+and that is correct, not stale: show a snapshot, do not manufacture an
+observation to make the snapshot prettier.
+
+**Refused.** No `duo wait` (or `session settle`) verb to poll for this
+exit on its own — the same call notes/54 already made for the blocking-
+snapshot proposal above (2026-08-27, "Blocking snapshot wait is not
+settle"): an implicit wait inside the verb that already needs one beats a
+named verb whose only job is waiting. No change to the mint launch's argv
+— `--export`/`--print` stay exactly as the print-mint launch already
+shapes them; this step only reads the file they already write. No signals
+sent to the mint process, ever — every leg here is downstream of proof the
+process is *already* gone, never a way to end it.
+
+**Flagged for review.** `session.target_exited` was chosen for `prompt
+send`'s generic-leg failure because the bound instance really did exit —
+it is not a transient unavailability, and `retry.action:"resume_session"`
+tells the caller correctly that resending the same command will not help.
+But `operation.temporarily_unavailable` (used elsewhere in this file for
+"true but transient" conditions, e.g. the Devin session-lock hold) is a
+closer semantic match to what actually happened *before* the probe existed
+— a target the caller thought it could reach and can no longer prompt this
+way. The class conflict is real and unresolved: `session.target_exited`
+reads as caller error (the session it targeted is over), while the more
+accurate story is "the identity you launched never showed up, and now
+never will." The next owner of this error's mapping should decide which
+frame prompt send's callers are meant to build retry logic against.

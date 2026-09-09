@@ -1,0 +1,18 @@
+# duo prompt send on the just-minted session
+duo=duo version dev (commit unknown, built unknown)
+2026-09-08T23:54:46Z
+isolation: HERDR_SESSION=dmcrl01 scratch=/tmp/duo-dmcrl01 host=herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock runtime=devin
+
+wall_clock_before=2026-09-08T23:54:49.897Z
+$ duo_cmd prompt send ses_464ffa899905fb4602a15fd23dba9284 --text 'Reply with the single word pong.' --idempotency-key key-dmcrl01-devin-mint-1 --expires-at 2026-09-08T23:56:49.000Z --output json
+{"schema":"duo.external/v1","request_id":"req_6d04256a7d088098","operation":"prompt.deliver","result":{"command_id":"cmd_5ddfcfeb87c3b5d819c2f37ad9da88ab","revision":"3","target":{"session_id":"ses_464ffa899905fb4602a15fd23dba9284","runtime_instance_id":"ri_0f4edb6712a589782c4deb014513fb9a"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-09-08T23:56:49.000Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+wall_clock_after=2026-09-08T23:54:59.521Z
+send_elapsed_ms=9626
+expires_at=2026-09-08T23:56:49.000Z
+idempotency_key=key-dmcrl01-devin-mint-1
+leg=recovery_delivered
+error_code=
+responsibility_state=delivered
+bound_check=PASS (returned in 9626ms, far under the 120000ms expiry; no sleep to deadline)

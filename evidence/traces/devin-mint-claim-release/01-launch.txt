@@ -1,0 +1,10 @@
+# live Herdr+devin print-mint launch (builder --require agent_runtime=devin)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-08T23:54:46Z
+isolation: HERDR_SESSION=dmcrl01 scratch=/tmp/duo-dmcrl01 host=herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock runtime=devin
+
+$ duo_cmd session launch builder --require agent_runtime=devin --host "herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock" --workspace /tmp/duo-dmcrl01/ws --output json
+{"schema":"duo.external/v1","request_id":"req_097473b9f53b0d8a","operation":"session.launch","result":{"session_id":"ses_464ffa899905fb4602a15fd23dba9284","launch_resolution_id":"lrr_f85005a8c594549b4573d8bd318f2ccc","selection":"ordered","leaves":[{"name":"main","agent_runtime":"devin","model_line":"swe-1.7","model_family":"swe","composition":{"name":"devin_swe17@herdr","variant":"devin_swe17","agent_runtime":"devin","model_line":"swe-1.7","model_family":"swe","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock"},"declared_kind":"open","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock","host_source":"explicit-flag","outranked_evidence":[{"source":"ambient-env","captures":[{"name":"HERDR_SESSION","value":"duo","captured_at":"2026-09-08T23:54:46.467Z"}],"detail":"outranked by explicit-flag"}]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0
+
+session_id=ses_464ffa899905fb4602a15fd23dba9284

@@ -167,6 +167,147 @@ func TestDetachKeepsTheRuntime(t *testing.T) {
 	}
 }
 
+// TestReleaseAttachmentClaimDetachesWithoutExit is the print-mint recovery
+// path: a host proved the process that held the pane fingerprint claim
+// exited, but the runtime instance is bound to a live agent session and must
+// stay live. Unlike Detach, the claim itself is released.
+func TestReleaseAttachmentClaimDetachesWithoutExit(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	fp := herdrFingerprint("w1:p1", "term_a", 4242)
+	res := mustEnroll(t, h.a, candidate("/home/dev/Code/duo", fp))
+
+	if err := h.a.ReleaseAttachmentClaim(ctx, res.Session, "host", "mint process exited"); err != nil {
+		t.Fatalf("ReleaseAttachmentClaim: %v", err)
+	}
+	if _, held := h.a.ActiveClaim(fp.ClaimRef()); held {
+		t.Fatal("ReleaseAttachmentClaim did not release the active claim")
+	}
+	if view, _ := h.a.View(res.Session); view != domain.ViewDetached {
+		t.Fatalf("view = %s, want detached", view)
+	}
+	if s, _ := h.a.Session(res.Session); s.State != domain.SessionActive {
+		t.Fatalf("session state = %s, want active", s.State)
+	}
+	if inst, _ := h.a.Instance(res.Instance); inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s after release, want live", inst.State)
+	}
+
+	// Generation bookkeeping matches exitInstance's release: the freed key
+	// is claimable again, and the re-taken claim is a new generation.
+	second := mustEnroll(t, h.a, candidate("/home/dev/Code/duo", fp))
+	if second.Session == res.Session {
+		t.Fatal("re-enrolling the freed fingerprint continued the original session")
+	}
+	claim, held := h.a.ActiveClaim(fp.ClaimRef())
+	if !held || claim.Instance != second.Instance {
+		t.Fatalf("re-taken claim holder = %+v, want instance %s", claim, second.Instance)
+	}
+	if claim.Generation != 1 {
+		t.Fatalf("re-taken claim generation = %d, want 1", claim.Generation)
+	}
+
+	// Replay reproduces the folded state. (The original session shows as
+	// recovering rather than detached after reopen — Open() puts every
+	// non-terminal instance in the recovering view until a decision resolves
+	// it, and that outranks attached/detached — so the attachment record
+	// itself, not the derived View, is what proves the fold survived.)
+	h.reopen()
+	if _, held := h.a.ActiveClaim(fp.ClaimRef()); !held {
+		t.Fatal("after reopen, the re-taken claim is missing")
+	}
+	s, _ := h.a.Session(res.Session)
+	if s.State != domain.SessionActive {
+		t.Fatalf("after reopen, session state = %s, want active", s.State)
+	}
+	if at, _ := h.a.Attachment(s.Attachment); at.State != domain.Detached {
+		t.Fatalf("after reopen, attachment state = %s, want detached", at.State)
+	}
+	if inst, _ := h.a.Instance(res.Instance); inst.State != domain.InstanceLive {
+		t.Fatalf("after reopen, instance state = %s, want live", inst.State)
+	}
+}
+
+// TestReleaseAttachmentClaimLeavesAStartingInstanceStarting is the other half
+// of the recovery case: a print-mint launch's instance is still starting
+// (never marked live) when the mint process exits, and this verb must not
+// advance it.
+func TestReleaseAttachmentClaimLeavesAStartingInstanceStarting(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	launched, err := h.a.Launch(ctx, domain.LaunchRequest{
+		RootPath: "/home/dev/Code/duo", Actor: "user:beau", Reason: "print-mint",
+	})
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	fp := herdrFingerprint("w1:p1", "term_a", 4242)
+	if err := h.a.Bind(ctx, domain.BindRequest{
+		Session:     launched.Session,
+		Actor:       "host",
+		Attestation: domain.Attestation{Source: domain.SourceLaunchPlan},
+		Fingerprint: &fp,
+	}); err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+
+	if err := h.a.ReleaseAttachmentClaim(ctx, launched.Session, "host", "mint process exited"); err != nil {
+		t.Fatalf("ReleaseAttachmentClaim: %v", err)
+	}
+	if _, held := h.a.ActiveClaim(fp.ClaimRef()); held {
+		t.Fatal("ReleaseAttachmentClaim did not release the active claim")
+	}
+	if inst, _ := h.a.Instance(launched.Instance); inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %s, want starting", inst.State)
+	}
+	if s, _ := h.a.Session(launched.Session); s.State != domain.SessionActive {
+		t.Fatalf("session state = %s, want active", s.State)
+	}
+}
+
+// TestReleaseAttachmentClaimRefusesEmptyEvidence is because this verb exists
+// only to record host-proved process exit: an empty evidence string is not
+// that.
+func TestReleaseAttachmentClaimRefusesEmptyEvidence(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	fp := herdrFingerprint("w1:p1", "term_a", 4242)
+	res := mustEnroll(t, h.a, candidate("/home/dev/Code/duo", fp))
+
+	if err := h.a.ReleaseAttachmentClaim(ctx, res.Session, "host", ""); !errors.Is(err, domain.ErrEvidenceRequired) {
+		t.Fatalf("ReleaseAttachmentClaim with no evidence returned %v, want ErrEvidenceRequired", err)
+	}
+	if _, held := h.a.ActiveClaim(fp.ClaimRef()); !held {
+		t.Fatal("a refused release still gave up the active claim")
+	}
+	if view, _ := h.a.View(res.Session); view != domain.ViewAttached {
+		t.Fatalf("view = %s after a refused release, want attached", view)
+	}
+}
+
+// TestReleaseAttachmentClaimNotHeldIsANoOp matches setAttachment's idempotent
+// style: a second call, once the claim is already gone, changes nothing and
+// is not an error.
+func TestReleaseAttachmentClaimNotHeldIsANoOp(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	fp := herdrFingerprint("w1:p1", "term_a", 4242)
+	res := mustEnroll(t, h.a, candidate("/home/dev/Code/duo", fp))
+
+	if err := h.a.ReleaseAttachmentClaim(ctx, res.Session, "host", "mint process exited"); err != nil {
+		t.Fatalf("first ReleaseAttachmentClaim: %v", err)
+	}
+	if err := h.a.ReleaseAttachmentClaim(ctx, res.Session, "host", "mint process exited again"); err != nil {
+		t.Fatalf("second ReleaseAttachmentClaim (claim already released) returned %v, want nil", err)
+	}
+	if inst, _ := h.a.Instance(res.Instance); inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s after a no-op release, want live", inst.State)
+	}
+	if s, _ := h.a.Session(res.Session); s.State != domain.SessionActive {
+		t.Fatalf("session state = %s after a no-op release, want active", s.State)
+	}
+}
+
 // TestReattachRefusesADifferentExecution is §6.4: a pane that now holds a
 // different process is not the session Duo detached from.
 func TestReattachRefusesADifferentExecution(t *testing.T) {

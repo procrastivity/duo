@@ -295,7 +295,7 @@ func TestNoAttachmentIsRecordedWhenStartFails(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
 
-	if _, err := h.launch(mat, spawningHosts{failStart: true}, false); err == nil {
+	if _, err := h.launch(mat, newSpawningHosts(true), false); err == nil {
 		t.Fatal("launch succeeded, want the host's Start refusal")
 	}
 	for _, session := range h.authority.Sessions() {
@@ -311,7 +311,7 @@ func TestADryRunRecordsNoAttachment(t *testing.T) {
 	h := newBindHarness(t, nil)
 	mat := h.materializeWith("herdr:"+bindSocket, nil)
 
-	if _, err := h.launch(mat, spawningHosts{}, true); err != nil {
+	if _, err := h.launch(mat, newSpawningHosts(false), true); err != nil {
 		t.Fatalf("launch --dry-run: %v", err)
 	}
 	if sessions := h.authority.Sessions(); len(sessions) != 0 {
@@ -438,7 +438,7 @@ func TestAttachmentFailureIsLoudAndNeverFailsTheLaunch(t *testing.T) {
 		t.Fatalf("host kind = %q, want a non-herdr kind for this case", mat.Host().Kind)
 	}
 
-	report, err := h.launch(mat, spawningHosts{}, false)
+	report, err := h.launch(mat, newSpawningHosts(false), false)
 	if err != nil {
 		t.Fatalf("a refused attachment failed the launch: %v", err)
 	}

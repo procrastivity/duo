@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -615,6 +617,386 @@ func launchStartingClaudePair(t *testing.T, ident string) struct {
 		pane    string
 		host    *hostfake.Host
 	}{h, report.SessionID, att.Container, fakeHost}
+}
+
+// launchStartingDevinPair launches a Duo-created Devin leaf with no host
+// identity at spawn, mirroring launchStartingClaudePair for the mint-exit
+// scenarios below. Nothing seeds AgentOnPane and the pane stays alive
+// through launch's own single poll (TestMain zeroes identityBindTimeout),
+// so the instance stays starting and no exit is confirmed yet — the
+// mint-exit reveal below happens only during a later prompt send's own
+// identity wait (waitPromptIdentity), which is what step 4 changes.
+func launchStartingDevinPair(t *testing.T) struct {
+	harness    *bindHarness
+	session    string
+	pane       string
+	host       *hostfake.Host
+	resolution string
+} {
+	t.Helper()
+	h := newDevinBindHarness(t)
+	mat := h.materializeWith("herdr:"+bindSocket, nil)
+
+	RegisterAgentRuntime("devin", runtimefake.New("devin"))
+	t.Cleanup(func() { UnregisterAgentRuntime("devin") })
+
+	hosts := newIdentityHosts(nil)
+	report, err := h.launch(mat, hosts, false)
+	if err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+	if len(hosts.hosts) != 1 {
+		t.Fatalf("cached hosts = %d, want 1", len(hosts.hosts))
+	}
+	var (
+		hostID   string
+		fakeHost *hostfake.Host
+	)
+	for id, fh := range hosts.hosts {
+		hostID, fakeHost = id, fh
+	}
+	RegisterHostPromptProvider(hostID, fakeHost)
+	t.Cleanup(func() { UnregisterHostPromptProvider(hostID) })
+
+	sess, ok := h.authority.Session(domain.SessionID(report.SessionID))
+	if !ok {
+		t.Fatalf("no session %s", report.SessionID)
+	}
+	inst, ok := h.authority.Instance(sess.Current)
+	if !ok || inst.State != domain.InstanceStarting {
+		t.Fatalf("instance state = %+v, want starting", inst)
+	}
+	if _, ok := agentBindingsFor(h.authority, sess); ok {
+		t.Fatal("identity appeared at launch; want a delayed mint-exit reveal")
+	}
+	att, ok := h.authority.Attachment(sess.Attachment)
+	if !ok || att.Container == "" {
+		t.Fatal("launch attachment has no pane id")
+	}
+	return struct {
+		harness    *bindHarness
+		session    string
+		pane       string
+		host       *hostfake.Host
+		resolution string
+	}{h, report.SessionID, att.Container, fakeHost, report.LaunchResolutionID}
+}
+
+// killMintPane simulates the print-mint process exiting on the host: the
+// same host-proved pane-absence devinPrintMintHosts.Start produces
+// synchronously during launch (identity_bind_test.go), timed here instead
+// to land during a later prompt send's own identity wait.
+func killMintPane(t *testing.T, h *bindHarness, fakeHost *hostfake.Host, sess domain.Session) {
+	t.Helper()
+	att, ok := h.authority.Attachment(sess.Attachment)
+	if !ok {
+		t.Fatal("no host attachment to kill")
+	}
+	fakeHost.Kill(host.Attachment{
+		IntegrationInstanceID: att.IntegrationInstance,
+		PaneID:                att.Container,
+		HostContainerID:       att.Epoch.Value,
+	})
+}
+
+// TestPromptSend_MintExitNoRecoveryReturnsTargetExitedPromptly is step 4's
+// scenario (a)+(c): the print-mint process exits with no ATIF export to
+// recover an agent-session id from, so waitPromptIdentity's generic exit
+// leg runs Authority.Exit and reports Exited without Live. prompt send must
+// not sleep to expires_at (expireUnboundPrompt is skipped entirely): it
+// falls through to Composer.Release, which fails against the now-terminal
+// instance with domain.ErrInstanceExited, and mapPromptReleaseError must
+// translate that into a typed session.target_exited failure — returned in
+// roughly the mint-exit probe's own time, not at the 15s deadline. `duo
+// prompt show` must then list the failed attempt CreateAttempt committed.
+func TestPromptSend_MintExitNoRecoveryReturnsTargetExitedPromptly(t *testing.T) {
+	pair := launchStartingDevinPair(t)
+	sess, ok := pair.harness.authority.Session(domain.SessionID(pair.session))
+	if !ok {
+		t.Fatalf("no session %s", pair.session)
+	}
+	killMintPane(t, pair.harness, pair.host, sess)
+	pair.harness.close()
+
+	expires := time.Now().UTC().Add(15 * time.Second).Format(time.RFC3339Nano)
+	start := time.Now()
+	code, out, errOut := runSession(t,
+		"prompt", "send", pair.session,
+		"--text", "Run the focused checks.",
+		"--idempotency-key", "key-mint-exit-1",
+		"--expires-at", expires,
+		"--output", "json",
+	)
+	elapsed := time.Since(start)
+	if code == exitcode.Success {
+		t.Fatalf("mint-exit send succeeded (stdout: %s stderr: %s)", out, errOut)
+	}
+	if elapsed > 5*time.Second {
+		t.Fatalf("send took %s, want well before the 15s expires_at (no sleep-to-deadline)", elapsed)
+	}
+	body := errOut
+	if body == "" {
+		body = out
+	}
+	assertValidExternalV1(t, []byte(body))
+	var env struct {
+		Error struct {
+			Code    string            `json:"code"`
+			Effect  string            `json:"effect"`
+			Retry   promptRetryAdvice `json:"retry"`
+			Details map[string]any    `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &env); err != nil {
+		t.Fatalf("failure JSON: %v\n%s", err, body)
+	}
+	if env.Error.Code != "session.target_exited" {
+		t.Fatalf("code = %q, want session.target_exited (stdout=%s stderr=%s)", env.Error.Code, out, errOut)
+	}
+	if env.Error.Effect != "no_effect" {
+		t.Errorf("effect = %q, want no_effect", env.Error.Effect)
+	}
+	if env.Error.Retry.Safe || env.Error.Retry.Action != "resume_session" {
+		t.Errorf("retry = %+v, want {safe:false action:resume_session}", env.Error.Retry)
+	}
+	commandID, _ := env.Error.Details["command_id"].(string)
+	if commandID == "" {
+		t.Fatalf("details missing command_id: %+v", env.Error.Details)
+	}
+
+	// (c): duo prompt show lists the failed attempt CreateAttempt
+	// committed against the terminal instance.
+	code, out, errOut = runSession(t, "prompt", "show", commandID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("prompt show: exit code = %d (stderr: %s)", code, errOut)
+	}
+	var shown struct {
+		Result commandInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &shown); err != nil {
+		t.Fatalf("show JSON: %v", err)
+	}
+	if shown.Result.ResponsibilityState != string(domain.ResponsibilityFailed) {
+		t.Errorf("inspect state = %q, want failed", shown.Result.ResponsibilityState)
+	}
+}
+
+// TestPromptSend_MintExitDevinRecoversAndDelivers is step 4's scenario (b):
+// the print-mint process exits, but it left its ATIF export behind, so
+// waitPromptIdentity's Devin recovery leg binds the recovered
+// agent-session id, marks the instance live, and releases the launch
+// claim — reporting {Bound:true, Live:true, Exited:true}. waitPromptReady
+// must treat that exactly like an ordinary successful bind: Release
+// proceeds and the fake Devin runtime delivers the prompt.
+func TestPromptSend_MintExitDevinRecoversAndDelivers(t *testing.T) {
+	pair := launchStartingDevinPair(t)
+	sess, ok := pair.harness.authority.Session(domain.SessionID(pair.session))
+	if !ok {
+		t.Fatalf("no session %s", pair.session)
+	}
+
+	const mintedID = "brave-muskmelon-2"
+	path, err := devin.ATIFPath(pair.resolution, "primary")
+	if err != nil {
+		t.Fatalf("ATIFPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	doc := fmt.Sprintf(`{"schema_version":"1.7","session_id":%q,"steps":[]}`, mintedID)
+	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	killMintPane(t, pair.harness, pair.host, sess)
+	pair.harness.close()
+
+	expires := time.Now().UTC().Add(15 * time.Second).Format(time.RFC3339Nano)
+	code, out, errOut := runSession(t,
+		"prompt", "send", pair.session,
+		"--text", "Run the focused checks.",
+		"--idempotency-key", "key-mint-exit-2",
+		"--expires-at", expires,
+		"--output", "json",
+	)
+	if code != exitcode.Success {
+		t.Fatalf("prompt send: exit code = %d (stderr: %s)\nstdout: %s", code, errOut, out)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var sent struct {
+		Result promptDeliverResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &sent); err != nil {
+		t.Fatalf("send JSON: %v", err)
+	}
+	if sent.Result.ResponsibilityState != string(domain.ResponsibilityDelivered) {
+		t.Fatalf("state = %q, want delivered (Devin mint-exit recovery)", sent.Result.ResponsibilityState)
+	}
+	if sent.Result.Hold != nil {
+		t.Fatalf("hold present on delivered: %+v", sent.Result.Hold)
+	}
+
+	a, closer, err := openReadAuthority(context.Background())
+	if err != nil {
+		t.Fatalf("reopen authority: %v", err)
+	}
+	defer func() { _ = closer.Close() }()
+	sess2, ok := a.Session(domain.SessionID(pair.session))
+	if !ok {
+		t.Fatalf("no session %s after send", pair.session)
+	}
+	inst, ok := a.Instance(sess2.Current)
+	if !ok {
+		t.Fatal("no current instance")
+	}
+	if inst.State != domain.InstanceLive {
+		t.Fatalf("instance state = %s, want live after Devin mint-exit recovery", inst.State)
+	}
+	bindings, ok := agentBindingsFor(a, sess2)
+	if !ok || bindings.ExternalAgentSessionID != mintedID {
+		t.Fatalf("want agent-session bound to minted id %q, got ok=%v %+v", mintedID, ok, bindings)
+	}
+}
+
+// sessionShowJSON runs `duo session show <id> --output json` and decodes its
+// result, failing the test on any non-success exit or invalid duo.external/v1
+// envelope. It opens its own read-only authority handle (session.go's
+// openReadAuthority), so it never needs the caller's bindHarness writer lease
+// released first.
+func sessionShowJSON(t *testing.T, sessionID string) sessionInspectResult {
+	t.Helper()
+	code, out, errOut := runSession(t, "session", "show", sessionID, "--output", "json")
+	if code != exitcode.Success {
+		t.Fatalf("session show %s: exit code = %d (stderr: %s)", sessionID, code, errOut)
+	}
+	assertValidExternalV1(t, []byte(out))
+	var env struct {
+		Result sessionInspectResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("session show JSON: %v\n%s", err, out)
+	}
+	return env.Result
+}
+
+// TestSessionShowProjectsMintExitOnlyAfterAnObservingWrite is step 5's
+// end-to-end projection pin, walking the whole observed-exit story through
+// `session show` rather than the authority directly.
+//
+// At launch, session show already reports the ordinary starting shape:
+// runtime_instance_state "starting" and the launched attachment's
+// claim_held true. Once the mint pane dies, session show alone must never
+// notice — invariant I-3, read path, no side effects: the claim stays held
+// and the state stays starting no matter how many times show runs, because
+// nothing but an observing write verb drives bindStartingIdentity's
+// mint-exit probe (identity_bind.go). Only `prompt send` — the observing
+// write verb both variants exercise — reaches that probe and drives one of
+// its two terminal legs: no ATIF export takes the generic leg
+// (Authority.Exit, so send itself fails session.target_exited and the
+// instance ends up exited); an ATIF export takes the Devin recovery leg
+// (bind the recovered id, MarkLive, ReleaseAttachmentClaim, so send
+// delivers and the instance ends up live). Either way, session show's
+// projection afterward must show the claim released and the instance state
+// moved off starting — never still "starting" — and the text-mode reattach
+// line must say the rebuilt claim is not held.
+func TestSessionShowProjectsMintExitOnlyAfterAnObservingWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		seedATIF   bool
+		wantState  string
+		wantSendOK bool
+	}{
+		{name: "no_atif_generic_leg", seedATIF: false, wantState: string(domain.InstanceExited), wantSendOK: false},
+		{name: "atif_devin_recovery", seedATIF: true, wantState: string(domain.InstanceLive), wantSendOK: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pair := launchStartingDevinPair(t)
+			sess, ok := pair.harness.authority.Session(domain.SessionID(pair.session))
+			if !ok {
+				t.Fatalf("no session %s", pair.session)
+			}
+			// Release the writer lease up front: everything left in this
+			// test either reads sess/pair.host in memory (killMintPane) or
+			// goes through runSession's own authority handles.
+			pair.harness.close()
+
+			shown := sessionShowJSON(t, pair.session)
+			if shown.InstanceState != string(domain.InstanceStarting) {
+				t.Fatalf("instance state at launch = %q, want starting", shown.InstanceState)
+			}
+			if len(shown.Attachments) != 1 || !shown.Attachments[0].ClaimHeld {
+				t.Fatalf("attachments at launch = %+v, want exactly one with claim_held true", shown.Attachments)
+			}
+
+			if tc.seedATIF {
+				const mintedID = "brave-muskmelon-show"
+				path, err := devin.ATIFPath(pair.resolution, "primary")
+				if err != nil {
+					t.Fatalf("ATIFPath: %v", err)
+				}
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatalf("MkdirAll: %v", err)
+				}
+				doc := fmt.Sprintf(`{"schema_version":"1.7","session_id":%q,"steps":[]}`, mintedID)
+				if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
+					t.Fatalf("WriteFile: %v", err)
+				}
+			}
+
+			killMintPane(t, pair.harness, pair.host, sess)
+
+			// I-3 pin: a read-only session show run after the pane died,
+			// before any observing write verb, must change nothing. The
+			// claim release is recorded by the next observing write verb,
+			// not by show.
+			shown = sessionShowJSON(t, pair.session)
+			if shown.InstanceState != string(domain.InstanceStarting) {
+				t.Fatalf("instance state after kill (read-only show) = %q, want still starting: session show must never itself observe the mint exit (I-3)", shown.InstanceState)
+			}
+			if len(shown.Attachments) != 1 || !shown.Attachments[0].ClaimHeld {
+				t.Fatalf("claim released by a read-only session show (I-3): %+v", shown.Attachments)
+			}
+
+			expires := time.Now().UTC().Add(15 * time.Second).Format(time.RFC3339Nano)
+			code, out, errOut := runSession(t,
+				"prompt", "send", pair.session,
+				"--text", "Run the focused checks.",
+				"--idempotency-key", "key-show-mint-exit-"+tc.name,
+				"--expires-at", expires,
+				"--output", "json",
+			)
+			if tc.wantSendOK {
+				if code != exitcode.Success {
+					t.Fatalf("prompt send: exit code = %d (stderr: %s)\nstdout: %s", code, errOut, out)
+				}
+			} else if code == exitcode.Success {
+				t.Fatalf("mint-exit send succeeded, want a session.target_exited failure (stdout: %s)", out)
+			}
+
+			// prompt send is the observing write verb: it ran the shared
+			// identity wait, so session show's projection now reflects the
+			// pane's real fate.
+			shown = sessionShowJSON(t, pair.session)
+			if shown.InstanceState != tc.wantState {
+				t.Fatalf("instance state after prompt send = %q, want %q", shown.InstanceState, tc.wantState)
+			}
+			if shown.InstanceState == string(domain.InstanceStarting) {
+				t.Fatal("instance state must never still read starting once an observing write verb has run past a confirmed mint exit")
+			}
+			if len(shown.Attachments) != 1 || shown.Attachments[0].ClaimHeld {
+				t.Fatalf("claim still held after the observed exit: %+v", shown.Attachments)
+			}
+
+			code, out, errOut = runSession(t, "session", "show", pair.session)
+			if code != exitcode.Success {
+				t.Fatalf("show text: exit code = %d (stderr: %s)", code, errOut)
+			}
+			const wantLine = "reattach with: omitted — rebuilt claim is not held by this session\n"
+			if !strings.Contains(out, wantLine) {
+				t.Errorf("show text missing the not-held reattach line %q:\n%s", wantLine, out)
+			}
+		})
+	}
 }
 
 func TestPromptCLIPathsMatchRegistry(t *testing.T) {

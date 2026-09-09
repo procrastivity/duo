@@ -46,3 +46,34 @@ func TestATIFPathEmptyLeafIsFileNamedID(t *testing.T) {
 		t.Fatalf("empty leaf ATIFPath = %q, want %q", got, want)
 	}
 }
+
+func TestSessionIDFromExportReturnsMintedID(t *testing.T) {
+	got, err := devin.SessionIDFromExport("testdata/atif-user-assistant.json")
+	if err != nil {
+		t.Fatalf("SessionIDFromExport: %v", err)
+	}
+	if got != "special-platinum" {
+		t.Fatalf("SessionIDFromExport = %q, want %q", got, "special-platinum")
+	}
+}
+
+func TestSessionIDFromExportMissingFileIsHonestMiss(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "does-not-exist.json")
+	got, err := devin.SessionIDFromExport(path)
+	if err != nil {
+		t.Fatalf("SessionIDFromExport: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("SessionIDFromExport = %q, want empty for missing file", got)
+	}
+}
+
+func TestSessionIDFromExportNoSessionIDIsHonestMiss(t *testing.T) {
+	got, err := devin.SessionIDFromExport("testdata/atif-no-session-id.json")
+	if err != nil {
+		t.Fatalf("SessionIDFromExport: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("SessionIDFromExport = %q, want empty for document without session_id", got)
+	}
+}

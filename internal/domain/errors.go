@@ -81,6 +81,9 @@ var (
 	// ErrCommandNotAttempting reports ReconcileAttempt on a command that is
 	// not in the attempting state.
 	ErrCommandNotAttempting = errors.New("domain: prompt command is not attempting")
+	// ErrEvidenceRequired reports a verb that exists only to record proved
+	// host or process evidence, called with no evidence at all.
+	ErrEvidenceRequired = errors.New("domain: this verb requires evidence")
 )
 
 // ConflictError is §4.2 step 5's outcome: evidence that overlaps two Duo

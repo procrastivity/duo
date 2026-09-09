@@ -1,0 +1,11 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "steps": [
+    {
+      "step_id": 1,
+      "source": "user",
+      "timestamp": "2026-08-29T05:00:01.000000000Z",
+      "message": "no session_id on this document"
+    }
+  ]
+}

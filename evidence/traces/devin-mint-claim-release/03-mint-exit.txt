@@ -1,0 +1,16 @@
+# poll for the print-mint process exiting on its own (observation only)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-08T23:54:46Z
+isolation: HERDR_SESSION=dmcrl01 scratch=/tmp/duo-dmcrl01 host=herdr:/tmp/duo-dmcrl01/xdg-config/herdr/sessions/dmcrl01/herdr.sock runtime=devin
+
+container(pane_id)=w1:p1
+polling: herdr agent list + herdr pane process-info --pane w1:p1, every 200ms up to 10s
+
+--- sample ---
+elapsed_ms=0
+agent_count=0
+foreground_process=sh
+mint_gone=true
+
+mint_gone_final=true
+elapsed_ms_to_gone=0
