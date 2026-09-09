@@ -11,3 +11,6 @@
 .direnv/
 
 .DS_Store
+
+# wip projection — canonical store is ~/.local/share/wip/
+.wip/
