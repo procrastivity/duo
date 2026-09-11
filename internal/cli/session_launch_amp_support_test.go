@@ -20,7 +20,7 @@ func TestStage1SupportAcceptsHerdrAmp(t *testing.T) {
 	if !v.OK {
 		t.Fatalf("amp on pinned herdr refused: %+v", v)
 	}
-	if !strings.Contains(v.RecordDigest, "notes63-amp-0.0.1788048110-g570348") {
-		t.Fatalf("digest = %q, want notes63-amp-0.0.1788048110-g570348", v.RecordDigest)
+	if !strings.Contains(v.RecordDigest, "amp-exclusive-writer-0.0.1789142434-g4f3b4d") {
+		t.Fatalf("digest = %q, want amp-exclusive-writer-0.0.1789142434-g4f3b4d", v.RecordDigest)
 	}
 }

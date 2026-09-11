@@ -550,9 +550,10 @@ var (
 	devinDigest = "notes59-devin-3000.6.7"
 	// ampDigest names the Tier C evidence until a conformance-record
 	// digest scheme exists for this candidate (same pattern as
-	// notes59-devin-3000.6.7). Must equal
+	// notes59-devin-3000.6.7): the step-07 sealed live captures at
+	// evidence/traces/amp-exclusive-writer. Must equal
 	// amp.Factory{}.Descriptor().ConformanceRecordDigest.
-	ampDigest = "notes63-amp-0.0.1788048110-g570348"
+	ampDigest = "amp-exclusive-writer-0.0.1789142434-g4f3b4d"
 )
 
 // stage1HostVersions is the pinned-version table launch.Options.HostVersions

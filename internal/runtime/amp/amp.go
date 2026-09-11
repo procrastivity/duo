@@ -33,11 +33,14 @@ import (
 const AdapterID = "amp"
 
 // PinnedExternalVersion is the Amp CLI version the executor-lock and
-// delivery facts (docs/adapters/decisions.md, 2026-09-09) were verified
-// at. Amp's build train ships hourly and auto-updates by default (see
-// Factory.Probe's doc comment), so this is a floor this package was
-// proven against, not a claim that a live binary still matches it.
-const PinnedExternalVersion = "0.0.1788048110-g570348"
+// delivery facts were verified at — the step-07 sealed live run
+// (evidence/traces/amp-exclusive-writer, 2026-09-11; pin taken from the
+// export's own env.initial.platform.clientVersion, which self-records
+// the version the run actually used). Amp's build train ships hourly
+// and auto-updates by default (see Factory.Probe's doc comment), so
+// this is a floor this package was proven against, not a claim that a
+// live binary still matches it.
+const PinnedExternalVersion = "0.0.1789142434-g4f3b4d"
 
 // ThreadIDFormatIdentity names the identity channel Correlate binds: an
 // Amp thread id (the stream-JSON "session_id" field; see
@@ -102,9 +105,11 @@ func (f Factory) Descriptor() adapter.Descriptor {
 		BuildVersion:              "stage1",
 		SupportedExternalVersions: []string{PinnedExternalVersion},
 		// Same "names the evidence until a conformance record exists"
-		// pattern as devin's notes59-devin-3000.6.7. Must match
-		// internal/cli's amp evidence digest, once that lands.
-		ConformanceRecordDigest: "notes63-amp-0.0.1788048110-g570348",
+		// pattern as devin's notes59-devin-3000.6.7, now naming the
+		// step-07 sealed live captures
+		// (evidence/traces/amp-exclusive-writer). Must match
+		// internal/cli's amp evidence digest.
+		ConformanceRecordDigest: "amp-exclusive-writer-0.0.1789142434-g4f3b4d",
 		// Copied from Devin's: transcripts and mint logs carry raw prompt
 		// and result text, and every Amp operation needs the account
 		// credential.

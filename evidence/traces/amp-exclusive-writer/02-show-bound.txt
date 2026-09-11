@@ -1,0 +1,14 @@
+# session show after launch: amp thread bound as agent session, claim released
+duo=duo version dev (commit unknown, built unknown)
+2026-09-11T18:41:48Z
+isolation: HERDR_SESSION=ampxw01 scratch=/tmp/duo-ampxw01 host=herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock runtime=amp settings=/tmp/duo-ampxw01/xdg-config/amp/settings.json
+
+$ duo_cmd session show ses_eda3c4743e8728a5a03dda14ad789b6f --output json
+{"schema":"duo.external/v1","request_id":"req_37e390fee5cd82be","operation":"session.inspect","result":{"session_id":"ses_eda3c4743e8728a5a03dda14ad789b6f","workspace_id":"ws_5810f6ae7e156c9b282c24cba8f0d202","lifecycle":"active","view":"recovering","runtime_instance_id":"ri_6139e92ab5ea86d99477920ebc19f83f","runtime_instance_state":"starting","owner":"cli","creator":"cli","operations":[{"operation":"prompt.deliver","availability":"unsupported"},{"operation":"conversation.list","availability":"unsupported"}],"attachments":[{"attachment_id":"att_6b837a886ae228455280e064215447e2","state":"attached","integration_instance":"herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock","epoch":{"kind":"herdr.terminal_id","value":"term_65b396fe069c71","scope":"pane"},"container":"w1:p1","process_birth":{"pid":3287842,"started_at":"2026-09-11T18:41:47.700Z"},"claim_held":true,"reattach_command":"duo session reattach ses_eda3c4743e8728a5a03dda14ad789b6f --integration-instance herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock --epoch-kind herdr.terminal_id --epoch-value term_65b396fe069c71 --epoch-scope pane --container w1:p1 --process-pid 3287842 --process-started-at 2026-09-11T18:41:47.700Z"}]},"warnings":[],"features":[]}
+exit=0
+
+runtime_instance_state=starting
+claim_held=True
+prompt_deliver_availability=unsupported
+
+bound_check=MID-FLIGHT (runtime_instance_state=starting, claim_held=True — the launch wait's 8s deadline fired before the mint exit was observable; in-bound, matching devin-mint-claim-release's 02. The send path's shared identity wait performs the recovery; 03's post-send show is the hard live/claim-released proof)

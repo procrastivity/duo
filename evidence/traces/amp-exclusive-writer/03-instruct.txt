@@ -1,0 +1,26 @@
+# duo prompt send on the bound amp session (real turn)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-11T18:41:48Z
+isolation: HERDR_SESSION=ampxw01 scratch=/tmp/duo-ampxw01 host=herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock runtime=amp settings=/tmp/duo-ampxw01/xdg-config/amp/settings.json
+
+wall_clock_before=2026-09-11T18:41:57.302Z
+$ duo_cmd prompt send ses_eda3c4743e8728a5a03dda14ad789b6f --text 'Reply with the single word pong.' --idempotency-key key-ampxw01-amp-instruct-1 --expires-at 2026-09-11T18:43:57.000Z --output json
+{"schema":"duo.external/v1","request_id":"req_f85a01ba8421dd51","operation":"prompt.deliver","result":{"command_id":"cmd_7c6332bbfe0cdd585216589689d2acd1","revision":"3","target":{"session_id":"ses_eda3c4743e8728a5a03dda14ad789b6f","runtime_instance_id":"ri_6139e92ab5ea86d99477920ebc19f83f"},"responsibility_state":"delivered","queue_policy":"queue_until_safe","expires_at":"2026-09-11T18:43:57.000Z","activity_observed":false,"acknowledged":false,"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+wall_clock_after=2026-09-11T18:42:08.072Z
+send_elapsed_ms=10770
+expires_at=2026-09-11T18:43:57.000Z
+idempotency_key=key-ampxw01-amp-instruct-1
+leg=delivered
+responsibility_state=delivered
+elapsed_bound_check=PASS (returned in 10770ms, far under the 120000ms expiry; no sleep to deadline)
+
+$ amp_cmd threads export T-01a091c6-a561-71fb-ab37-183dd507b588 (retried up to 4x/3s for documented server sync lag)
+export_exit=0
+export_message_count=4
+export_last_message_role=assistant
+post_send_runtime_instance_state=live
+post_send_claim_held=False
+post_send_prompt_deliver_availability=available
+bound_check=PASS (responsibility_state=delivered; export shows 4 messages, last role=assistant — the turn landed; post-send state=live, claim released)

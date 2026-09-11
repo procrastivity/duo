@@ -252,19 +252,27 @@ TID="$MINT_TID"
 echo "$TID" >"$SCRATCH/thread-id.txt"
 
 # ---------------------------------------------------------------------------
-# 02-show-bound.txt — duo session show after the launch's own identity
-# wait has had the chance to recover the mint exit. PASS when
-# runtime_instance_state is "live" (the only path there is
-# commitIdentityBind binding a non-empty agent-session id — i.e. the amp
-# thread id captured above — as this instance's identity; see
-# internal/cli/identity_bind.go's handleMintExit/commitIdentityBind) and
-# claim_held is false (mirrors devin-mint-claim-release's
-# 05-show-released.txt: claim released, not stuck at "starting"). A
-# second, corroborating signal: operations reports prompt.deliver
-# "available", which requires both a live instance and a bound runtime
-# adapter (internal/cli/session_show.go's operationsForInspect) — amp has
-# no ConditionProvider, so unlike the Devin capture there is no
-# `condition` field to inspect here.
+# 02-show-bound.txt — duo session show right after launch. Two states are
+# in-bound here, mirroring devin-mint-claim-release's 02-show-starting.txt
+# (which notes either outcome and fails on neither):
+#
+#   - "live" with claim_held=false: the launch's own identity wait
+#     (bindStartingIdentity) observed the mint exit and recovered the
+#     thread id in-window (internal/cli/identity_bind.go's
+#     handleMintExit/commitIdentityBind).
+#   - "starting" with claim_held=true: caught mid-flight. The launch wait's
+#     deadline (identityBindTimeout, 8s) can fire before the exit is
+#     observable — the continuity probe only runs once Herdr's durable
+#     agent deregistration (foreground loss) has removed the AgentOnPane
+#     row, and a real `amp -x` mint turn plus that deregistration lag can
+#     outlast 8s. The same shared identity wait re-runs inside `duo prompt
+#     send` with the command's own expires_at as its deadline
+#     (waitPromptIdentity), performs the identical recovery, and 03's
+#     post-send show below is the hard proof of live/claim-released.
+#
+# Anything else — notably "exited" (handleMintExit's generic leg ran:
+# recovery found no thread id and Authority.Exit released the claims) —
+# fails the capture: no send can recover an exited instance.
 # ---------------------------------------------------------------------------
 write_header "$EVIDENCE/02-show-bound.txt" "session show after launch: amp thread bound as agent session, claim released"
 SHOW1_CMD="duo_cmd session show ${SES} --output json"
@@ -302,17 +310,24 @@ BOUND_LIVE=false
 CLAIM_RELEASED=false
 [ "$SHOW1_CLAIM" = "False" ] || [ "$SHOW1_CLAIM" = "None" ] && CLAIM_RELEASED=true
 
+MID_FLIGHT=false
+if [ "$SHOW1_STATE" = "starting" ] && [ "$SHOW1_CLAIM" = "True" ]; then
+  MID_FLIGHT=true
+fi
+
 {
   if [ "$BOUND_LIVE" = "true" ] && [ "$CLAIM_RELEASED" = "true" ]; then
     echo "bound_check=PASS (runtime_instance_state=live — the amp thread id is bound as the agent session — claim_held=false, prompt_deliver_availability=${SHOW1_AVAIL})"
+  elif [ "$MID_FLIGHT" = "true" ]; then
+    echo "bound_check=MID-FLIGHT (runtime_instance_state=starting, claim_held=True — the launch wait's 8s deadline fired before the mint exit was observable; in-bound, matching devin-mint-claim-release's 02. The send path's shared identity wait performs the recovery; 03's post-send show is the hard live/claim-released proof)"
   else
-    echo "bound_check=FAIL (runtime_instance_state=${SHOW1_STATE}, claim_held=${SHOW1_CLAIM} — expected live/false; the shared identity wait inside session launch did not resolve the mint exit before this show ran)"
+    echo "bound_check=FAIL (runtime_instance_state=${SHOW1_STATE}, claim_held=${SHOW1_CLAIM} — neither live/released nor mid-flight starting/held; an exited instance cannot be recovered by the send path)"
   fi
   echo
 } >>"$EVIDENCE/02-show-bound.txt"
 
-if [ "$BOUND_LIVE" != "true" ] || [ "$CLAIM_RELEASED" != "true" ]; then
-  echo "capture-live.sh: session not bound live after mint; aborting before any prompt send" >&2
+if [ "$MID_FLIGHT" != "true" ] && { [ "$BOUND_LIVE" != "true" ] || [ "$CLAIM_RELEASED" != "true" ]; }; then
+  echo "capture-live.sh: session neither bound live nor mid-flight after mint; aborting before any prompt send" >&2
   exit 2
 fi
 
@@ -431,19 +446,53 @@ if [ "$EXPORT_STATUS" -eq 0 ] && [ "${EXPORT_MSG_COUNT:-0}" -ge 4 ] 2>/dev/null;
   TURN_LANDED=true
 fi
 
+# Post-send show: the hard live/claim-released proof 02 defers to when it
+# records MID-FLIGHT. Whichever wait ran the recovery — the launch's own
+# (02 already PASS) or this send's waitPromptIdentity — by now the amp
+# thread id must be bound (runtime_instance_state=live), the exited mint
+# process's claim released (claim_held=false), and prompt.deliver
+# "available" (operationsForInspect: live instance + bound adapter).
+SHOW2_JSON="$(duo_cmd session show "$SES" --output json)"
+SHOW2_SUMMARY="$(python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+r = d.get('result', {})
+state = r.get('runtime_instance_state', '')
+atts = r.get('attachments') or []
+claim_held = atts[0].get('claim_held') if atts else None
+ops = r.get('operations') or []
+prompt_deliver_availability = ''
+for op in ops:
+    if op.get('operation') == 'prompt.deliver':
+        prompt_deliver_availability = op.get('availability', '')
+print(f'post_send_runtime_instance_state={state}')
+print(f'post_send_claim_held={claim_held}')
+print(f'post_send_prompt_deliver_availability={prompt_deliver_availability}')
+" "$SHOW2_JSON")"
 {
-  if [ "$SEND_LEG" = "delivered" ] && [ "$TURN_LANDED" = "true" ]; then
-    echo "bound_check=PASS (responsibility_state=delivered; export shows ${EXPORT_MSG_COUNT} messages, last role=${EXPORT_LAST_ROLE} — the turn landed)"
+  echo "$SHOW2_SUMMARY"
+} >>"$EVIDENCE/03-instruct.txt"
+SHOW2_STATE="$(echo "$SHOW2_SUMMARY" | sed -n 's/^post_send_runtime_instance_state=//p')"
+SHOW2_CLAIM="$(echo "$SHOW2_SUMMARY" | sed -n 's/^post_send_claim_held=//p')"
+
+BOUND_AFTER_SEND=false
+if [ "$SHOW2_STATE" = "live" ] && { [ "$SHOW2_CLAIM" = "False" ] || [ "$SHOW2_CLAIM" = "None" ]; }; then
+  BOUND_AFTER_SEND=true
+fi
+
+{
+  if [ "$SEND_LEG" = "delivered" ] && [ "$TURN_LANDED" = "true" ] && [ "$BOUND_AFTER_SEND" = "true" ]; then
+    echo "bound_check=PASS (responsibility_state=delivered; export shows ${EXPORT_MSG_COUNT} messages, last role=${EXPORT_LAST_ROLE} — the turn landed; post-send state=live, claim released)"
   else
-    echo "bound_check=FAIL (leg=${SEND_LEG}, export_message_count=${EXPORT_MSG_COUNT}; expected delivered and >=4 messages)"
+    echo "bound_check=FAIL (leg=${SEND_LEG}, export_message_count=${EXPORT_MSG_COUNT}, post_send_state=${SHOW2_STATE}, post_send_claim_held=${SHOW2_CLAIM}; expected delivered, >=4 messages, and live/claim-released after the send)"
   fi
   echo
 } >>"$EVIDENCE/03-instruct.txt"
 
 echo "$EXPORT_MSG_COUNT" >"$SCRATCH/msg-count-after-instruct.txt"
 
-if [ "$SEND_LEG" != "delivered" ] || [ "$TURN_LANDED" != "true" ]; then
-  echo "capture-live.sh: instruct turn did not land; aborting before the collision capture" >&2
+if [ "$SEND_LEG" != "delivered" ] || [ "$TURN_LANDED" != "true" ] || [ "$BOUND_AFTER_SEND" != "true" ]; then
+  echo "capture-live.sh: instruct turn did not land bound-live; aborting before the collision capture" >&2
   exit 2
 fi
 
@@ -496,14 +545,29 @@ if [ -z "$LAUNCH_PANE" ]; then
   exit 2
 fi
 
+# One split, captured and parsed from the same invocation. (Run 3 used
+# append_cmd — which executes its command — plus a second execution for
+# the parse, creating two panes: the captured JSON named w1:p2 while the
+# holder ran in w1:p3, and the extra pane was never closed.)
 SPLIT_CMD="herdr_cmd pane split \"${LAUNCH_PANE}\" --direction down --cwd \"${SCRATCH}/ws\" --no-focus"
-append_cmd "$EVIDENCE/04-collision.txt" "$SPLIT_CMD"
+set +e
+SPLIT_JSON="$(herdr_cmd pane split "$LAUNCH_PANE" --direction down --cwd "$SCRATCH/ws" --no-focus 2>&1)"
+SPLIT_STATUS=$?
+set -e
+{
+  echo "\$ $SPLIT_CMD"
+  echo "$SPLIT_JSON"
+  echo "exit=$SPLIT_STATUS"
+  echo
+} >>"$EVIDENCE/04-collision.txt"
 
-SPLIT_JSON="$(herdr_cmd pane split "$LAUNCH_PANE" --direction down --cwd "$SCRATCH/ws" --no-focus)"
 HOLDER_PANE="$(python3 -c "
 import json, sys
-d = json.loads(sys.argv[1])
-print(d['result']['pane']['pane_id'])
+try:
+    d = json.loads(sys.argv[1])
+    print(d['result']['pane']['pane_id'])
+except Exception:
+    print('')
 " "$SPLIT_JSON")"
 echo "holder_pane=${HOLDER_PANE}" >>"$EVIDENCE/04-collision.txt"
 
@@ -564,13 +628,24 @@ COLLISION_EXPIRES="$(date -u -d '+120 seconds' '+%Y-%m-%dT%H:%M:%S.000Z')"
 COLLISION_CMD="duo_cmd prompt send ${SES} --text '${COLLISION_TEXT}' --idempotency-key ${COLLISION_KEY} --expires-at ${COLLISION_EXPIRES} --output json"
 append_cmd "$EVIDENCE/04-collision.txt" "$COLLISION_CMD"
 
+# The envelope is the LAST duo prompt.deliver line in the capture file —
+# never simply the first '{' line: this file's herdr pane-split JSON
+# precedes it, and run 3's first-'{' parse grabbed that split result,
+# emptying every envelope field and skipping the command-state leg.
 COLLISION_ENVELOPE="$(python3 -c "
 import json, pathlib
 text = pathlib.Path('${EVIDENCE}/04-collision.txt').read_text()
+envelope = ''
 for line in text.splitlines():
-    if line.startswith('{'):
-        print(line)
-        break
+    if not line.startswith('{'):
+        continue
+    try:
+        d = json.loads(line)
+    except Exception:
+        continue
+    if d.get('schema') == 'duo.external/v1' and d.get('operation') == 'prompt.deliver':
+        envelope = line
+print(envelope)
 ")"
 
 COLLISION_SUMMARY="$(python3 -c "

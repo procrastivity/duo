@@ -1155,3 +1155,38 @@ server-origin writers too is unknown" — and stay out of scope. No
 human-priority override of the server lock: the lock is first-connect-wins,
 symmetric between human and headless writers (notes/63 §5), and this step
 does not change that.
+
+## 2026-09-11 — Amp exclusive-writer sealed live; pin moved
+
+The step-07 live run sealed all five captures
+(`evidence/traces/amp-exclusive-writer/01`–`05`): mint through the
+Duo-materialized wrapper, mid-flight show, instruct turn with post-send
+live/claim-released proof, second-writer collision with the full typed
+envelope (`operation.temporarily_unavailable` / `unknown_effect` /
+`retry_after_holder_release` / `thread_locked`, command terminal `failed`
+with no requeue, no trace in the export), and archive.
+
+**Pin.** `amp 0.0.1789142434-g4f3b4d`; evidence digest
+`amp-exclusive-writer-0.0.1789142434-g4f3b4d`. The version comes from the
+sealed export's own `env.initial.platform.clientVersion`, which
+self-records the version the run actually used — a better pin source than
+a hand-run `amp --version` beside the run, since Amp self-updates hourly
+(two updates were observed during this one day of runs).
+
+**Caveat, recorded on purpose.** The launch leg ran against a locally
+patched Herdr 0.8.2: stock Herdr's `agent.start` refuses the wrapper's
+kind (`bash` is not in its fixed interactive-agent enum), and the patch
+widens only that validation seam — delivery, settle, detection, and the
+wire schema are stock, so the Amp-side facts (executor lock, collision
+envelope, mint log) are unaffected. How Duo launches the mint on stock
+Herdr stays open: a pane-surface delivery shape, or an upstream Herdr
+generic kind. Step-07's findings on the `duo-amp-exclusive-writer` Matter
+carry the full chain.
+
+**Identity-wait shape confirmed.** The launch wait's 8s deadline
+(`identityBindTimeout`) can fire before Herdr's foreground-loss
+deregistration makes the mint exit observable; the send path's shared
+identity wait (`waitPromptIdentity`, deadline = the command's
+`expires_at`) then performs the same mint-log recovery. Both legs are now
+sealed: run 4 recovered in the send path; the capture pair treats the
+mid-flight show as in-bound, matching the Devin model captures.

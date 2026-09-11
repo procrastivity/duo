@@ -23,9 +23,9 @@ set -eu
 # script (step-07 of this matter); an agent authoring the pair must never
 # execute it.
 #
-#   - `amp` on PATH, at the pinned version 0.0.1788048110-g570348
-#     (docs/adapters/decisions.md, 2026-09-09, "Amp exclusive-writer scope
-#     is per-turn, not per-session", "Pin"). This script does not exec
+#   - `amp` on PATH, at the pinned version 0.0.1789142434-g4f3b4d
+#     (docs/adapters/decisions.md, 2026-09-11, "Amp exclusive-writer
+#     sealed live", "Pin"). This script does not exec
 #     `amp --version` to check it — same I-D7 pin-hazard rationale as
 #     Factory.Probe's own doc comment (internal/runtime/amp/amp.go): Amp's
 #     build train ships hourly and auto-updates by default, so a version

@@ -1,0 +1,18 @@
+# live Herdr+amp mint launch (amp_mint --require agent_runtime=amp)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-11T18:41:48Z
+isolation: HERDR_SESSION=ampxw01 scratch=/tmp/duo-ampxw01 host=herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock runtime=amp settings=/tmp/duo-ampxw01/xdg-config/amp/settings.json
+
+$ duo_cmd session launch amp_mint --require agent_runtime=amp --host "herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock" --workspace /tmp/duo-ampxw01/ws --output json
+duo: host bound: workspace ws_5810f6ae7e156c9b282c24cba8f0d202 -> herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock (host_source=explicit-flag, fact fact_d2b7fd323af331202b9fa969d639fbf3)
+duo: change it later with: duo workspace host rebind --host herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock --evidence "<what you checked>"
+{"schema":"duo.external/v1","request_id":"req_fe85808f700bb019","operation":"session.launch","result":{"session_id":"ses_eda3c4743e8728a5a03dda14ad789b6f","launch_resolution_id":"lrr_6e52c8f30c20c0e2369de44c97542e1c","selection":"ordered","leaves":[{"name":"main","agent_runtime":"amp","model_line":"amp-default","model_family":"amp","composition":{"name":"amp_default@herdr","variant":"amp_default","agent_runtime":"amp","model_line":"amp-default","model_family":"amp","host_kind":"herdr","host_instance_id":"herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock"},"declared_kind":"determined","outcome":"selected","relented_avoids":[]}],"host":{"kind":"herdr","instance_label":"/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock","host_source":"explicit-flag","outranked_evidence":[]},"target":"tab","target_source":"built-in"},"warnings":[],"features":[]}
+exit=0
+
+session_id=ses_eda3c4743e8728a5a03dda14ad789b6f
+launch_resolution_id=lrr_6e52c8f30c20c0e2369de44c97542e1c
+mint_log_path=/tmp/duo-ampxw01/xdg-data/duo/amp-mint/lrr_6e52c8f30c20c0e2369de44c97542e1c/main.jsonl
+elapsed_ms_to_mint_log_complete=0
+thread_id=T-01a091c6-a561-71fb-ab37-183dd507b588
+mint_success=true
+bound_check=PASS (mint log names a thread id and closed with a successful result record)

@@ -15,8 +15,8 @@ func TestFactoryDescriptor(t *testing.T) {
 	if d.AdapterID != amp.AdapterID || d.Role != adapter.RoleRuntime {
 		t.Fatalf("descriptor = %+v, want adapter id %q in the runtime role", d, amp.AdapterID)
 	}
-	if d.ConformanceRecordDigest != "notes63-amp-0.0.1788048110-g570348" {
-		t.Fatalf("ConformanceRecordDigest = %q, want notes63-amp-0.0.1788048110-g570348", d.ConformanceRecordDigest)
+	if d.ConformanceRecordDigest != "amp-exclusive-writer-0.0.1789142434-g4f3b4d" {
+		t.Fatalf("ConformanceRecordDigest = %q, want amp-exclusive-writer-0.0.1789142434-g4f3b4d", d.ConformanceRecordDigest)
 	}
 	if len(d.SupportedExternalVersions) != 1 || d.SupportedExternalVersions[0] != amp.PinnedExternalVersion {
 		t.Fatalf("SupportedExternalVersions = %v, want [%s]", d.SupportedExternalVersions, amp.PinnedExternalVersion)
