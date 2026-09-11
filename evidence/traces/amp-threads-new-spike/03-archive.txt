@@ -1,0 +1,9 @@
+# amp threads archive (disposable thread cleanup)
+2026-09-11T19:31:35Z
+isolation: scratch=/tmp/duo-ampnew01 settings=/tmp/duo-ampnew01/xdg-config/amp/settings.json (no herdr, no duo)
+
+$ amp_cmd threads archive T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+✓ Thread archived successfully
+exit=0
+
+bound_check=PASS (amp threads archive exited 0)

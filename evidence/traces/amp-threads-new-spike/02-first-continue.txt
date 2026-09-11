@@ -1,0 +1,28 @@
+# first threads continue -x on the empty thread (billed turn)
+2026-09-11T19:31:35Z
+isolation: scratch=/tmp/duo-ampnew01 settings=/tmp/duo-ampnew01/xdg-config/amp/settings.json (no herdr, no duo)
+
+$ printf '%s\n' 'Reply with the single word pong.' | amp_cmd threads continue T-01a091f4-3898-7340-860d-1a8b4d23ea4c -x --no-archive-after-execute --stream-json | tee /tmp/duo-ampnew01/first-continue-stream.jsonl
+{"type":"system","subtype":"init","cwd":"/home/dev/Code/duo","session_id":"T-01a091f4-3898-7340-860d-1a8b4d23ea4c","tools":["apply_patch","clear_schedule","code_exec","create_thread","download_thread_changes","download_thread_file","find_shared_plugins_and_skills","find_thread","finder","get_current_user_identity","get_schedule","get_thread_status","librarian","list_agent_modes","list_runners","list_workspace_members","load_plugin","oracle","painter","public_artifact_url","read_thread","read_web_page","reload_mcp","reload_plugins","reload_skills","send_thread_message","set_schedule","shell_command","shell_command_kill","shell_command_status","ship_thread_changes","skill","Task","thread_file_url","thread_portal_login_url","tool_search","update_schedule","update_thread","upload_thread_file","view_media","wait_for_threads","web_search"],"mcp_servers":[],"agent_mode":"medium"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with the single word pong."}]},"parent_tool_use_id":null,"session_id":"T-01a091f4-3898-7340-860d-1a8b4d23ea4c"}
+{"type":"assistant","message":{"type":"message","role":"assistant","content":[{"type":"text","text":"pong"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"cache_creation_input_tokens":23480,"cache_read_input_tokens":0,"output_tokens":5,"max_tokens":272000,"service_tier":"standard"}},"parent_tool_use_id":null,"session_id":"T-01a091f4-3898-7340-860d-1a8b4d23ea4c"}
+{"type":"result","subtype":"success","duration_ms":5080,"is_error":false,"num_turns":1,"result":"pong","session_id":"T-01a091f4-3898-7340-860d-1a8b4d23ea4c"}
+exit=0
+
+stream_session_id=T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+stream_result_success=true
+
+$ amp_cmd threads usage T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+Untitled
+Usage information is currently unavailable for this thread.
+Details: https://ampcode.com/threads/T-01a091f4-3898-7340-860d-1a8b4d23ea4c/usage
+
+# Run `amp threads usage <thread-id> --details` for more detailed information.
+exit=0
+
+$ amp_cmd threads export T-01a091f4-3898-7340-860d-1a8b4d23ea4c (retried up to 4x/3s for sync lag; full JSON in /tmp/duo-ampnew01/export-after-turn.json)
+export_message_count=2
+export_last_message_role=assistant
+export_client_version=0.0.1789142434-g4f3b4d
+
+bound_check=PASS (first continue on the empty thread delivered: stream result/success with session_id=T-01a091f4-3898-7340-860d-1a8b4d23ea4c; export shows 2 messages, last role=assistant)
