@@ -21,6 +21,7 @@ import (
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
+	"github.com/procrastivity/duo/internal/runtime/amp"
 	"github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	"github.com/procrastivity/duo/internal/store"
@@ -67,6 +68,104 @@ func TestMapPromptReleaseDevinLockJSON(t *testing.T) {
 				t.Fatalf("unsafe or incomplete message: %q", env.Error.Message)
 			}
 		})
+	}
+}
+
+func TestMapPromptReleaseAmpThreadLockedJSON(t *testing.T) {
+	for _, tc := range []struct {
+		name, threadID string
+	}{
+		{name: "without thread id"},
+		{name: "with thread id", threadID: "T-42"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := amp.ErrThreadLocked
+			if tc.threadID != "" {
+				raw = &amp.ThreadLockedError{ThreadID: tc.threadID}
+			}
+			var stderr bytes.Buffer
+			streams := &iostreams.Streams{Err: &stderr}
+			err := mapPromptReleaseError(streams, "json", "prompt.deliver", domain.PromptCommand{ID: "cmd_lock"}, raw)
+			if err == nil {
+				t.Fatal("expected written failure marker")
+			}
+			assertValidExternalV1(t, stderr.Bytes())
+			var env struct {
+				Error struct {
+					Code, Message, Effect string
+					Retry                 promptRetryAdvice
+					Details               map[string]any
+				} `json:"error"`
+			}
+			if json.Unmarshal(stderr.Bytes(), &env) != nil {
+				t.Fatalf("invalid JSON: %s", stderr.String())
+			}
+			if env.Error.Code != "operation.temporarily_unavailable" || env.Error.Effect != "unknown_effect" || !env.Error.Retry.Safe || env.Error.Retry.Action != "retry_after_holder_release" {
+				t.Fatalf("error mapping = %+v", env.Error)
+			}
+			if env.Error.Details["error_kind"] != "thread_locked" {
+				t.Fatalf("details = %#v", env.Error.Details)
+			}
+			gotID, hasID := env.Error.Details["amp_thread_id"]
+			if hasID != (tc.threadID != "") || (hasID && gotID != tc.threadID) {
+				t.Fatalf("amp_thread_id = %#v, present %v", gotID, hasID)
+			}
+			if tc.threadID != "" && !strings.Contains(env.Error.Message, tc.threadID) {
+				t.Fatalf("message missing thread id: %q", env.Error.Message)
+			}
+		})
+	}
+}
+
+func TestMapPromptReleaseAmpThreadNotFoundJSON(t *testing.T) {
+	var stderr bytes.Buffer
+	streams := &iostreams.Streams{Err: &stderr}
+	err := mapPromptReleaseError(streams, "json", "prompt.deliver", domain.PromptCommand{ID: "cmd_notfound"}, amp.ErrThreadNotFound)
+	if err == nil {
+		t.Fatal("expected written failure marker")
+	}
+	assertValidExternalV1(t, stderr.Bytes())
+	var env struct {
+		Error struct {
+			Code, Message, Effect string
+			Retry                 promptRetryAdvice
+			Details               map[string]any
+		} `json:"error"`
+	}
+	if json.Unmarshal(stderr.Bytes(), &env) != nil {
+		t.Fatalf("invalid JSON: %s", stderr.String())
+	}
+	if env.Error.Code != "object.not_found" || env.Error.Effect != "unknown_effect" || env.Error.Retry.Safe || env.Error.Retry.Action != "verify_thread_id" {
+		t.Fatalf("error mapping = %+v", env.Error)
+	}
+	if env.Error.Details["error_kind"] != "thread_not_found" {
+		t.Fatalf("details = %#v", env.Error.Details)
+	}
+}
+
+func TestMapPromptReleaseAmpThreadArchivedJSON(t *testing.T) {
+	var stderr bytes.Buffer
+	streams := &iostreams.Streams{Err: &stderr}
+	err := mapPromptReleaseError(streams, "json", "prompt.deliver", domain.PromptCommand{ID: "cmd_archived"}, amp.ErrThreadArchived)
+	if err == nil {
+		t.Fatal("expected written failure marker")
+	}
+	assertValidExternalV1(t, stderr.Bytes())
+	var env struct {
+		Error struct {
+			Code, Message, Effect string
+			Retry                 promptRetryAdvice
+			Details               map[string]any
+		} `json:"error"`
+	}
+	if json.Unmarshal(stderr.Bytes(), &env) != nil {
+		t.Fatalf("invalid JSON: %s", stderr.String())
+	}
+	if env.Error.Code != "object.not_found" || env.Error.Effect != "unknown_effect" || env.Error.Retry.Safe || env.Error.Retry.Action != "unarchive_or_use_new_thread" {
+		t.Fatalf("error mapping = %+v", env.Error)
+	}
+	if env.Error.Details["error_kind"] != "thread_archived" {
+		t.Fatalf("details = %#v", env.Error.Details)
 	}
 }
 

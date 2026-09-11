@@ -1,0 +1,202 @@
+# second-writer collision: TUI holder + duo prompt send (JSON mode)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-11T18:41:48Z
+isolation: HERDR_SESSION=ampxw01 scratch=/tmp/duo-ampxw01 host=herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock runtime=amp settings=/tmp/duo-ampxw01/xdg-config/amp/settings.json
+
+launch_pane=w1:p1
+$ herdr_cmd pane split "w1:p1" --direction down --cwd "/tmp/duo-ampxw01/ws" --no-focus
+{"id":"cli:pane:split","result":{"pane":{"agent_status":"unknown","cwd":"/tmp/duo-ampxw01/ws","focused":false,"foreground_cwd":"/tmp/duo-ampxw01/ws","pane_id":"w1:p2","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"term_65b397162a2422","workspace_id":"w1"},"type":"pane_info"}}
+exit=0
+
+holder_pane=w1:p2
+$ herdr_cmd pane run "w1:p2" amp threads continue T-01a091c6-a561-71fb-ab37-183dd507b588 --settings-file /tmp/duo-ampxw01/xdg-config/amp/settings.json
+exit=0
+
+tui_holder_up=true (elapsed_ms=0, foreground_process=amp)
+
+$ duo_cmd prompt send ses_eda3c4743e8728a5a03dda14ad789b6f --text 'COLLISION-PROBE: reply with the word blocked.' --idempotency-key key-ampxw01-amp-collision-1 --expires-at 2026-09-11T18:44:15.000Z --output json
+{"schema":"duo.external/v1","request_id":"req_1b0ecfe499ff8b24","operation":"prompt.deliver","error":{"class":"unavailable","code":"operation.temporarily_unavailable","message":"The Amp thread \"T-01a091c6-a561-71fb-ab37-183dd507b588\" is locked by another executor. Retry after the holder releases it.","target":{"id":"cmd_2e0f83ce291efbae4508c72fe8bdab33","kind":"prompt_command"},"retry":{"safe":true,"action":"retry_after_holder_release"},"effect":"unknown_effect","details":{"amp_thread_id":"T-01a091c6-a561-71fb-ab37-183dd507b588","error_kind":"thread_locked"}}}
+exit=1
+
+code=operation.temporarily_unavailable
+effect=unknown_effect
+retry_action=retry_after_holder_release
+error_kind=thread_locked
+command_id=cmd_2e0f83ce291efbae4508c72fe8bdab33
+
+$ duo_cmd prompt show cmd_2e0f83ce291efbae4508c72fe8bdab33 --output json
+{"schema":"duo.external/v1","request_id":"req_f26069518f489271","operation":"command.inspect","result":{"command_id":"cmd_2e0f83ce291efbae4508c72fe8bdab33","revision":"3","operation":"prompt.deliver","target":{"session_id":"ses_eda3c4743e8728a5a03dda14ad789b6f","runtime_instance_id":"ri_6139e92ab5ea86d99477920ebc19f83f"},"responsibility_state":"failed","queue_policy":"queue_until_safe","expires_at":"2026-09-11T18:44:15.000Z","attempts":[{"attempt_id":"catt_5dd485d5faa2508a787b7c408577a91a","realization":"native","started_at":"2026-09-11T18:42:15.939Z","recorded_result":"failed"}],"milestones":{"accepted_at":"2026-09-11T18:42:15.929Z","activity_observed":false,"acknowledged":false},"retry":{"safe":false,"action":"observe_existing_command"}},"warnings":[],"features":[]}
+exit=0
+
+command_responsibility_state=failed
+$ amp_cmd threads export T-01a091c6-a561-71fb-ab37-183dd507b588
+{
+  "v": 20,
+  "id": "T-01a091c6-a561-71fb-ab37-183dd507b588",
+  "env": {
+    "initial": {
+      "trees": [
+        {
+          "uri": "file:///tmp/duo-ampxw01/ws",
+          "displayName": "ws"
+        }
+      ],
+      "platform": {
+        "os": "linux",
+        "client": "CLI Execute Mode",
+        "osVersion": "6.8.0-136-generic",
+        "clientType": "cli",
+        "webBrowser": false,
+        "clientVersion": "0.0.1789142434-g4f3b4d",
+        "installationID": "07f78799-22b0-4f2e-9cd9-fdca207d009a",
+        "cpuArchitecture": "x64",
+        "deviceFingerprint": "v1:fp_ec1e2cdae87497f5be5b6279ca6992b44923e38bbfdfae53b712c79bd2593e20"
+      },
+      "runnerID": null,
+      "workingDirectory": "file:///tmp/duo-ampxw01/ws"
+    }
+  },
+  "meta": {
+    "features": [],
+    "executorType": "local-client",
+    "lastKnownAgentState": {
+      "state": "idle",
+      "messageID": "M-034N6ufNq5q4Xaoxjhqn3Q",
+      "updatedAt": "2026-09-11T18:42:07.872Z"
+    },
+    "deleted": false,
+    "createdOnServer": false,
+    "lastUserMessageAt": "2026-09-11T18:42:03.043Z",
+    "workspaceID": null,
+    "projectID": null,
+    "visibility": "private",
+    "sharedGroupIDs": [],
+    "agentMode": "medium",
+    "usesDtw": true,
+    "usesThreadActors": true
+  },
+  "title": "DUO-AMP-READY",
+  "created": 1789152109921,
+  "messages": [
+    {
+      "meta": {
+        "sentAt": 1789152113071
+      },
+      "role": "user",
+      "readAt": null,
+      "content": [
+        {
+          "text": "Reply with exactly: DUO-AMP-READY",
+          "type": "text"
+        }
+      ],
+      "createdAt": "2026-09-11T18:41:53.071Z",
+      "messageId": 1,
+      "userState": {
+        "timeZone": "UTC",
+        "currentlyVisibleFiles": []
+      },
+      "protocolMessageID": "M-034N6uOvhw0R9OpTEF2W6R",
+      "protocolMessageVersion": 0
+    },
+    {
+      "meta": {
+        "openAIResponsePhase": "final_answer"
+      },
+      "role": "assistant",
+      "state": {
+        "type": "complete",
+        "stopReason": "end_turn"
+      },
+      "usage": {
+        "model": "gpt-5.6-sol",
+        "features": [],
+        "timestamp": "2026-09-11T18:41:56.771Z",
+        "inputTokens": 0,
+        "outputTokens": 10,
+        "maxInputTokens": 272000,
+        "totalInputTokens": 23192,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 23192
+      },
+      "readAt": null,
+      "content": [
+        {
+          "text": "DUO-AMP-READY",
+          "type": "text",
+          "finalTime": 1789152116451,
+          "startTime": 1789152116232,
+          "blockState": "complete"
+        }
+      ],
+      "createdAt": "2026-09-11T18:41:56.713Z",
+      "messageId": 2,
+      "protocolMessageID": "M-034N6uPtep8WHlf4hh9niD",
+      "protocolMessageVersion": 1
+    },
+    {
+      "meta": {
+        "sentAt": 1789152123043
+      },
+      "role": "user",
+      "readAt": null,
+      "content": [
+        {
+          "text": "Reply with the single word pong.",
+          "type": "text"
+        }
+      ],
+      "createdAt": "2026-09-11T18:42:03.043Z",
+      "messageId": 3,
+      "protocolMessageID": "M-034N6ueKKYpHNVkeHsbknt",
+      "protocolMessageVersion": 0
+    },
+    {
+      "meta": {
+        "openAIResponsePhase": "final_answer"
+      },
+      "role": "assistant",
+      "state": {
+        "type": "complete",
+        "stopReason": "end_turn"
+      },
+      "usage": {
+        "model": "gpt-5.6-sol",
+        "features": [],
+        "timestamp": "2026-09-11T18:42:07.643Z",
+        "inputTokens": 0,
+        "outputTokens": 5,
+        "maxInputTokens": 272000,
+        "totalInputTokens": 23257,
+        "cacheReadInputTokens": 23040,
+        "cacheCreationInputTokens": 217
+      },
+      "readAt": null,
+      "content": [
+        {
+          "text": "pong",
+          "type": "text",
+          "finalTime": 1789152127247,
+          "startTime": 1789152127076,
+          "blockState": "complete"
+        }
+      ],
+      "createdAt": "2026-09-11T18:42:07.581Z",
+      "messageId": 4,
+      "protocolMessageID": "M-034N6ufNq5q4Xaoxjhqn3Q",
+      "protocolMessageVersion": 1
+    }
+  ],
+  "agentMode": "medium",
+  "creatorUserID": "user_01K5FVT0W9ECAZ9KJCRNKC2SVT",
+  "pinned": false,
+  "multiplayerExpiresAt": null,
+  "updatedAt": "2026-09-11T18:42:12.331Z"
+}
+exit=0
+
+message_count=4
+contains_collision_text=False
+bound_check=PASS (envelope=operation.temporarily_unavailable/unknown_effect/retry_after_holder_release/thread_locked; command terminal failed, no requeue; export message_count=4 unchanged from baseline 4, no trace of the refused turn)
+
+holder_pane_closed=true

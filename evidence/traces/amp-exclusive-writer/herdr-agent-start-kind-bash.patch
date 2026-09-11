@@ -1,0 +1,39 @@
+diff --git a/src/app/agents.rs b/src/app/agents.rs
+index f25383fe..3234c321 100644
+--- a/src/app/agents.rs
++++ b/src/app/agents.rs
+@@ -150,8 +150,23 @@ impl App {
+         if !valid_agent_name(&name) {
+             return Err(AgentStartError::InvalidName);
+         }
+-        let Some(kind) = crate::detect::parse_agent_label(&params.kind) else {
+-            return Err(AgentStartError::UnsupportedKind(params.kind));
++        // Local patch (Duo amp exclusive-writer step-07): accept kind
++        // "bash" so a Duo-materialized wrapper script can be started
++        // through the normal agent path. The submitted command becomes
++        // `bash <args>`; the managed kind stays Amp, because the wrapper's
++        // pipeline runs `amp -x` and that is the agent detection should
++        // observe in the foreground job. Only this validation seam is
++        // widened — delivery, settle, and detection are unchanged.
++        let (kind, executable) = if params.kind == "bash" {
++            (crate::detect::Agent::Amp, "bash".to_string())
++        } else {
++            let Some(kind) = crate::detect::parse_agent_label(&params.kind) else {
++                return Err(AgentStartError::UnsupportedKind(params.kind));
++            };
++            (
++                kind,
++                crate::detect::interactive_agent_executable(kind).to_string(),
++            )
+         };
+         if params
+             .args
+@@ -192,7 +207,7 @@ impl App {
+         let shell_name = available_shell_name(runtime)
+             .ok_or_else(|| AgentStartError::TargetBusy(params.pane_id.clone()))?;
+
+-        let mut argv = vec![crate::detect::interactive_agent_executable(kind).to_string()];
++        let mut argv = vec![executable];
+         argv.extend(params.args);
+         let command = crate::platform::interactive_shell_command(&argv, &shell_name)
+             .ok_or(AgentStartError::InvalidArgument)?;

@@ -1,0 +1,10 @@
+# amp threads archive (disposable thread cleanup)
+duo=duo version dev (commit unknown, built unknown)
+2026-09-11T18:41:48Z
+isolation: HERDR_SESSION=ampxw01 scratch=/tmp/duo-ampxw01 host=herdr:/tmp/duo-ampxw01/xdg-config/herdr/sessions/ampxw01/herdr.sock runtime=amp settings=/tmp/duo-ampxw01/xdg-config/amp/settings.json
+
+$ amp_cmd threads archive T-01a091c6-a561-71fb-ab37-183dd507b588
+✓ Thread archived successfully
+exit=0
+
+bound_check=PASS (amp threads archive exited 0)

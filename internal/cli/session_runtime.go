@@ -12,6 +12,7 @@ import (
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/registry"
 	"github.com/procrastivity/duo/internal/runtime"
+	"github.com/procrastivity/duo/internal/runtime/amp"
 	"github.com/procrastivity/duo/internal/runtime/claude"
 	"github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
@@ -121,6 +122,8 @@ func openKnownAgentRuntime(integrationInstanceID string) (any, error) {
 		return runtimepi.New(integrationInstanceID), nil
 	case "devin":
 		return devin.New(integrationInstanceID), nil
+	case "amp":
+		return amp.New(integrationInstanceID), nil
 	default:
 		return nil, fmt.Errorf("cli: no agent-runtime adapter for integration instance %q", integrationInstanceID)
 	}

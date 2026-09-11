@@ -1,0 +1,25 @@
+# amp threads new: creation output, fresh-thread usage, empty-thread export
+2026-09-11T19:31:35Z
+isolation: scratch=/tmp/duo-ampnew01 settings=/tmp/duo-ampnew01/xdg-config/amp/settings.json (no herdr, no duo)
+
+$ amp_cmd threads new
+https://ampcode.com/threads/T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+exit=0
+
+thread_id=T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+$ amp_cmd threads usage T-01a091f4-3898-7340-860d-1a8b4d23ea4c
+Untitled
+Usage information is currently unavailable for this thread.
+Details: https://ampcode.com/threads/T-01a091f4-3898-7340-860d-1a8b4d23ea4c/usage
+
+# Run `amp threads usage <thread-id> --details` for more detailed information.
+exit=0
+
+$ amp_cmd threads export T-01a091f4-3898-7340-860d-1a8b4d23ea4c (empty-thread shape; summary below, full JSON in /tmp/duo-ampnew01/export-empty.json)
+message_count=0
+title=''
+visibility=private
+lastKnownAgentState=
+createdOnServer=False
+
+bound_check=PASS (threads new printed an extractable id; export shows an empty thread, message_count=0)

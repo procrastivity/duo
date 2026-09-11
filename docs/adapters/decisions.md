@@ -1097,3 +1097,96 @@ hooks, not list drop):
 - `ConditionProvider`, Pi adapters, and the skill are untouched — peer
   distinction is a conversation-projection concern, not a condition or
   hook change.
+
+## 2026-09-09 — Amp exclusive-writer scope is per-turn, not per-session
+
+Duo is the only writer on Duo-owned Amp threads — the same call the Devin
+exclusive-holder Matter already made (`duo-devin-exclusive-hold`,
+`terminal-multiplexers/notes/60-devin-launch-first-pass.md`, 2026-08-29
+"exclusive-holder Matter opened": "Duo exclusive holder, not
+TUI/observe-only"). Amp gives that call a different shape: there is no
+long-lived Duo process to hold a pane against. The verified delivery recipe
+(notes/61 §3) is spawn-per-turn — `amp threads continue <tid> -x
+--no-archive-after-execute --stream-json`, prompt on stdin, one process per
+turn, exiting at the `result` stream-JSON record. Amp's server-side
+single-executor lock (notes/62 §5) is therefore held only for the lifetime
+of that spawned process, i.e. only during a turn; exclusivity between turns
+is a policy Duo keeps, not a lock Amp is holding open on Duo's behalf. The
+known upgrade path is `--stream-json-input`, verified as a long-lived
+bidirectional pipe that keeps one process — and so one executor
+connection — open across ordered turns (notes/61 §3; notes/63 §5);
+adopting it is future work, not this step's shape.
+
+**Collision.** A second writer connecting to the same thread while Duo's
+spawn holds the executor is refused server-side, first-connect-wins, no
+queue (notes/62 §5 collision matrix). The refusal surfaces at the CLI as a
+generic `Error: Unexpected error inside Amp CLI.`; the typed cause —
+`ExecutorHandshakeRejectedError` — lives only in the per-thread debug log
+at `~/.cache/amp/logs/threads/<id>.log`, so mapping the collision to a
+typed Duo error means reading that log, never parsing CLI stderr.
+
+**Grade: `unknown_effect`, never auto-retried.** The archive proved seven
+of seven refused collisions leave no trace in the export (notes/62 §5: "no
+trace ... refusals are proven-no-effect") — reason enough to grade a
+clean refusal `no_effect`. But that proof does not cover the retry itself:
+the append RPC's `retryAttempt` counter and `requiresOrderedDelivery: true`
+look idempotent-shaped but were never exercised against a forced
+timeout-then-retry (notes/62 §5: "duplicate-safety stays unproven"), and
+notes/63 §5 separately found a *settling* handshake — one still
+negotiating, not yet refusing — can hang an injection attempt to its full
+timeout instead of refusing fast. A collision that hangs to timeout is
+indistinguishable, from Duo's side, from one that partially wrote before
+timing out; grading it `unknown_effect` and refusing to auto-retry is the
+only honest read until retry idempotency is proven live. Caller retry after
+the holder releases is declared safe (`retry_after_holder_release`) — the
+collision is a scheduling fact about who is connected, not a defect in the
+caller's request.
+
+**Pin.** `amp 0.0.1788048110-g570348`; evidence digest
+`notes63-amp-0.0.1788048110-g570348`.
+
+**Non-goals.** The live event feed stays out of scope — `blocked/no-go`
+per notes/63 Stage B addendum and its 2026-09-06 rerun (clean approval and
+clean denial both unproven, compaction not reproducible). Server-origin and
+multiplayer writers (orb execute, the `--no-tui` runner, `threads share
+multiplayer`, cross-thread `send_thread_message`) are unprobed against the
+executor lock — notes/62 §5: "whether the executor lock binds
+server-origin writers too is unknown" — and stay out of scope. No
+human-priority override of the server lock: the lock is first-connect-wins,
+symmetric between human and headless writers (notes/63 §5), and this step
+does not change that.
+
+## 2026-09-11 — Amp exclusive-writer sealed live; pin moved
+
+The step-07 live run sealed all five captures
+(`evidence/traces/amp-exclusive-writer/01`–`05`): mint through the
+Duo-materialized wrapper, mid-flight show, instruct turn with post-send
+live/claim-released proof, second-writer collision with the full typed
+envelope (`operation.temporarily_unavailable` / `unknown_effect` /
+`retry_after_holder_release` / `thread_locked`, command terminal `failed`
+with no requeue, no trace in the export), and archive.
+
+**Pin.** `amp 0.0.1789142434-g4f3b4d`; evidence digest
+`amp-exclusive-writer-0.0.1789142434-g4f3b4d`. The version comes from the
+sealed export's own `env.initial.platform.clientVersion`, which
+self-records the version the run actually used — a better pin source than
+a hand-run `amp --version` beside the run, since Amp self-updates hourly
+(two updates were observed during this one day of runs).
+
+**Caveat, recorded on purpose.** The launch leg ran against a locally
+patched Herdr 0.8.2: stock Herdr's `agent.start` refuses the wrapper's
+kind (`bash` is not in its fixed interactive-agent enum), and the patch
+widens only that validation seam — delivery, settle, detection, and the
+wire schema are stock, so the Amp-side facts (executor lock, collision
+envelope, mint log) are unaffected. How Duo launches the mint on stock
+Herdr stays open: a pane-surface delivery shape, or an upstream Herdr
+generic kind. Step-07's findings on the `duo-amp-exclusive-writer` Matter
+carry the full chain.
+
+**Identity-wait shape confirmed.** The launch wait's 8s deadline
+(`identityBindTimeout`) can fire before Herdr's foreground-loss
+deregistration makes the mint exit observable; the send path's shared
+identity wait (`waitPromptIdentity`, deadline = the command's
+`expires_at`) then performs the same mint-log recovery. Both legs are now
+sealed: run 4 recovered in the send path; the capture pair treats the
+mid-flight show as in-bound, matching the Devin model captures.
