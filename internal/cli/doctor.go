@@ -471,8 +471,9 @@ func writeConfigSection(b *strings.Builder, c doctorConfigSection) {
 }
 
 func writeDevinProjectionSection(b *strings.Builder, p runtimedevin.ProjectionInspection) {
-	fmt.Fprintf(b, "  devin hooks:     %s\n", p.Status)
-	fmt.Fprintf(b, "    file:          %s\n", p.HooksPath)
+	fmt.Fprintf(b, "  devin projection: %s\n", p.Status)
+	fmt.Fprintf(b, "    hooks file:    %s\n", p.HooksPath)
+	fmt.Fprintf(b, "    posture file:  %s\n", p.PosturePath)
 	if p.ActiveLaunches > 0 {
 		fmt.Fprintf(b, "    active launches: %d\n", p.ActiveLaunches)
 	}

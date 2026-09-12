@@ -3,12 +3,14 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/procrastivity/duo/internal/buildinfo"
 	"github.com/procrastivity/duo/internal/exitcode"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
+	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 )
 
 // TestDoctorCommand_JSON runs `duo doctor --output json` through the same Execute
@@ -107,6 +109,57 @@ func TestDoctorCommand_Human(t *testing.T) {
 		"pinned=3000.6.7",
 		"supported=3000.6.2, 3000.6.7",
 	} {
+		if !bytes.Contains(out.Bytes(), []byte(want)) {
+			t.Errorf("human-mode output missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+// TestDoctorCommand_ReportsDevinProjection pins the devin projection section
+// in both render modes: the JSON report carries status and the posture file
+// path, and the human report names both files.
+func TestDoctorCommand_ReportsDevinProjection(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	clearAmbientHerdrEnv(t)
+
+	workspace := t.TempDir()
+	if err := runtimedevin.MaterializeProjection(workspace, "lrr_doctor"); err != nil {
+		t.Fatalf("MaterializeProjection: %v", err)
+	}
+
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	streams := &iostreams.Streams{Out: out, Err: errOut}
+	root := NewRootCommand(streams, buildinfo.Info{Version: "v0.1.0-test", Commit: "abcdef0", Date: "2026-08-23T00:00:00Z"})
+	root.SetArgs([]string{"doctor", "--workspace", workspace, "--output", "json"})
+
+	if code := Execute(root, streams); code != exitcode.Success {
+		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut.String())
+	}
+	var report struct {
+		DevinProjection struct {
+			Status      string `json:"status"`
+			PosturePath string `json:"posture_path"`
+		} `json:"devin_projection"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out.String())
+	}
+	if report.DevinProjection.Status != "current" {
+		t.Errorf("devin_projection.status = %q, want current", report.DevinProjection.Status)
+	}
+	wantPosture := filepath.Join(workspace, ".devin", "config.local.json")
+	if report.DevinProjection.PosturePath != wantPosture {
+		t.Errorf("devin_projection.posture_path = %q, want %q", report.DevinProjection.PosturePath, wantPosture)
+	}
+
+	out.Reset()
+	root = NewRootCommand(streams, buildinfo.Info{Version: "v0.1.0-test", Commit: "abcdef0", Date: "2026-08-23T00:00:00Z"})
+	root.SetArgs([]string{"doctor", "--workspace", workspace})
+	if code := Execute(root, streams); code != exitcode.Success {
+		t.Fatalf("human-mode exit code = %d, want %d (stderr: %s)", code, exitcode.Success, errOut.String())
+	}
+	for _, want := range []string{"devin projection: current", "config.local.json", "hooks.v1.json"} {
 		if !bytes.Contains(out.Bytes(), []byte(want)) {
 			t.Errorf("human-mode output missing %q:\n%s", want, out.String())
 		}

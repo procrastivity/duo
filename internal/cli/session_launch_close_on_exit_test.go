@@ -547,7 +547,7 @@ func TestDevinExportStillAppendedOnRemainOnExit(t *testing.T) {
 	}
 }
 
-func TestDevinLaunchMaterializesNarrowHooksProjection(t *testing.T) {
+func TestDevinLaunchMaterializesWorkspaceProjection(t *testing.T) {
 	h := newDevinBindHarness(t)
 	_, hosts := launchWithAugmenter(t, h, false)
 	req, ok := hosts.captured["primary"]
@@ -568,7 +568,18 @@ func TestDevinLaunchMaterializesNarrowHooksProjection(t *testing.T) {
 			t.Errorf("generated hooks missing %q: %s", event, b)
 		}
 	}
+	posturePath := filepath.Join(req.ResolvedLaunchTuple.WorkspacePath, ".devin", "config.local.json")
+	pb, err := os.ReadFile(posturePath)
+	if err != nil {
+		t.Fatalf("read generated Devin posture file: %v", err)
+	}
+	if !bytes.Contains(pb, []byte(`"permissions"`)) || !bytes.Contains(pb, []byte(`"Exec(git status)"`)) {
+		t.Fatalf("generated posture file lacks the exec allow-list: %s", pb)
+	}
+	if bytes.Contains(pb, []byte(`"Exec(git)"`)) {
+		t.Fatalf("generated posture file carries blanket Exec(git): %s", pb)
+	}
 	if _, err := os.Stat(filepath.Join(req.ResolvedLaunchTuple.WorkspacePath, ".devin", ".duo-generated.json")); err != nil {
-		t.Fatalf("generated Devin hook stamp missing: %v", err)
+		t.Fatalf("generated Devin projection stamp missing: %v", err)
 	}
 }
