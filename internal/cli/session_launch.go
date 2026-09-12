@@ -636,11 +636,13 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // (print-mint; the process is not a long-lived TUI) so conversation.list
 // has a file
 // locator (duo-devin-atif-locator); that leg is not gated on close-on-exit.
-// It also materializes Devin's Duo-owned narrow hooks projection into the
-// launch workspace. Devin reads `.devin/hooks.v1.json` at session start,
-// so the projection carries an installation stamp that doctor can compare
-// with active launches and report as stale when a later launch regenerates
-// it without restarting the earlier Devin process. Amp always
+// It also materializes Devin's Duo-owned workspace projection — the narrow
+// hooks set plus the exec-posture allow-list — into the launch workspace.
+// Devin reads `.devin/hooks.v1.json` and `.devin/config.local.json` at
+// process start, so the projection carries an installation stamp that
+// doctor can compare with active launches and report as stale when a later
+// launch regenerates it without restarting the earlier Devin process.
+// Amp always
 // materializes a Duo-owned mint wrapper script (MaterializeMintScript)
 // alongside a generated settings file (MaterializeSettings) and appends
 // the wrapper's own path as the leaf's sole argument, plus
@@ -683,7 +685,8 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // Augment is a no-op when closeOnExit is false. Pi Augment still materializes
 // inject. Devin Augment always appends `--export`, `--permission-mode
 // accept-edits` (3000.6.7 rejects smart; I-D3 forbids dangerous; exec is
-// the operator Devin permissions.allow list), `--respect-workspace-trust
+// the Duo-owned allow-list in the materialized .devin/config.local.json,
+// additive with the operator's own permissions.allow), `--respect-workspace-trust
 // false`, and `--print` LaunchMintPrompt. Amp Augment always materializes
 // the mint wrapper script and settings file and appends the wrapper's
 // path plus DUO_AMP_MINT_PROMPT, whatever closeOnExit is. Every
@@ -736,10 +739,10 @@ func (stage1LeafAugmenter) Augment(_ context.Context, launchResolutionID, leaf, 
 		return launch.LeafAugmentation{Args: args, Env: env}, nil
 	case "devin":
 		if workspacePath == "" {
-			return launch.LeafAugmentation{}, fmt.Errorf("cli: Devin hook projection for leaf %s needs a workspace path", leaf)
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: Devin workspace projection for leaf %s needs a workspace path", leaf)
 		}
-		if _, err := devin.MaterializeHooks(workspacePath, launchResolutionID); err != nil {
-			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the Devin hook projection for leaf %s: %w", leaf, err)
+		if err := devin.MaterializeProjection(workspacePath, launchResolutionID); err != nil {
+			return launch.LeafAugmentation{}, fmt.Errorf("cli: materializing the Devin workspace projection for leaf %s: %w", leaf, err)
 		}
 		path, err := devin.ATIFPath(launchResolutionID, leaf)
 		if err != nil {
