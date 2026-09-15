@@ -15,11 +15,11 @@ func TestFactoryDescriptor(t *testing.T) {
 	if d.AdapterID != "devin" || d.Role != adapter.RoleRuntime {
 		t.Fatalf("descriptor = %+v, want adapter id devin in the runtime role", d)
 	}
-	if d.ConformanceRecordDigest != "notes59-devin-3000.6.7" {
-		t.Fatalf("ConformanceRecordDigest = %q, want notes59-devin-3000.6.7", d.ConformanceRecordDigest)
+	if d.ConformanceRecordDigest != devin.ConformanceRecordDigest {
+		t.Fatalf("ConformanceRecordDigest = %q, want %s", d.ConformanceRecordDigest, devin.ConformanceRecordDigest)
 	}
-	if len(d.SupportedExternalVersions) != 2 || d.SupportedExternalVersions[0] != "3000.6.2" || d.SupportedExternalVersions[1] != devin.PinnedExternalVersion {
-		t.Fatalf("SupportedExternalVersions = %v, want [3000.6.2 %s]", d.SupportedExternalVersions, devin.PinnedExternalVersion)
+	if len(d.SupportedExternalVersions) != 1 || d.SupportedExternalVersions[0] != devin.PinnedExternalVersion {
+		t.Fatalf("SupportedExternalVersions = %v, want [%s]", d.SupportedExternalVersions, devin.PinnedExternalVersion)
 	}
 	if d.DiagnosticRedactionPolicy == "" {
 		t.Fatal("descriptor missing DiagnosticRedactionPolicy")
@@ -44,18 +44,32 @@ func TestFactoryProbeMissingBinaryUnavailable(t *testing.T) {
 	}
 }
 
-func TestFactoryProbeExistingBinaryUnverified(t *testing.T) {
+func TestFactoryProbeExistingBinarySupported(t *testing.T) {
 	ctx := context.Background()
+	var gotArgs []string
 	f := devin.Factory{
 		IntegrationInstanceID: "integration-1",
 		Binary:                os.Args[0],
+		VersionProbe: func(_ context.Context, binary string, args []string) ([]byte, error) {
+			if binary != os.Args[0] {
+				t.Fatalf("probe binary = %q, want %q", binary, os.Args[0])
+			}
+			gotArgs = append([]string(nil), args...)
+			return []byte("devin 3000.10.21 (611c1cba)\n"), nil
+		},
 	}
 	probe, err := f.Probe(ctx)
 	if err != nil {
 		t.Fatalf("Probe: %v", err)
 	}
-	if probe.Compatibility != adapter.CompatibilityUnverified {
-		t.Fatalf("Compatibility = %s, want Unverified (Probe never execs --version)", probe.Compatibility)
+	if probe.Compatibility != adapter.CompatibilitySupported {
+		t.Fatalf("Compatibility = %s, want Supported", probe.Compatibility)
+	}
+	if probe.DetectedVersion != devin.PinnedExternalVersion {
+		t.Fatalf("DetectedVersion = %q, want %q", probe.DetectedVersion, devin.PinnedExternalVersion)
+	}
+	if len(gotArgs) != 3 || gotArgs[0] != "--config" || gotArgs[2] != "--version" {
+		t.Fatalf("version args = %v, want --config TEMP --version", gotArgs)
 	}
 	if probe.ProtocolOrFormatIdentity != devin.SessionIDFormatIdentity {
 		t.Fatalf("ProtocolOrFormatIdentity = %q, want %q", probe.ProtocolOrFormatIdentity, devin.SessionIDFormatIdentity)

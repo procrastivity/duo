@@ -68,17 +68,14 @@ func TestDoctorCommand_JSON(t *testing.T) {
 			t.Errorf("adapter %q has status %q, want \"supported\"", a.Name, a.Status)
 		}
 		if a.Name == "devin" {
-			if a.Status != "unverified" && a.Status != "unavailable" {
-				t.Errorf("Devin status = %q, want unverified or unavailable", a.Status)
+			if a.Status != "supported" && a.Status != "unverified" && a.Status != "unavailable" {
+				t.Errorf("Devin status = %q, want supported, unverified, or unavailable", a.Status)
 			}
-			if a.DetectedExternalVersion != "" {
-				t.Errorf("Devin detected version = %q, want empty because Probe does not execute --version", a.DetectedExternalVersion)
+			if a.PinnedExternalVersion != runtimedevin.PinnedExternalVersion {
+				t.Errorf("Devin pinned version = %q, want %s", a.PinnedExternalVersion, runtimedevin.PinnedExternalVersion)
 			}
-			if a.PinnedExternalVersion != "3000.6.7" {
-				t.Errorf("Devin pinned version = %q, want 3000.6.7", a.PinnedExternalVersion)
-			}
-			if len(a.SupportedExternalVersions) != 2 || a.SupportedExternalVersions[0] != "3000.6.2" || a.SupportedExternalVersions[1] != "3000.6.7" {
-				t.Errorf("Devin supported versions = %v, want [3000.6.2 3000.6.7]", a.SupportedExternalVersions)
+			if len(a.SupportedExternalVersions) != 1 || a.SupportedExternalVersions[0] != runtimedevin.PinnedExternalVersion {
+				t.Errorf("Devin supported versions = %v, want [%s]", a.SupportedExternalVersions, runtimedevin.PinnedExternalVersion)
 			}
 		}
 	}
@@ -105,9 +102,9 @@ func TestDoctorCommand_Human(t *testing.T) {
 	}
 	for _, want := range []string{
 		"devin (agent_runtime):",
-		"external version: detected=not probed",
-		"pinned=3000.6.7",
-		"supported=3000.6.2, 3000.6.7",
+		"external version: detected=",
+		"pinned=3000.10.21",
+		"supported=3000.10.21",
 	} {
 		if !bytes.Contains(out.Bytes(), []byte(want)) {
 			t.Errorf("human-mode output missing %q:\n%s", want, out.String())

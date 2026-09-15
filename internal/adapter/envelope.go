@@ -90,6 +90,9 @@ type Probe struct {
 	FixtureOrSchemaDigest string
 	// Compatibility is the probe's one compatibility verdict.
 	Compatibility CompatibilityState
+	// CompatibilityReason explains an unverified or incompatible verdict.
+	// It must be safe to show in diagnostics.
+	CompatibilityReason string
 }
 
 // Factory is the shared adapter-factory shape from §5.1: declare a

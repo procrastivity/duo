@@ -22,12 +22,6 @@ import (
 	"github.com/procrastivity/duo/internal/runtime"
 )
 
-// PinnedExternalVersion is the Devin CLI version the Tier C sweep ended
-// on (notes/59). Auto-update moved 3000.6.2 → 3000.6.7 mid-probe; both
-// remain in SupportedExternalVersions. Probe never execs --version, so
-// it never claims Supported against a live binary.
-const PinnedExternalVersion = "3000.6.7"
-
 // SessionIDFormatIdentity names the identity channel Correlate binds:
 // a Herdr-reported agent-session id (kind=id, hyphenated name). ATIF is
 // a separate TranscriptID path; Correlate still leaves it empty.
@@ -80,6 +74,10 @@ type Factory struct {
 	// Binary is the executable Probe looks up; empty means "devin" on
 	// PATH. Tests point it at a missing path or at os.Args[0].
 	Binary string
+	// VersionProbe replaces the read-only version command in tests. The
+	// production probe writes a temporary auto_update=false config and runs
+	// only --config <temporary-file> --version.
+	VersionProbe VersionProbe
 }
 
 // Descriptor implements adapter.Factory.
@@ -88,20 +86,18 @@ func (f Factory) Descriptor() adapter.Descriptor {
 		AdapterID:                 "devin",
 		Role:                      adapter.RoleRuntime,
 		BuildVersion:              "stage1",
-		SupportedExternalVersions: []string{"3000.6.2", "3000.6.7"},
-		// Same "names the evidence until a conformance record exists"
-		// pattern as notes16-claude-2.1.240. Must match
-		// internal/cli.devinDigest.
-		ConformanceRecordDigest:   "notes59-devin-3000.6.7",
+		SupportedExternalVersions: []string(SupportedVersionPolicy()),
+		ConformanceRecordDigest:   ConformanceRecordDigest,
 		DiagnosticRedactionPolicy: "redact-credentials-and-transcript-content",
 	}
 }
 
-// Probe implements adapter.Factory. It does not exec `devin --version`
-// (I-D7: auto-update is a pin hazard; notes/59 moved the binary mid-session).
-// LookPath only: found is Unverified, missing is Unavailable. A probe does
-// not publish live Duo operation support by itself (§5.1).
-func (f Factory) Probe(context.Context) (adapter.Probe, error) {
+// Probe implements adapter.Factory with a read-only, pinned version probe.
+// The command always uses a temporary config with auto_update=false and the
+// fixed argv --config <temporary-file> --version. Missing binaries are
+// unavailable; command failures, malformed output, and policy misses are
+// explicit unverified results.
+func (f Factory) Probe(ctx context.Context) (adapter.Probe, error) {
 	binary := f.Binary
 	if binary == "" {
 		binary = "devin"
@@ -111,11 +107,38 @@ func (f Factory) Probe(context.Context) (adapter.Probe, error) {
 		ConnectionState:          "absent",
 		Compatibility:            adapter.CompatibilityUnavailable,
 	}
-	if _, err := exec.LookPath(binary); err != nil {
+	resolved, err := exec.LookPath(binary)
+	if err != nil {
 		return probe, nil
 	}
 	probe.ConnectionState = "found"
-	probe.Compatibility = adapter.CompatibilityUnverified
+	run := f.VersionProbe
+	if run == nil {
+		run = defaultVersionProbe
+	}
+	output, err := probeVersion(ctx, resolved, run)
+	if err != nil {
+		probe.ConnectionState = "version-probe-failed"
+		probe.Compatibility = adapter.CompatibilityUnverified
+		probe.CompatibilityReason = "the Devin version probe failed"
+		return probe, nil
+	}
+	version, err := ParseVersionOutput(output)
+	if err != nil {
+		probe.ConnectionState = "version-invalid"
+		probe.Compatibility = adapter.CompatibilityUnverified
+		probe.CompatibilityReason = "the Devin version output did not match devin <version> (<build>)"
+		return probe, nil
+	}
+	probe.DetectedVersion = version.Version
+	probe.ConnectionState = "version-detected"
+	if SupportedVersionPolicy().Matches(version.Version) {
+		probe.ConnectionState = "version-supported"
+		probe.Compatibility = adapter.CompatibilitySupported
+	} else {
+		probe.Compatibility = adapter.CompatibilityUnverified
+		probe.CompatibilityReason = fmt.Sprintf("detected version %s is outside supported policy %s", version.Version, TestedVersionRange())
+	}
 	return probe, nil
 }
 
