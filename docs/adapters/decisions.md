@@ -1190,3 +1190,76 @@ identity wait (`waitPromptIdentity`, deadline = the command's
 `expires_at`) then performs the same mint-log recovery. Both legs are now
 sealed: run 4 recovered in the send path; the capture pair treats the
 mid-flight show as in-bound, matching the Devin model captures.
+
+## 2026-09-15 — Devin uses one exact supported version
+
+The supported-version policy covers the complete `devin-workspace.v1`
+projection. It does not infer compatibility from a version prefix or a detected
+live version. The policy has these values:
+
+- Pinned external version: `3000.10.21` (`611c1cba`).
+- Supported external versions: `3000.10.21` only.
+- Projection `tested_version_range`: `3000.10.21`.
+- Conformance record: `devin-workspace-v1-3000.10.21-2026-09-15`.
+- Canonical evidence-record digest:
+  `sha256:88fce7a9607c12316e60920435de7a76f39c24e4029662d1b5b445435732df92`.
+
+The old `3000.6.2` and `3000.6.7` entries retain historical Tier C evidence.
+They do not have complete evidence for the current three-file projection, which
+adds `.devin/config.local.json`. Version `3000.6.14` has separate MCP evidence
+but no complete projection evidence. Therefore, none of these three versions
+stays in the supported set. Exact-version support is deliberate because the
+Devin train auto-updates and has changed observable behavior between point
+versions.
+
+The 2026-09-15 run used the binary with SHA-256
+`ba1956450c0e0bf95f477ccd442a0b45b14765402b2377d6737ae758126d70cd`.
+The run materialized the projection from Duo commit `f1f53fc`. The projection
+manifest digest was
+`sha256:3068dfc5b967e8ed4307e8f1682f6d2708cfe7b51df9d7a3459b4756a2cad750`.
+A print-mode launch used `accept-edits`, disabled the workspace-trust prompt,
+and exported ATIF-v1.7. The launch completed a workspace write and the
+projected `git add` and `git commit` execs with no permission rejection. The
+hook log contained this sequence:
+
+1. `SessionStart`
+2. `UserPromptSubmit`
+3. `PreToolUse(write)`
+4. `PostToolUse(write, success)`
+5. `PreToolUse(exec)`
+6. `PostToolUse(exec, success)`
+7. `Stop`
+8. `SessionEnd`
+
+The version detector must run only this command shape:
+
+```text
+<resolved-devin> --config <temporary-0600-config> --version
+```
+
+The temporary config contains `{"version":1,"auto_update":false}`. The probe
+removes the config after the command. A direct run of the named installed
+binary produced `devin 3000.10.21 (611c1cba)` and did not change the real
+installation tree. The parser accepts only the `devin <version> (<build>)`
+shape. The probe reports `unavailable` when `LookPath` cannot find the binary.
+The probe reports `unverified` in these conditions:
+
+- The command fails.
+- The command times out.
+- The output does not match the required shape.
+- The detected version is outside the exact supported set.
+
+No probe command can contain the `update` subcommand or an update-like flag.
+
+The projection target must use the same policy source as the adapter
+descriptor. Projection inspection must compare the stamped target with that
+policy. The current manifest digest does not include
+`tested_version_range`, so a file-only digest check cannot detect an old target
+claim by itself.
+
+This run did not reverify interactive TUI behavior, ACP lock arbitration,
+cloud handoff, MCP, or the store-forest edge cases. Those behaviors retain
+their existing version-scoped evidence and do not widen this supported set.
+The probe removed its disposable session and residual lock. The copied probe
+binary and the `auto_update: false` config kept the installed Devin version
+unchanged.
