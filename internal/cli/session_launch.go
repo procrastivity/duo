@@ -526,8 +526,7 @@ func writeDeducedHostLines(b *strings.Builder, host *launch.WireHost) {
 // Pi as the dogfood agent runtimes; Devin as a candidate launch runtime
 // — notes/59, matter duo-devin-launch). Candidate is not a supported
 // roster claim. It performs no I/O and no live probe: every digest it
-// cites comes from a factory's static Descriptor() (or a notes/ pin
-// for Devin until a conformance record exists), never from Probe(),
+// cites comes from a factory's static Descriptor(), never from Probe(),
 // which is what keeps it on §7.1's accepted "configuration plus installed
 // evidence" rung.
 //
@@ -544,13 +543,9 @@ var (
 	herdrDigest  = herdr.Factory{}.Descriptor().ConformanceRecordDigest
 	claudeDigest = claude.Factory{}.Descriptor().ConformanceRecordDigest
 	piDigest     = pi.Factory{}.Descriptor().ConformanceRecordDigest
-	// devinDigest names the Tier C evidence until a conformance-record
-	// digest scheme exists for this candidate (same pattern as
-	// notes16-claude-2.1.240).
-	devinDigest = "notes59-devin-3000.6.7"
+	devinDigest  = devin.Factory{}.Descriptor().ConformanceRecordDigest
 	// ampDigest names the Tier C evidence until a conformance-record
-	// digest scheme exists for this candidate (same pattern as
-	// notes59-devin-3000.6.7): the step-07 sealed live captures at
+	// digest scheme exists for this candidate: the step-07 sealed live captures at
 	// evidence/traces/amp-exclusive-writer. Must equal
 	// amp.Factory{}.Descriptor().ConformanceRecordDigest.
 	ampDigest = "amp-exclusive-writer-0.0.1789142434-g4f3b4d"
@@ -684,7 +679,7 @@ func (stage1HostSet) LauncherFor(t launch.Tuple) (host.HostLauncher, error) {
 // and config close_on_exit: false opt out of close-on-exit only. Claude
 // Augment is a no-op when closeOnExit is false. Pi Augment still materializes
 // inject. Devin Augment always appends `--export`, `--permission-mode
-// accept-edits` (3000.6.7 rejects smart; I-D3 forbids dangerous; exec is
+// accept-edits` (the verified exact-version posture; I-D3 forbids dangerous; exec is
 // the Duo-owned allow-list in the materialized .devin/config.local.json,
 // additive with the operator's own permissions.allow), `--respect-workspace-trust
 // false`, and `--print` LaunchMintPrompt. Amp Augment always materializes

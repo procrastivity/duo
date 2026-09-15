@@ -66,7 +66,8 @@ func TestMaterializeProjectionWritesStampedWorkspaceProjection(t *testing.T) {
 		Schema     string `json:"schema"`
 		Projection string `json:"projection_format"`
 		Target     struct {
-			Harness string `json:"harness"`
+			Harness            string `json:"harness"`
+			TestedVersionRange string `json:"tested_version_range"`
 		} `json:"target"`
 		InstallationID string `json:"installation_id"`
 		Files          []struct {
@@ -81,6 +82,9 @@ func TestMaterializeProjectionWritesStampedWorkspaceProjection(t *testing.T) {
 	}
 	if stamp.Schema != "duo.projection-stamp/v1" || stamp.Projection != devin.DevinWorkspaceProjectionFormat || stamp.Target.Harness != "devin" || stamp.InstallationID != "lrr_first" {
 		t.Fatalf("stamp = %+v, want Duo Devin ownership metadata", stamp)
+	}
+	if stamp.Target.TestedVersionRange != devin.TestedVersionRange() {
+		t.Fatalf("tested_version_range = %q, want %q", stamp.Target.TestedVersionRange, devin.TestedVersionRange())
 	}
 	if len(stamp.Files) != 3 {
 		t.Fatalf("stamp files = %d, want 3 (hooks, script, posture)", len(stamp.Files))
@@ -134,6 +138,44 @@ func TestInspectProjectionCurrentAfterMaterialize(t *testing.T) {
 	wantPosture := filepath.Join(workspace, ".devin", "config.local.json")
 	if inspection.PosturePath != wantPosture {
 		t.Fatalf("posture_path = %q, want %q", inspection.PosturePath, wantPosture)
+	}
+}
+
+func TestInspectProjectionReportsStaleVersionPolicy(t *testing.T) {
+	workspace := t.TempDir()
+	if err := devin.MaterializeProjection(workspace, "lrr_first"); err != nil {
+		t.Fatalf("MaterializeProjection: %v", err)
+	}
+	stampPath := filepath.Join(workspace, ".devin", ".duo-generated.json")
+	stampBytes, err := os.ReadFile(stampPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stamp map[string]any
+	if err := json.Unmarshal(stampBytes, &stamp); err != nil {
+		t.Fatal(err)
+	}
+	stamp["target"].(map[string]any)["tested_version_range"] = ">=3000.6.2 <3000.6.8"
+	stampBytes, err = json.Marshal(stamp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stampPath, stampBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	inspection := devin.InspectProjection(workspace, nil)
+	if inspection.Status != devin.ProjectionStale {
+		t.Fatalf("status = %q, want stale; detail = %q", inspection.Status, inspection.Detail)
+	}
+	if inspection.Detail == "" {
+		t.Fatal("stale version policy has no diagnostic detail")
+	}
+	if err := devin.MaterializeProjection(workspace, "lrr_second"); err != nil {
+		t.Fatalf("MaterializeProjection did not regenerate an owned stale policy: %v", err)
+	}
+	if inspection = devin.InspectProjection(workspace, nil); inspection.Status != devin.ProjectionCurrent {
+		t.Fatalf("status after regeneration = %q, want current; detail = %q", inspection.Status, inspection.Detail)
 	}
 }
 

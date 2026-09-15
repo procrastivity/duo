@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/procrastivity/duo/internal/buildinfo"
+	"github.com/procrastivity/duo/internal/doctor"
 	"github.com/procrastivity/duo/internal/exitcode"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/registry"
@@ -44,6 +45,7 @@ func TestDoctorCommand_JSON(t *testing.T) {
 				SupportedExternalVersions []string `json:"supportedExternalVersions"`
 				DetectedExternalVersion   string   `json:"detectedExternalVersion"`
 				PinnedExternalVersion     string   `json:"pinnedExternalVersion"`
+				Reason                    string   `json:"reason"`
 			} `json:"registered"`
 		} `json:"adapters"`
 	}
@@ -77,6 +79,9 @@ func TestDoctorCommand_JSON(t *testing.T) {
 			if len(a.SupportedExternalVersions) != 1 || a.SupportedExternalVersions[0] != runtimedevin.PinnedExternalVersion {
 				t.Errorf("Devin supported versions = %v, want [%s]", a.SupportedExternalVersions, runtimedevin.PinnedExternalVersion)
 			}
+			if a.Status == "unverified" && a.Reason == "" {
+				t.Error("unverified Devin adapter has no reason")
+			}
 		}
 	}
 }
@@ -108,6 +113,45 @@ func TestDoctorCommand_Human(t *testing.T) {
 	} {
 		if !bytes.Contains(out.Bytes(), []byte(want)) {
 			t.Errorf("human-mode output missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestDoctorRenderersShowUnverifiedVersionReason(t *testing.T) {
+	const reason = "detected version 3000.10.22 is outside supported policy 3000.10.21"
+	report := doctorReport{Report: doctor.Report{Adapters: doctor.AdaptersStatus{Registered: []doctor.Adapter{{
+		Name:                      "devin",
+		Kind:                      "agent_runtime",
+		Status:                    "unverified",
+		SupportedExternalVersions: []string{"3000.10.21"},
+		DetectedExternalVersion:   "3000.10.22",
+		PinnedExternalVersion:     "3000.10.21",
+		Reason:                    reason,
+	}}}}}
+
+	human := humanReport(report)
+	for _, want := range []string{
+		"devin (agent_runtime): unverified",
+		"detected=3000.10.22, pinned=3000.10.21, supported=3000.10.21",
+		"reason: " + reason,
+	} {
+		if !bytes.Contains([]byte(human), []byte(want)) {
+			t.Errorf("human report missing %q:\n%s", want, human)
+		}
+	}
+
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal JSON report: %v", err)
+	}
+	for _, want := range []string{
+		`"detectedExternalVersion":"3000.10.22"`,
+		`"pinnedExternalVersion":"3000.10.21"`,
+		`"supportedExternalVersions":["3000.10.21"]`,
+		`"reason":"` + reason + `"`,
+	} {
+		if !bytes.Contains(encoded, []byte(want)) {
+			t.Errorf("JSON report missing %q:\n%s", want, encoded)
 		}
 	}
 }

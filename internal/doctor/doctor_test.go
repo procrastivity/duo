@@ -4,8 +4,36 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/procrastivity/duo/internal/adapter"
 	"github.com/procrastivity/duo/internal/store"
 )
+
+func TestFromProbeCarriesVersionPolicyAndReason(t *testing.T) {
+	descriptor := adapter.Descriptor{
+		AdapterID:                 "devin",
+		Role:                      adapter.RoleRuntime,
+		SupportedExternalVersions: []string{"3000.10.21"},
+	}
+	probe := adapter.Probe{
+		DetectedVersion:     "3000.10.22",
+		Compatibility:       adapter.CompatibilityUnverified,
+		CompatibilityReason: "detected version 3000.10.22 is outside supported policy 3000.10.21",
+	}
+
+	report := FromProbe(descriptor, probe, "3000.10.21")
+	if report.DetectedExternalVersion != probe.DetectedVersion {
+		t.Fatalf("detected version = %q, want %q", report.DetectedExternalVersion, probe.DetectedVersion)
+	}
+	if report.PinnedExternalVersion != "3000.10.21" {
+		t.Fatalf("pinned version = %q, want 3000.10.21", report.PinnedExternalVersion)
+	}
+	if len(report.SupportedExternalVersions) != 1 || report.SupportedExternalVersions[0] != "3000.10.21" {
+		t.Fatalf("supported versions = %v, want [3000.10.21]", report.SupportedExternalVersions)
+	}
+	if report.Reason != probe.CompatibilityReason {
+		t.Fatalf("reason = %q, want %q", report.Reason, probe.CompatibilityReason)
+	}
+}
 
 func TestRun_MissingStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "duo.db")

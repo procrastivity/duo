@@ -79,6 +79,7 @@ type Adapter struct {
 	SupportedExternalVersions []string `json:"supportedExternalVersions,omitempty"`
 	DetectedExternalVersion   string   `json:"detectedExternalVersion"`
 	PinnedExternalVersion     string   `json:"pinnedExternalVersion,omitempty"`
+	Reason                    string   `json:"reason,omitempty"`
 }
 
 // FromDescriptor maps one §5.1 adapter descriptor plus its probe's
@@ -112,6 +113,7 @@ func FromProbe(d adapter.Descriptor, p adapter.Probe, pinned string) Adapter {
 	report := FromDescriptor(d, p.Compatibility)
 	report.DetectedExternalVersion = p.DetectedVersion
 	report.PinnedExternalVersion = pinned
+	report.Reason = p.CompatibilityReason
 	return report
 }
 

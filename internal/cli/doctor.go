@@ -33,8 +33,8 @@ import (
 // registers, probed for their compatibility verdict. A probe error reports
 // the adapter as unavailable rather than dropping the row — doctor's job is
 // to show what is registered, not only what is healthy. Devin's pin is kept
-// separate from its supported-version list because the list intentionally
-// retains the earlier 3000.6.2 evidence.
+// separate from its supported-version policy so doctor can show both the
+// selected pin and the complete policy.
 func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 	hostFactory := hostfake.Factory{}
 	runtimeFactory := runtimefake.Factory{}
@@ -209,6 +209,9 @@ func humanReport(report doctorReport) string {
 			}
 			fmt.Fprintf(&b, "      external version: detected=%s, pinned=%s, supported=%s\n",
 				detected, a.PinnedExternalVersion, strings.Join(a.SupportedExternalVersions, ", "))
+			if a.Reason != "" {
+				fmt.Fprintf(&b, "      reason: %s\n", a.Reason)
+			}
 		}
 	}
 

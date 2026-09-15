@@ -6,6 +6,7 @@ import (
 
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/launch"
+	"github.com/procrastivity/duo/internal/runtime/devin"
 )
 
 func TestStage1SupportAcceptsHerdrDevin(t *testing.T) {
@@ -17,8 +18,8 @@ func TestStage1SupportAcceptsHerdrDevin(t *testing.T) {
 	if !v.OK {
 		t.Fatalf("devin on pinned herdr refused: %+v", v)
 	}
-	if !strings.Contains(v.RecordDigest, "notes59-devin-3000.6.7") {
-		t.Fatalf("digest = %q, want notes59-devin-3000.6.7", v.RecordDigest)
+	if !strings.Contains(v.RecordDigest, devin.ConformanceRecordDigest) {
+		t.Fatalf("digest = %q, want %s", v.RecordDigest, devin.ConformanceRecordDigest)
 	}
 }
 
