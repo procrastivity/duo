@@ -84,6 +84,28 @@ func TestSweepHarnessDirsNilKeepReapsAll(t *testing.T) {
 	}
 }
 
+func TestInspectHarnessDirsReportsWithoutDeleting(t *testing.T) {
+	root := t.TempDir()
+	mustHarnessDir(t, root, "lrr_live", "primary")
+	mustHarnessDir(t, root, "lrr_orphan", "main")
+
+	report, err := InspectHarnessDirs(root, func(id string) bool { return id == "lrr_live" })
+	if err != nil {
+		t.Fatalf("InspectHarnessDirs: %v", err)
+	}
+	if !report.ReadOnly || report.Reaped != 0 || report.Kept != 1 || report.Orphaned != 1 {
+		t.Fatalf("inspection = %+v, want read-only, kept 1, orphaned 1, reaped 0", report)
+	}
+	if len(report.IDs) != 1 || report.IDs[0] != "lrr_orphan" {
+		t.Fatalf("IDs = %v, want [lrr_orphan]", report.IDs)
+	}
+	for _, id := range []string{"lrr_live", "lrr_orphan"} {
+		if _, err := os.Stat(filepath.Join(root, id)); err != nil {
+			t.Errorf("inspection removed %s: %v", id, err)
+		}
+	}
+}
+
 func mustHarnessDir(t *testing.T, root, lrr, leaf string) {
 	t.Helper()
 	dir := filepath.Join(root, lrr, leaf)

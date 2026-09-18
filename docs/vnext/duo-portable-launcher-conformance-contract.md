@@ -1,8 +1,7 @@
 # Portable launcher skill installation and authority preflight
 
-> Status: **Stage 1 contract for the Amp, OpenCode, and Codex outer-launcher
-> conformance Matter.** This document specifies Stage 2; it does not claim
-> that the installer or readiness report already exists.
+> Status: **Stage 2 shared projection and launcher preflight implemented.**
+> Live Amp, OpenCode, and Codex conformance evidence remains for Stages 3–5.
 
 This contract specializes the general projection rules in
 [`duo-vnext-installation-contract.md`](./duo-vnext-installation-contract.md)
@@ -12,8 +11,8 @@ surface, remote authority, or terminal-input fallback.
 
 ## 1. Observed baseline versus the contract
 
-The distinction is important because several useful seams exist, but the
-portable projection does not.
+The distinction is important because the shared product seams now exist, but
+the three launcher support claims still require live evidence.
 
 ### 1.1 Existing behavior in this checkout
 
@@ -30,27 +29,23 @@ portable projection does not.
   host. The repository-relative symlink target
   `../../skills/duo-delegation-loop` was also live-confirmed. The checkout did
   not itself contain `.agents/`.
-- `internal/asset` resolves shipped or embedded assets;
-  `internal/manifest` inventories asset digests and declares the currently
-  empty `harness_targets` array. `internal/manifest.Stamp` and
-  `internal/manifest.Drift` are older, smaller primitives using
-  `.duo-manifest-stamp.json`; they do **not** implement the normative
-  `duo.projection-stamp/v1` ownership record.
+- `internal/asset` resolves shipped or embedded assets. `internal/manifest`
+  declares and installs the `portable_launchers` target with the normative
+  `duo.projection-stamp/v1` ownership record. Its older `Stamp` and `Drift`
+  primitives still use `.duo-manifest-stamp.json` and do not confer ownership
+  on the portable target.
 - `contracts/schemas/duo-projection-stamp-v1.schema.json` and the installation
   contract define `.duo-generated.json`. `internal/runtime/devin` has a
   target-local implementation of that pattern. It is useful precedent, not
   the owner of this launcher-neutral skill.
 - `internal/doctor` owns authority-store diagnostics. `internal/cli/doctor.go`
   composes those diagnostics with effective-path config inspection, selected
-  workspace and host deduction, and other runtime-specific sections. It does
-  not inspect this skill and it does not ping the deduced Herdr server.
-- Contrary to the rule established below, current `duo doctor` can write: it
-  calls `internal/doctor.SweepHarnessDirs`, `store.Open` may migrate a present
-  database, and the writer probe transiently acquires a lease. Stage 2 must
-  remove those effects from the diagnostic path rather than describing the
-  current command as already read-only.
-- There is no `duo install` command and no portable launcher target in the
-  operation registry or manifest.
+  workspace and host deduction, bounded Herdr reachability, portable skill
+  inspection, and other runtime-specific sections. Its launcher preflight
+  uses a physical read-only store handle, inspects writer leases without
+  acquiring one, and reports harness orphans without reaping them.
+- `duo install portable-launchers` owns explicit install and repair. Diagnosis
+  never invokes it or writes projection state.
 
 ### 1.2 Contract introduced by this document
 

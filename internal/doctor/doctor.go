@@ -1,23 +1,19 @@
-// Package doctor implements `duo doctor`'s core diagnostics: authority-store
-// health (schema version, writer-lease state) and the registered-adapters
-// inventory. It is deliberately narrow — Step 10's "core" scope — and does
-// not yet cover generated-artifact drift, harness trust, or live socket
-// checks (duo-vnext-installation-contract.md and duo-vnext-external-
-// surfaces.md describe the full eventual `duo doctor`; docs/doctor/
-// decisions.md records what this package intentionally leaves out and why).
+// Package doctor implements `duo doctor` diagnostics: authority-store health,
+// registered adapters, read-only harness inspection, and the stable portable
+// launcher-preflight report shape.
 //
-// This package reads internal/store's public API only (Open, OpenAuthority,
-// the lease error types) and never touches internal/host or
-// internal/runtime. Adapter rows arrive from the caller — the composition
-// root owns which adapter factories exist, and hands doctor their §5.1
-// descriptors through FromDescriptor; doctor itself stays neutral.
+// Store diagnosis uses OpenReadOnly and direct lease inspection; it never
+// creates/migrates a database or acquires a writer lease. Adapter rows and
+// host/projection evidence arrive from the composition root, keeping this
+// package neutral about concrete host and runtime adapters.
 package doctor
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/procrastivity/duo/internal/adapter"
 	"github.com/procrastivity/duo/internal/store"
@@ -158,10 +154,9 @@ func Run(path string, adapters []Adapter) Report {
 	}
 }
 
-// probeStore reports path's health without ever creating a store file that
-// was not already there. See docs/doctor/decisions.md for why the writer-
-// lease probe (a transient OpenAuthority + immediate Close when no writer
-// holds it) still counts as a read-only check.
+// probeStore reports path's health through SQLite's physical read-only mode.
+// It never creates/migrates a database and observes the writer lease without
+// acquiring even a transient lease.
 func probeStore(path string) StoreStatus {
 	status := StoreStatus{Path: path}
 
@@ -179,16 +174,23 @@ func probeStore(path string) StoreStatus {
 	}
 	status.Present = true
 
-	ro, err := store.Open(path)
+	ro, err := store.OpenReadOnly(path)
 	if err != nil {
 		status.Error = err.Error()
 		return status
 	}
 	status.SchemaVersion = ro.Version()
+	lease, writerErr := ro.InspectWriterLease(context.Background(), time.Now())
+	if writerErr == nil {
+		status.Writer = &WriterStatus{
+			Active:      lease.Active,
+			Incarnation: lease.Incarnation,
+			PID:         lease.PID,
+			Hostname:    lease.Hostname,
+			ExpiresAt:   lease.ExpiresAt,
+		}
+	}
 	closeErr := ro.Close()
-
-	writer, writerErr := probeWriter(path)
-	status.Writer = writer
 
 	switch {
 	case closeErr != nil:
@@ -199,30 +201,4 @@ func probeStore(path string) StoreStatus {
 		status.Healthy = true
 	}
 	return status
-}
-
-// probeWriter reports whether another process holds the authority-writer
-// lease. When nothing holds it, OpenAuthority itself briefly becomes the
-// writer to observe that fact — this handle is closed immediately, which
-// deletes the just-minted lease row again (Store.Close's documented
-// behavior), leaving the lease exactly as unclaimed as it was found.
-func probeWriter(path string) (*WriterStatus, error) {
-	authority, err := store.OpenAuthority(path)
-
-	var active *store.WriterActiveError
-	if errors.As(err, &active) {
-		return &WriterStatus{
-			Active:      true,
-			Incarnation: active.Incarnation,
-			PID:         active.PID,
-			Hostname:    active.Hostname,
-			ExpiresAt:   active.ExpiresAt,
-		}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	closeErr := authority.Close()
-	return &WriterStatus{Active: false}, closeErr
 }

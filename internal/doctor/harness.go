@@ -33,8 +33,48 @@ type HarnessSweep struct {
 	// Kept is the number of launch-resolution directories left in place
 	// because KeepHarnessDir returned true.
 	Kept int `json:"kept"`
-	// IDs are the reaped launch-resolution directory names, sorted.
+	// IDs are affected launch-resolution directory names, sorted: reaped
+	// for SweepHarnessDirs and reported orphaned for InspectHarnessDirs.
 	IDs []string `json:"ids,omitempty"`
+	// Orphaned is the number of launch-resolution directories diagnosis
+	// found without a live owner. Doctor reports these but never reaps them.
+	Orphaned int `json:"orphaned"`
+	// ReadOnly distinguishes a diagnostic inspection from the explicit
+	// cleanup helper retained below for non-doctor callers.
+	ReadOnly bool `json:"read_only"`
+	// Error is a safe read failure. Harness state is informational and does
+	// not prevent the required launcher checks from producing a report.
+	Error string `json:"error,omitempty"`
+}
+
+// InspectHarnessDirs reports immediate launch-resolution directories without
+// deleting them. IDs are orphan names in sorted order; Reaped is always zero.
+func InspectHarnessDirs(root string, keep KeepHarnessDir) (HarnessSweep, error) {
+	out := HarnessSweep{IDs: []string{}, ReadOnly: true}
+	if root == "" {
+		return out, fmt.Errorf("doctor: harness inspection needs a root")
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return out, nil
+		}
+		return out, fmt.Errorf("doctor: reading harness directory %s: %w", root, err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == "" || name == "." || name == ".." || !entry.IsDir() || filepath.Base(name) != name {
+			continue
+		}
+		if keep != nil && keep(name) {
+			out.Kept++
+			continue
+		}
+		out.Orphaned++
+		out.IDs = append(out.IDs, name)
+	}
+	sort.Strings(out.IDs)
+	return out, nil
 }
 
 // SweepHarnessDirs deletes immediate subdirectories of root whose

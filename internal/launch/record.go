@@ -387,7 +387,7 @@ func mintRecordID() (string, error) {
 	return recordPrefix + "_" + hex.EncodeToString(b[:]), nil
 }
 
-// configurationDigest hashes the launch-relevant subset of a resolved
+// ConfigurationDigest hashes the launch-relevant subset of a resolved
 // configuration document: the declaration families resolution reads.
 //
 // §7.1 calls this "the resolved launch-configuration digest — the merged
@@ -403,7 +403,7 @@ func mintRecordID() (string, error) {
 // evidence bundle the record cites separately. Two launches of the same
 // document against two different sockets share a configuration digest,
 // which is the honest answer: the configuration did not change.
-func configurationDigest(doc config.DocumentV3) (string, error) {
+func ConfigurationDigest(doc config.DocumentV3) (string, error) {
 	// encoding/json sorts map keys, so the same document always produces
 	// the same bytes regardless of decode order.
 	subset := struct {

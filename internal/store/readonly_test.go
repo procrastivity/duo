@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestOpenReadOnlyDoesNotCreateMissingDatabaseOrParent(t *testing.T) {
@@ -116,6 +117,37 @@ func TestOpenReadOnlyRejectsUnsupportedSchema(t *testing.T) {
 
 	if _, err := OpenReadOnly(path); err == nil {
 		t.Fatal("OpenReadOnly accepted a future schema")
+	}
+}
+
+func TestOpenReadOnlyInspectsWriterLeaseWithoutTakingOne(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "duo.db")
+	writable, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := writable.Close(); err != nil {
+		t.Fatalf("Close writable: %v", err)
+	}
+	before := databaseSnapshot(t, path)
+
+	reader, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatalf("OpenReadOnly: %v", err)
+	}
+	lease, err := reader.InspectWriterLease(context.Background(), time.Now())
+	if err != nil {
+		t.Fatalf("InspectWriterLease: %v", err)
+	}
+	if lease.Active || lease.Incarnation != "" {
+		t.Fatalf("lease = %+v, want no active or transient writer", lease)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("Close reader: %v", err)
+	}
+	after := databaseSnapshot(t, path)
+	if after != before {
+		t.Fatalf("lease inspection mutated database:\nbefore: %+v\nafter:  %+v", before, after)
 	}
 }
 

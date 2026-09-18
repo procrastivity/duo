@@ -26,7 +26,7 @@ func plantHarnessDir(t *testing.T, lrr, leaf string) string {
 	return dir
 }
 
-func doctorHarnessSweepJSON(t *testing.T, extraArgs ...string) (reaped int, out string) {
+func doctorHarnessInspectionJSON(t *testing.T, extraArgs ...string) (orphaned int, out string) {
 	t.Helper()
 	args := append([]string{"doctor", "--output", "json"}, extraArgs...)
 	code, stdout, errOut := runSession(t, args...)
@@ -35,21 +35,25 @@ func doctorHarnessSweepJSON(t *testing.T, extraArgs ...string) (reaped int, out 
 	}
 	var report struct {
 		HarnessSweep struct {
-			Reaped int      `json:"reaped"`
-			Kept   int      `json:"kept"`
-			IDs    []string `json:"ids"`
+			Reaped   int      `json:"reaped"`
+			Kept     int      `json:"kept"`
+			Orphaned int      `json:"orphaned"`
+			ReadOnly bool     `json:"read_only"`
+			IDs      []string `json:"ids"`
 		} `json:"harness_sweep"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
 		t.Fatalf("decoding doctor JSON: %v\n%s", err, stdout)
 	}
-	return report.HarnessSweep.Reaped, stdout
+	if !report.HarnessSweep.ReadOnly || report.HarnessSweep.Reaped != 0 {
+		t.Fatalf("doctor mutated harness state: %+v", report.HarnessSweep)
+	}
+	return report.HarnessSweep.Orphaned, stdout
 }
 
-// TestDoctorReapsRefusedLaunchHarnessDir is notes/51 9a: a harness directory
-// whose launch-resolution id has no durable record (a refused launch, or
-// any materialize that never committed) is gone after doctor.
-func TestDoctorReapsRefusedLaunchHarnessDir(t *testing.T) {
+// TestDoctorReportsRefusedLaunchHarnessDirReadOnly proves diagnosis reports
+// an orphan but leaves cleanup to an explicit write operation.
+func TestDoctorReportsRefusedLaunchHarnessDirReadOnly(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	clearAmbientHerdrEnv(t)
@@ -59,12 +63,12 @@ func TestDoctorReapsRefusedLaunchHarnessDir(t *testing.T) {
 		t.Fatalf("planted harness dir missing before doctor: %v", err)
 	}
 
-	reaped, stdout := doctorHarnessSweepJSON(t)
-	if reaped != 1 {
-		t.Errorf("harness_sweep.reaped = %d, want 1\n%s", reaped, stdout)
+	orphaned, stdout := doctorHarnessInspectionJSON(t)
+	if orphaned != 1 {
+		t.Errorf("harness_sweep.orphaned = %d, want 1\n%s", orphaned, stdout)
 	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Errorf("refused launch harness dir still present after doctor: %v", err)
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("doctor removed refused-launch harness dir: %v", err)
 	}
 }
 
@@ -90,19 +94,18 @@ func TestDoctorKeepsLiveSessionHarnessDir(t *testing.T) {
 	root := h.root
 	h.close()
 
-	reaped, _ := doctorHarnessSweepJSON(t, "--workspace", root)
-	if reaped != 0 {
-		t.Errorf("harness_sweep.reaped = %d, want 0 for a live session", reaped)
+	orphaned, _ := doctorHarnessInspectionJSON(t, "--workspace", root)
+	if orphaned != 0 {
+		t.Errorf("harness_sweep.orphaned = %d, want 0 for a live session", orphaned)
 	}
 	if _, err := os.Stat(dir); err != nil {
 		t.Errorf("live session harness dir was reaped: %v", err)
 	}
 }
 
-// TestDoctorReapsTerminalSessionHarnessDir: once the runtime instance is
-// exited, doctor removes the harness directory. Close-on-exit no longer
-// needs the files.
-func TestDoctorReapsTerminalSessionHarnessDir(t *testing.T) {
+// TestDoctorReportsTerminalSessionHarnessDirReadOnly: a terminal runtime is
+// reported as orphaned, but doctor does not perform cleanup.
+func TestDoctorReportsTerminalSessionHarnessDirReadOnly(t *testing.T) {
 	h := newBindHarness(t, nil)
 	clearAmbientHerdrEnv(t)
 
@@ -125,15 +128,15 @@ func TestDoctorReapsTerminalSessionHarnessDir(t *testing.T) {
 	root := h.root
 	h.close()
 
-	reaped, stdout := doctorHarnessSweepJSON(t, "--workspace", root)
-	if reaped != 1 {
-		t.Errorf("harness_sweep.reaped = %d, want 1 for a terminal session\n%s", reaped, stdout)
+	orphaned, stdout := doctorHarnessInspectionJSON(t, "--workspace", root)
+	if orphaned != 1 {
+		t.Errorf("harness_sweep.orphaned = %d, want 1 for a terminal session\n%s", orphaned, stdout)
 	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Errorf("terminal session harness dir still present after doctor: %v", err)
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("doctor removed terminal-session harness dir: %v", err)
 	}
 	parent := filepath.Dir(dir)
-	if _, err := os.Stat(parent); !os.IsNotExist(err) {
-		t.Errorf("terminal session lrr directory still present after doctor: %v", err)
+	if _, err := os.Stat(parent); err != nil {
+		t.Errorf("doctor removed terminal-session lrr directory: %v", err)
 	}
 }
