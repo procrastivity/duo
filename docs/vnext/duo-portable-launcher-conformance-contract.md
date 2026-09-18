@@ -231,10 +231,17 @@ below prevents a mixed tree from receiving an optimistic state.
    source digest, complete expected file set, and installed file bytes all
    agree.
 
-An outer launcher version outside the manifest's exact tested pins is an
-unsupported conformance claim, but it does not mutate otherwise-current
-files. Captures must reject such a run as launcher-incompatible. Doctor may
-report that version when it is supplied or detected, but it must not guess
+For Amp, OpenCode, and Codex alike, outer-launcher eligibility is not an exact
+tested-pin allowlist; `tested_versions` remains ordered historical metadata.
+A recognized launcher with a well-formed exact version and executable SHA-256
+may attempt the current capability checks and full suite whether or not that
+version appears in history, but it inherits no support claim: only a passing
+current run establishes conformance. Captures must still reject an unknown
+launcher name, a missing or malformed exact version or executable SHA-256, a
+copied-byte digest mismatch, setup/driver/result identity disagreement, or any
+change to the selected identity within the run. This rolling outer-launcher
+policy does not widen the exact inner Pi, Herdr, provider, or model fixture
+pins. Doctor may report a supplied or detected version, but it must not guess
 which outer launcher invoked it.
 
 ### 4.1 Install and repair
