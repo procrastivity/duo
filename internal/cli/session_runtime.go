@@ -124,6 +124,10 @@ func openKnownAgentRuntime(integrationInstanceID string) (any, error) {
 		return devin.New(integrationInstanceID), nil
 	case "amp":
 		return amp.New(integrationInstanceID), nil
+	// OpenCode is intentionally not a cwd/server-id fallback here. Its
+	// observer requires the launch-owned epoch, loopback endpoint, and
+	// observed session ID, which this legacy CLI lookup cannot carry safely.
+	// Callers must construct internal/runtime/opencode explicitly.
 	default:
 		return nil, fmt.Errorf("cli: no agent-runtime adapter for integration instance %q", integrationInstanceID)
 	}

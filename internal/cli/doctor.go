@@ -25,6 +25,7 @@ import (
 	"github.com/procrastivity/duo/internal/launch/materialize"
 	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
+	runtimeopencode "github.com/procrastivity/duo/internal/runtime/opencode"
 	"github.com/procrastivity/duo/internal/scrub"
 	"github.com/procrastivity/duo/internal/surface"
 )
@@ -39,8 +40,9 @@ func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 	hostFactory := hostfake.Factory{}
 	runtimeFactory := runtimefake.Factory{}
 	devinFactory := runtimedevin.Factory{}
+	opencodeFactory := runtimeopencode.Factory{}
 
-	out := make([]doctor.Adapter, 0, 3)
+	out := make([]doctor.Adapter, 0, 4)
 	for _, registered := range []struct {
 		descriptor func() adapter.Descriptor
 		probe      func(context.Context) (adapter.Probe, error)
@@ -49,6 +51,11 @@ func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 		{descriptor: hostFactory.Descriptor, probe: hostFactory.Probe},
 		{descriptor: runtimeFactory.Descriptor, probe: runtimeFactory.Probe},
 		{descriptor: devinFactory.Descriptor, probe: devinFactory.Probe, pinned: runtimedevin.PinnedExternalVersion},
+		// OpenCode is descriptor-registered for reporting, but this root
+		// deliberately supplies no endpoint, credential, or launch binding.
+		// Its probe therefore remains unavailable/unverified and never
+		// constructs an ambient runtime.
+		{descriptor: func() adapter.Descriptor { return runtimeopencode.Registered().Descriptor }, probe: opencodeFactory.Probe, pinned: runtimeopencode.PinnedExternalVersion},
 	} {
 		p := adapter.Probe{Compatibility: adapter.CompatibilityUnavailable}
 		if probed, err := registered.probe(cmd.Context()); err == nil {

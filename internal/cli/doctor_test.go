@@ -56,15 +56,15 @@ func TestDoctorCommand_JSON(t *testing.T) {
 	if !report.Store.Healthy {
 		t.Error("Store.Healthy = false for a merely-missing store")
 	}
-	if len(report.Adapters.Registered) != 3 {
-		t.Fatalf("Adapters.Registered has %d rows, want the fake pair plus Devin", len(report.Adapters.Registered))
+	if len(report.Adapters.Registered) != 4 {
+		t.Fatalf("Adapters.Registered has %d rows, want the fake pair plus Devin and OpenCode", len(report.Adapters.Registered))
 	}
-	want := map[string]string{"fake-host": "session_host", "fake-runtime": "agent_runtime", "devin": "agent_runtime"}
+	want := map[string]string{"fake-host": "session_host", "fake-runtime": "agent_runtime", "devin": "agent_runtime", "opencode": "agent_runtime"}
 	for _, a := range report.Adapters.Registered {
 		if want[a.Name] != a.Kind {
 			t.Errorf("adapter %q has kind %q, want %q", a.Name, a.Kind, want[a.Name])
 		}
-		if a.Name != "devin" && a.Status != "supported" {
+		if a.Name != "devin" && a.Name != "opencode" && a.Status != "supported" {
 			t.Errorf("adapter %q has status %q, want \"supported\"", a.Name, a.Status)
 		}
 		if a.Name == "devin" {
@@ -80,6 +80,9 @@ func TestDoctorCommand_JSON(t *testing.T) {
 			if len(a.SupportedExternalVersions) != 2 || a.SupportedExternalVersions[0] != "3000.6.2" || a.SupportedExternalVersions[1] != "3000.6.7" {
 				t.Errorf("Devin supported versions = %v, want [3000.6.2 3000.6.7]", a.SupportedExternalVersions)
 			}
+		}
+		if a.Name == "opencode" && a.Status != "unavailable" && a.Status != "unverified" {
+			t.Errorf("OpenCode status = %q, want unavailable or unverified", a.Status)
 		}
 	}
 }
