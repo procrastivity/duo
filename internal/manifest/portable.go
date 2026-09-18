@@ -33,7 +33,9 @@ const (
 	// ProjectionStampFile is the ownership record beside the projected skill.
 	ProjectionStampFile   = ".duo-generated.json"
 	projectionStampSchema = "duo.projection-stamp/v1"
-	portableVersionRange  = "amp=0.0.1789675234-g2899fe;opencode=1.18.31;codex=0.154.0"
+	// LauncherEligibilityCapabilityEvidence admits recognized launchers from
+	// current suite evidence rather than from historical tested versions.
+	LauncherEligibilityCapabilityEvidence = "capability_evidence"
 )
 
 var portableLaunchers = []Launcher{
@@ -69,9 +71,10 @@ type DigestedPath struct {
 
 // ProjectionTarget identifies the portable target and its evidence pins.
 type ProjectionTarget struct {
-	Harness            string     `json:"harness"`
-	TestedVersionRange string     `json:"tested_version_range"`
-	Launchers          []Launcher `json:"launchers"`
+	Harness             string     `json:"harness"`
+	TestedVersionRange  string     `json:"tested_version_range"`
+	LauncherEligibility string     `json:"launcher_eligibility,omitempty"`
+	Launchers           []Launcher `json:"launchers"`
 }
 
 // UnmarshalJSON permits the target-level extension fields allowed by the v1
@@ -383,7 +386,10 @@ func expectedStamp(spec portableSpec, installationID, generatedAt string) Projec
 	return ProjectionStamp{
 		Schema: projectionStampSchema, ProductVersion: spec.manifest.Product.Version,
 		ManifestDigest: spec.manifest.ManifestDigest, ProjectionFormat: PortableProjectionFormat,
-		Target:     ProjectionTarget{Harness: PortableTargetName, TestedVersionRange: portableVersionRange, Launchers: cloneLaunchers(portableLaunchers)},
+		Target: ProjectionTarget{
+			Harness: PortableTargetName, TestedVersionRange: testedVersionDisplay(portableLaunchers),
+			LauncherEligibility: LauncherEligibilityCapabilityEvidence, Launchers: cloneLaunchers(portableLaunchers),
+		},
 		Components: []string{"filesystem_skill"}, InstallationID: installationID, GeneratedAt: generatedAt,
 		SourceAssets: []DigestedPath{{Path: PortableSkillAsset, Digest: spec.target.Artifact.ContentDigest}},
 		Files:        []DigestedPath{{Path: PortableSkillFile, Digest: spec.target.Artifact.ContentDigest}},
@@ -392,25 +398,18 @@ func expectedStamp(spec portableSpec, installationID, generatedAt string) Projec
 
 func stampCurrent(got, want ProjectionStamp) bool {
 	got.GeneratedAt, want.GeneratedAt = "", ""
-	return got.Schema == want.Schema && got.ProductVersion == want.ProductVersion &&
-		got.ManifestDigest == want.ManifestDigest && got.ProjectionFormat == want.ProjectionFormat &&
+	return got.Schema == want.Schema && got.ProjectionFormat == want.ProjectionFormat &&
 		got.InstallationID == want.InstallationID && got.Target.Harness == want.Target.Harness &&
-		got.Target.TestedVersionRange == want.Target.TestedVersionRange &&
-		launchersEqual(got.Target.Launchers, want.Target.Launchers) &&
 		slices.Equal(got.Components, want.Components) && slices.Equal(got.SourceAssets, want.SourceAssets) &&
 		slices.Equal(got.Files, want.Files)
 }
 
-func launchersEqual(a, b []Launcher) bool {
-	if len(a) != len(b) {
-		return false
+func testedVersionDisplay(launchers []Launcher) string {
+	rows := make([]string, 0, len(launchers))
+	for _, launcher := range launchers {
+		rows = append(rows, launcher.Name+"="+strings.Join(launcher.TestedVersions, ","))
 	}
-	for i := range a {
-		if a[i].Name != b[i].Name || !slices.Equal(a[i].TestedVersions, b[i].TestedVersions) {
-			return false
-		}
-	}
-	return true
+	return strings.Join(rows, ";")
 }
 
 func readProjectionStamp(filename string) (ProjectionStamp, error) {
@@ -434,7 +433,8 @@ func readProjectionStamp(filename string) (ProjectionStamp, error) {
 func validatePortableStamp(stamp ProjectionStamp) error {
 	if stamp.Schema != projectionStampSchema || stamp.ProjectionFormat != PortableProjectionFormat ||
 		stamp.Target.Harness != PortableTargetName || stamp.ProductVersion == "" || stamp.InstallationID == "" ||
-		stamp.GeneratedAt == "" || stamp.Target.TestedVersionRange == "" {
+		stamp.GeneratedAt == "" || stamp.Target.TestedVersionRange == "" ||
+		(stamp.Target.LauncherEligibility != "" && stamp.Target.LauncherEligibility != LauncherEligibilityCapabilityEvidence) {
 		return fmt.Errorf("unsupported stamp identity")
 	}
 	if _, err := time.Parse(time.RFC3339, stamp.GeneratedAt); err != nil {
@@ -445,7 +445,7 @@ func validatePortableStamp(stamp ProjectionStamp) error {
 	}
 	launcherNames := map[string]bool{}
 	for _, launcher := range stamp.Target.Launchers {
-		if launcher.Name == "" || launcherNames[launcher.Name] || len(launcher.TestedVersions) == 0 {
+		if !portableLauncherName(launcher.Name) || launcherNames[launcher.Name] || len(launcher.TestedVersions) == 0 {
 			return fmt.Errorf("invalid launcher row")
 		}
 		launcherNames[launcher.Name] = true
@@ -474,6 +474,15 @@ func validatePortableStamp(stamp ProjectionStamp) error {
 		seen[item.Path] = true
 	}
 	return nil
+}
+
+func portableLauncherName(name string) bool {
+	switch name {
+	case "amp", "opencode", "codex":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateDigestedPaths(paths []DigestedPath, rejectStamp bool) error {

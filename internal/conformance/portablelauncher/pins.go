@@ -1,6 +1,9 @@
 package portablelauncher
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // Pinned suite identities and canonical payload digests.
 const (
@@ -15,25 +18,25 @@ const (
 	ReplyDigest          = "sha256:b3300f2f6e0338d2b672891be66827d95779a2eabf4a75dcae1b6f56c9a4dc98"
 	PromptDigest         = "sha256:b40d3a68eb33083b92199d734da2dece28395a6acc6d5e2cb9d7032dae4d11c7"
 	ConflictDigest       = "sha256:dbe904a42a9d9d9cdf7908508fa393ce43c9c53ea16a8cb8c9b82e7005f602bc"
+	// LauncherEligibilityCapabilityEvidence means that an exact per-run outer
+	// launcher identity is admitted by the current capability suite, not by a
+	// compiled historical version list.
+	LauncherEligibilityCapabilityEvidence = "capability_evidence"
 )
 
 var exactCommitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
-// AcceptedLauncher is an exact launcher version and executable digest admitted
-// by the suite.
-type AcceptedLauncher struct {
-	Version string `json:"version"`
-	Digest  string `json:"executable_sha256"`
+var recognizedLaunchers = map[string]bool{
+	"amp": true, "opencode": true, "codex": true,
 }
 
-var acceptedLaunchers = map[string]AcceptedLauncher{
-	"amp":      {Version: "0.0.1789675234-g2899fe", Digest: "sha256:f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee"},
-	"opencode": {Version: "1.18.31", Digest: "sha256:f9dab32248695e9ebd56b16a1921798fd85112cf5a69c7dfd0cabc1e17be4a11"},
-	"codex":    {Version: "0.154.0", Digest: "sha256:3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"},
+// RecognizedLauncher reports whether name participates in the common
+// capability-evidence policy. Version history is deliberately not consulted.
+func RecognizedLauncher(name string) bool {
+	return recognizedLaunchers[name]
 }
 
-// AcceptedLauncherPin returns the exact admitted pin for a launcher name.
-func AcceptedLauncherPin(name string) (AcceptedLauncher, bool) {
-	p, ok := acceptedLaunchers[name]
-	return p, ok
+func validLauncherPin(pin LauncherPin) bool {
+	return RecognizedLauncher(pin.Name) && pin.Version != "" && pin.Version == strings.TrimSpace(pin.Version) &&
+		digestPattern.MatchString(pin.ExecutableSHA256)
 }

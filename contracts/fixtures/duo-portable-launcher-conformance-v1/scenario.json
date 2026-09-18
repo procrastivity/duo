@@ -1,7 +1,7 @@
 {
   "schema": "duo.portable-launcher-conformance-scenario/v1",
   "name": "portable-launcher-delegation",
-  "revision": 1,
+  "revision": 2,
   "task_digest": "sha256:5949809812a3ada98c95e77e9942af848e3080e4984df43a2d96fe5a24d5eab2",
   "fixture": {
     "workspace": "$WORKSPACE",
@@ -58,20 +58,12 @@
       "pre_setup": false
     }
   ],
-  "launchers": {
-    "amp": {
-      "version": "0.0.1789675234-g2899fe",
-      "executable_sha256": "sha256:f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee"
-    },
-    "codex": {
-      "version": "0.154.0",
-      "executable_sha256": "sha256:3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
-    },
-    "opencode": {
-      "version": "1.18.31",
-      "executable_sha256": "sha256:f9dab32248695e9ebd56b16a1921798fd85112cf5a69c7dfd0cabc1e17be4a11"
-    }
-  },
+  "launcher_eligibility": "capability_evidence",
+  "launchers": [
+    "amp",
+    "opencode",
+    "codex"
+  ],
   "deadlines_ms": {
     "bind": 12000,
     "cleanup": 30000,

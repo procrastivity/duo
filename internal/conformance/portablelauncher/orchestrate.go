@@ -76,6 +76,11 @@ func orchestrate(ctx context.Context, input OrchestrationInput, seams Orchestrat
 		cleanupErr := cleanupFixture(ctx, fixture, input.Runner.InspectResources, input.Runner.ExportEvidence)
 		return Result{}, errors.Join(err, cleanupErr)
 	}
+	driverPin, err := loadRunLauncherPin(fixture.Root)
+	if err != nil || driverPin != input.Pins.Launcher {
+		cleanupErr := cleanupFixture(ctx, fixture, input.Runner.InspectResources, input.Runner.ExportEvidence)
+		return Result{}, errors.Join(fmt.Errorf("portable launcher orchestration: driver launcher identity does not match result pins"), err, cleanupErr)
+	}
 
 	identity, err := recordedExecutableForPath(filepath.Join(fixture.Root, "bin", "duo"))
 	if err != nil {

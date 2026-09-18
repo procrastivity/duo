@@ -15,6 +15,7 @@
       "properties": {
         "harness": {"enum": ["claude_code", "codex", "devin", "opencode", "pi", "portable_launchers"]},
         "tested_version_range": {"type": "string", "minLength": 1},
+        "launcher_eligibility": {"const": "capability_evidence"},
         "launchers": {
           "type": "array",
           "items": {"$ref": "#/$defs/launcher"},

@@ -6,13 +6,14 @@ import "encoding/json"
 
 // Public schema and identity constants for the portable-launcher suite.
 const (
-	ResultSchema   = "duo.portable-launcher-conformance-result/v1"
-	ScenarioSchema = "duo.portable-launcher-conformance-scenario/v1"
-	EvidenceSchema = "duo.portable-launcher-conformance-evidence/v1"
-	IndexSchema    = "duo.portable-launcher-conformance-evidence-index/v1"
-	ScenarioName   = "portable-launcher-delegation"
-	ScenarioID     = "portable-launcher-delegation/v1"
-	ScrubPolicy    = "portable-launcher-evidence/v1"
+	ResultSchema     = "duo.portable-launcher-conformance-result/v1"
+	ScenarioSchema   = "duo.portable-launcher-conformance-scenario/v1"
+	EvidenceSchema   = "duo.portable-launcher-conformance-evidence/v1"
+	IndexSchema      = "duo.portable-launcher-conformance-evidence-index/v1"
+	ScenarioName     = "portable-launcher-delegation"
+	ScenarioID       = "portable-launcher-delegation/v1"
+	ScenarioRevision = 2
+	ScrubPolicy      = "portable-launcher-evidence/v1"
 )
 
 // Result is one complete portable-launcher conformance result.

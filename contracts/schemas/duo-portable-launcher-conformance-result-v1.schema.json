@@ -22,7 +22,7 @@
       "required": ["name", "revision", "manifest_digest", "oracle_digest"],
       "properties": {
         "name": {"const": "portable-launcher-delegation"},
-        "revision": {"const": 1},
+        "revision": {"enum": [1, 2]},
         "manifest_digest": {"$ref": "#/$defs/digest"},
         "oracle_digest": {"$ref": "#/$defs/digest"}
       },

@@ -44,9 +44,6 @@ func TestPrepareFixtureMaterializesCanonicalScenarioAndDynamicDuoBuild(t *testin
 	duoArtifact.Commit, duoArtifact.BuildDate = duoPin.Commit, duoPin.BuildDate
 	artifacts["duo"] = duoArtifact
 
-	oldLauncher := acceptedLaunchers["amp"]
-	acceptedLaunchers["amp"] = AcceptedLauncher{Version: artifacts["launcher"].Version, Digest: artifacts["launcher"].Digest}
-	t.Cleanup(func() { acceptedLaunchers["amp"] = oldLauncher })
 	root := &cobra.Command{Use: "duo"}
 	verb := &cobra.Command{Use: "fixture", RunE: func(*cobra.Command, []string) error { return nil }}
 	surface.Annotate(verb, surface.Plumbing)
@@ -77,6 +74,18 @@ func TestPrepareFixtureMaterializesCanonicalScenarioAndDynamicDuoBuild(t *testin
 	gotScenario, err := os.ReadFile(filepath.Join(fixture.Workspace, ".duo-conformance", "scenario.json"))
 	if err != nil || string(gotScenario) != string(wantScenario) {
 		t.Fatalf("materialized scenario mismatch: err=%v", err)
+	}
+	pinBytes, err := os.ReadFile(filepath.Join(fixture.Root, filepath.FromSlash(launcherPinRelativePath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runPin LauncherPin
+	if err := decodeStrict(pinBytes, &runPin); err != nil {
+		t.Fatal(err)
+	}
+	wantPin := LauncherPin{Name: artifacts["launcher"].Name, Version: artifacts["launcher"].Version, ExecutableSHA256: artifacts["launcher"].Digest}
+	if runPin != wantPin {
+		t.Fatalf("run launcher pin = %#v, want %#v", runPin, wantPin)
 	}
 	if err := fixture.Cleanup(context.Background(), func(context.Context, *Fixture) error { return nil }, func(context.Context, *Fixture) error { return nil }); err != nil {
 		t.Fatalf("cleanup materialized fixture: %v", err)
@@ -189,6 +198,22 @@ func TestOrchestrateBoundsCleanupAfterCallerCancellation(t *testing.T) {
 	}
 }
 
+func TestOrchestrateRejectsSetupResultLauncherDisagreement(t *testing.T) {
+	input, seams, _, _ := orchestrationTestFixture(t)
+	input.Pins.Launcher.Version = "different-fresh-version"
+	if _, err := orchestrate(context.Background(), input, seams); err == nil || !strings.Contains(err.Error(), "setup launcher identity") {
+		t.Fatalf("launcher disagreement error = %v", err)
+	}
+}
+
+func TestOrchestrateRejectsDriverResultLauncherDisagreement(t *testing.T) {
+	input, seams, root, _ := orchestrationTestFixture(t)
+	writeDriverLauncherPin(t, root, LauncherPin{Name: "amp", Version: "different-driver-version", ExecutableSHA256: input.Pins.Launcher.ExecutableSHA256})
+	if _, err := orchestrate(context.Background(), input, seams); err == nil || !strings.Contains(err.Error(), "driver launcher identity") {
+		t.Fatalf("driver/result disagreement error = %v", err)
+	}
+}
+
 func baseRunRecordForOrchestration(facts AssemblyInput) RunRecord {
 	return RunRecord{Controls: append([]RecordedControl(nil), facts.Record.Controls...)}
 }
@@ -199,7 +224,7 @@ func orchestrationTestFixture(t *testing.T) (OrchestrationInput, OrchestrationSe
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"bin", "capture", "workspace"} {
+	for _, name := range []string{"bin", "capture", "workspace", "workspace/.duo-conformance"} {
 		if err := os.MkdirAll(filepath.Join(root, name), 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -209,6 +234,7 @@ func orchestrationTestFixture(t *testing.T) (OrchestrationInput, OrchestrationSe
 		t.Fatal(err)
 	}
 	pins := fixturePins()
+	writeDriverLauncherPin(t, root, pins.Launcher)
 	facts := assemblyTestInput(t)
 	facts.Pins = pins
 	setup := SetupInput{
