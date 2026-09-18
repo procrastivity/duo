@@ -1,0 +1,1251 @@
+{
+  "schema": "duo.portable-launcher-conformance-evidence/v1",
+  "scrub_status": "pass",
+  "observations": [
+    {
+      "sequence": 1,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 1,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 0,
+        "started_ms": 0
+      }
+    },
+    {
+      "sequence": 1,
+      "assertion_id": "setup.fixture_isolated_and_pinned",
+      "source": "controller",
+      "evidence": {
+        "credential_provider": "openai-codex",
+        "credential_source_kind": "operator_copy",
+        "credentials_present": true,
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "fixture_root": "$RUN",
+          "mcp_enabled": false,
+          "plugins_enabled": false,
+          "shared_state": false,
+          "terminal_input_used": false
+        },
+        "monotonic_ms": 0,
+        "pi_no_extensions": true,
+        "pins_digest": "sha256:51b356011b1f46ea2922218bb5f4c4332a205fd8091b358f12a94ee6e2d9da45"
+      }
+    },
+    {
+      "sequence": 2,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 2,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 1,
+        "started_ms": 1
+      }
+    },
+    {
+      "sequence": 2,
+      "assertion_id": "discovery.skill_identity",
+      "source": "launcher_event",
+      "evidence": {
+        "arguments": [
+          "fixture-launcher",
+          "{PORTABLE_LAUNCHER_TASK_BYTES}"
+        ],
+        "kind": "skill.discovery",
+        "skill": {
+          "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+          "format_version": "duo.skill/duo-delegation-loop/v1",
+          "name": "duo-delegation-loop"
+        },
+        "task_digest": "sha256:5949809812a3ada98c95e77e9942af848e3080e4984df43a2d96fe5a24d5eab2"
+      }
+    },
+    {
+      "sequence": 3,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 3,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 2,
+        "started_ms": 2
+      }
+    },
+    {
+      "sequence": 3,
+      "assertion_id": "preflight.ready",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "all_required_pass": true,
+          "required_checks": 7,
+          "status": "ready"
+        },
+        "monotonic_ms": 2
+      }
+    },
+    {
+      "sequence": 4,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 4,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 3,
+        "started_ms": 3
+      }
+    },
+    {
+      "sequence": 4,
+      "assertion_id": "launch.resolution",
+      "source": "duo_envelope",
+      "evidence": {
+        "argv_has_prompt": false,
+        "envelope": {
+          "features": [],
+          "operation": "session.launch",
+          "request_id": "req_fixture_4",
+          "result": {
+            "host": {
+              "host_source": "explicit-flag",
+              "instance_id": "hostinst_fixture",
+              "instance_label": "fixture",
+              "kind": "herdr",
+              "outranked_evidence": [],
+              "workspace_id": "workspace_fixture"
+            },
+            "launch_resolution_id": "lrr_fixture",
+            "leaves": [
+              {
+                "agent_runtime": "pi",
+                "declared_kind": "open",
+                "model_line": "gpt-5.6-luna",
+                "name": "main",
+                "outcome": "selected",
+                "relented_avoids": []
+              }
+            ],
+            "selection": "ordered",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 12000,
+        "finished_ms": 5,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 4,
+        "started_ms": 4
+      }
+    },
+    {
+      "sequence": 5,
+      "assertion_id": "bind.runtime_identity",
+      "source": "duo_envelope",
+      "evidence": {
+        "active_correlation_runtime_ids": [
+          "run_fixture"
+        ],
+        "authority_instance_ids": [
+          "run_fixture"
+        ],
+        "envelope": {
+          "features": [],
+          "operation": "session.inspect",
+          "request_id": "req_fixture_5",
+          "result": {
+            "attachments": [
+              {
+                "attachment_id": "attachment_fixture",
+                "claim_held": true,
+                "container": "workspace-1:pane-1",
+                "epoch": {
+                  "kind": "herdr.terminal_id",
+                  "scope": "pane",
+                  "value": "term_fixture"
+                },
+                "integration_instance": "herdr:fixture",
+                "process_birth": {
+                  "pid": 41210,
+                  "started_at": "2026-09-17T00:00:00Z"
+                },
+                "state": "attached"
+              }
+            ],
+            "lifecycle": "active",
+            "runtime_instance_id": "run_fixture",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 6,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 5,
+        "started_ms": 5
+      }
+    },
+    {
+      "sequence": 6,
+      "assertion_id": "send.delivery",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_6",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 20000,
+        "finished_ms": 7,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 6,
+        "started_ms": 6
+      }
+    },
+    {
+      "sequence": 7,
+      "assertion_id": "observe.assistant_text",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "conversation.list",
+          "request_id": "req_fixture_7",
+          "result": {
+            "items": [
+              {
+                "author_role": "agent",
+                "blocks": [
+                  {
+                    "content": {
+                      "text": "DUO_PORTABLE_LAUNCHER_OK_V1"
+                    },
+                    "position": "0",
+                    "type": "text"
+                  }
+                ],
+                "completion": "source_record_complete",
+                "received_at": "2026-09-17T00:00:00Z",
+                "record_id": "record_fixture",
+                "runtime_instance_id": "run_fixture",
+                "session_id": "ses_fixture"
+              }
+            ],
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 8,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 7,
+        "started_ms": 7
+      }
+    },
+    {
+      "sequence": 8,
+      "assertion_id": "command.delivery_integrity",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_8",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        },
+        "unchanged": true
+      }
+    },
+    {
+      "sequence": 9,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 9,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 8,
+        "started_ms": 8
+      }
+    },
+    {
+      "sequence": 9,
+      "assertion_id": "restart.authority_continuity",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "attempts": 1,
+          "distinct_processes": true,
+          "outcome": "same_live",
+          "same_store": true
+        },
+        "monotonic_ms": 8
+      }
+    },
+    {
+      "sequence": 10,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 12000,
+        "finished_ms": 10,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 9,
+        "started_ms": 9
+      }
+    },
+    {
+      "sequence": 10,
+      "assertion_id": "bind.runtime_identity",
+      "source": "duo_envelope",
+      "evidence": {
+        "active_correlation_runtime_ids": [
+          "run_fixture"
+        ],
+        "authority_instance_ids": [
+          "run_fixture"
+        ],
+        "envelope": {
+          "features": [],
+          "operation": "session.inspect",
+          "request_id": "req_fixture_10",
+          "result": {
+            "attachments": [
+              {
+                "attachment_id": "attachment_fixture",
+                "claim_held": true,
+                "container": "workspace-1:pane-1",
+                "epoch": {
+                  "kind": "herdr.terminal_id",
+                  "scope": "pane",
+                  "value": "term_fixture"
+                },
+                "integration_instance": "herdr:fixture",
+                "process_birth": {
+                  "pid": 41210,
+                  "started_at": "2026-09-17T00:00:00Z"
+                },
+                "state": "attached"
+              }
+            ],
+            "lifecycle": "active",
+            "runtime_instance_id": "run_fixture",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 11,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 20000,
+        "finished_ms": 11,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 10,
+        "started_ms": 10
+      }
+    },
+    {
+      "sequence": 11,
+      "assertion_id": "observe.restart_text",
+      "source": "duo_envelope",
+      "evidence": {
+        "baseline_record_id": "record_fixture",
+        "envelope": {
+          "features": [],
+          "operation": "conversation.list",
+          "request_id": "req_fixture_11",
+          "result": {
+            "items": [
+              {
+                "author_role": "agent",
+                "blocks": [
+                  {
+                    "content": {
+                      "text": "DUO_PORTABLE_LAUNCHER_OK_V1"
+                    },
+                    "position": "0",
+                    "type": "text"
+                  }
+                ],
+                "completion": "source_record_complete",
+                "received_at": "2026-09-17T00:00:00Z",
+                "record_id": "record_fixture",
+                "runtime_instance_id": "run_fixture",
+                "session_id": "ses_fixture"
+              }
+            ],
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 12,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 12,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 11,
+        "started_ms": 11
+      }
+    },
+    {
+      "sequence": 12,
+      "assertion_id": "command.delivery_integrity",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_12",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        },
+        "unchanged": true
+      }
+    },
+    {
+      "sequence": 13,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 13,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 12,
+        "started_ms": 12
+      }
+    },
+    {
+      "sequence": 13,
+      "assertion_id": "send.idempotent_replay",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "attempts": 1,
+          "new_turns": 0,
+          "same_command": true
+        },
+        "monotonic_ms": 12
+      }
+    },
+    {
+      "sequence": 14,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 14,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 13,
+        "started_ms": 13
+      }
+    },
+    {
+      "sequence": 14,
+      "assertion_id": "command.idempotent_no_duplication",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "attempts_delta": 0,
+          "commands_delta": 0,
+          "turns_delta": 0
+        },
+        "monotonic_ms": 13
+      }
+    },
+    {
+      "sequence": 15,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 15,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 14,
+        "started_ms": 14
+      }
+    },
+    {
+      "sequence": 15,
+      "assertion_id": "send.idempotency_conflict",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "error": {
+            "class": "conflict",
+            "code": "command.idempotency_conflict",
+            "details": {
+              "existing_digest": "sha256:b40d3a68eb33083b92199d734da2dece28395a6acc6d5e2cb9d7032dae4d11c7",
+              "idempotency_key": "portable-launcher-v1-primary",
+              "request_digest": "sha256:dbe904a42a9d9d9cdf7908508fa393ce43c9c53ea16a8cb8c9b82e7005f602bc"
+            },
+            "effect": "no_effect",
+            "message": "fixture idempotency conflict",
+            "retry": {
+              "action": "use_new_idempotency_key",
+              "safe": false
+            },
+            "target": {
+              "id": "cmd_fixture",
+              "kind": "prompt_command"
+            }
+          },
+          "operation": "prompt.deliver",
+          "request_id": "req_fixture_15",
+          "schema": "duo.external/v1"
+        },
+        "original_command_id": "cmd_fixture"
+      }
+    },
+    {
+      "sequence": 16,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 16,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 15,
+        "started_ms": 15
+      }
+    },
+    {
+      "sequence": 16,
+      "assertion_id": "command.idempotency_no_drift",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "attempts_delta": 0,
+          "commands_delta": 0,
+          "queue_delta": 0,
+          "turns_delta": 0
+        },
+        "monotonic_ms": 15
+      }
+    },
+    {
+      "sequence": 17,
+      "assertion_id": "blocked.induction_available",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "available": false
+        },
+        "monotonic_ms": 16
+      }
+    },
+    {
+      "sequence": 18,
+      "assertion_id": "prerequisite.not_reached",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "reached": false
+        },
+        "monotonic_ms": 17
+      }
+    },
+    {
+      "sequence": 19,
+      "assertion_id": "prerequisite.not_reached",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "reached": false
+        },
+        "monotonic_ms": 18
+      }
+    },
+    {
+      "sequence": 20,
+      "assertion_id": "prerequisite.not_reached",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "reached": false
+        },
+        "monotonic_ms": 19
+      }
+    },
+    {
+      "sequence": 21,
+      "assertion_id": "prerequisite.not_reached",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "reached": false
+        },
+        "monotonic_ms": 20
+      }
+    },
+    {
+      "sequence": 22,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 22,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 21,
+        "started_ms": 21
+      }
+    },
+    {
+      "sequence": 22,
+      "assertion_id": "launch.resolution",
+      "source": "duo_envelope",
+      "evidence": {
+        "argv_has_prompt": false,
+        "envelope": {
+          "features": [],
+          "operation": "session.launch",
+          "request_id": "req_fixture_22",
+          "result": {
+            "host": {
+              "host_source": "explicit-flag",
+              "instance_id": "hostinst_fixture",
+              "instance_label": "fixture",
+              "kind": "herdr",
+              "outranked_evidence": [],
+              "workspace_id": "workspace_fixture"
+            },
+            "launch_resolution_id": "lrr_fixture",
+            "leaves": [
+              {
+                "agent_runtime": "pi",
+                "declared_kind": "open",
+                "model_line": "gpt-5.6-luna",
+                "name": "main",
+                "outcome": "selected",
+                "relented_avoids": []
+              }
+            ],
+            "selection": "ordered",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 12000,
+        "finished_ms": 23,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 22,
+        "started_ms": 22
+      }
+    },
+    {
+      "sequence": 23,
+      "assertion_id": "bind.runtime_identity",
+      "source": "duo_envelope",
+      "evidence": {
+        "active_correlation_runtime_ids": [
+          "run_fixture"
+        ],
+        "authority_instance_ids": [
+          "run_fixture"
+        ],
+        "envelope": {
+          "features": [],
+          "operation": "session.inspect",
+          "request_id": "req_fixture_23",
+          "result": {
+            "attachments": [
+              {
+                "attachment_id": "attachment_fixture",
+                "claim_held": true,
+                "container": "workspace-1:pane-1",
+                "epoch": {
+                  "kind": "herdr.terminal_id",
+                  "scope": "pane",
+                  "value": "term_fixture"
+                },
+                "integration_instance": "herdr:fixture",
+                "process_birth": {
+                  "pid": 41210,
+                  "started_at": "2026-09-17T00:00:00Z"
+                },
+                "state": "attached"
+              }
+            ],
+            "lifecycle": "active",
+            "runtime_instance_id": "run_fixture",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 24,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 23,
+        "started_ms": 23
+      }
+    },
+    {
+      "sequence": 24,
+      "assertion_id": "send.delivery",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_24",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 20000,
+        "finished_ms": 25,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 24,
+        "started_ms": 24
+      }
+    },
+    {
+      "sequence": 25,
+      "assertion_id": "observe.exited",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "attempts": 1,
+          "condition": "exited",
+          "process_success": true,
+          "same_instance": true
+        },
+        "monotonic_ms": 24,
+        "target_verified": true
+      }
+    },
+    {
+      "sequence": 26,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 26,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 25,
+        "started_ms": 25
+      }
+    },
+    {
+      "sequence": 26,
+      "assertion_id": "command.delivery_integrity",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_26",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        },
+        "unchanged": true
+      }
+    },
+    {
+      "sequence": 27,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 27,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 26,
+        "started_ms": 26
+      }
+    },
+    {
+      "sequence": 27,
+      "assertion_id": "launch.resolution",
+      "source": "duo_envelope",
+      "evidence": {
+        "argv_has_prompt": false,
+        "envelope": {
+          "features": [],
+          "operation": "session.launch",
+          "request_id": "req_fixture_27",
+          "result": {
+            "host": {
+              "host_source": "explicit-flag",
+              "instance_id": "hostinst_fixture",
+              "instance_label": "fixture",
+              "kind": "herdr",
+              "outranked_evidence": [],
+              "workspace_id": "workspace_fixture"
+            },
+            "launch_resolution_id": "lrr_fixture",
+            "leaves": [
+              {
+                "agent_runtime": "pi",
+                "declared_kind": "open",
+                "model_line": "gpt-5.6-luna",
+                "name": "main",
+                "outcome": "selected",
+                "relented_avoids": []
+              }
+            ],
+            "selection": "ordered",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 28,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 12000,
+        "finished_ms": 28,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 27,
+        "started_ms": 27
+      }
+    },
+    {
+      "sequence": 28,
+      "assertion_id": "bind.runtime_identity",
+      "source": "duo_envelope",
+      "evidence": {
+        "active_correlation_runtime_ids": [
+          "run_fixture"
+        ],
+        "authority_instance_ids": [
+          "run_fixture"
+        ],
+        "envelope": {
+          "features": [],
+          "operation": "session.inspect",
+          "request_id": "req_fixture_28",
+          "result": {
+            "attachments": [
+              {
+                "attachment_id": "attachment_fixture",
+                "claim_held": true,
+                "container": "workspace-1:pane-1",
+                "epoch": {
+                  "kind": "herdr.terminal_id",
+                  "scope": "pane",
+                  "value": "term_fixture"
+                },
+                "integration_instance": "herdr:fixture",
+                "process_birth": {
+                  "pid": 41210,
+                  "started_at": "2026-09-17T00:00:00Z"
+                },
+                "state": "attached"
+              }
+            ],
+            "lifecycle": "active",
+            "runtime_instance_id": "run_fixture",
+            "session_id": "ses_fixture"
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 29,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 29,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 28,
+        "started_ms": 28
+      }
+    },
+    {
+      "sequence": 29,
+      "assertion_id": "send.delivery",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_29",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        }
+      }
+    },
+    {
+      "sequence": 30,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 22500,
+        "finished_ms": 20029,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 29,
+        "started_ms": 29
+      }
+    },
+    {
+      "sequence": 30,
+      "assertion_id": "observe.timeout",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "assistant_blocks": 0,
+          "attempts": 1,
+          "delivered": true,
+          "elapsed_max_ms": 22500,
+          "elapsed_min_ms": 20000,
+          "elapsed_ms": 20000,
+          "outer_timed_out": false,
+          "process_success": true,
+          "stopped_verified": true
+        },
+        "monotonic_ms": 29,
+        "target_verified": true,
+        "timeout_probe_supported": true
+      }
+    },
+    {
+      "sequence": 31,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 15000,
+        "finished_ms": 20030,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 20029,
+        "started_ms": 20029
+      }
+    },
+    {
+      "sequence": 31,
+      "assertion_id": "command.delivery_integrity",
+      "source": "duo_envelope",
+      "evidence": {
+        "envelope": {
+          "features": [],
+          "operation": "command.inspect",
+          "request_id": "req_fixture_31",
+          "result": {
+            "attempts": [
+              {
+                "attempt_id": "attempt_fixture",
+                "realization": "native",
+                "recorded_result": "delivered",
+                "started_at": "2026-09-17T00:00:00Z"
+              }
+            ],
+            "command_id": "cmd_fixture",
+            "milestones": {
+              "accepted_at": "2026-09-17T00:00:00Z",
+              "acknowledged": false,
+              "activity_observed": false,
+              "delivered_at": "2026-09-17T00:00:01Z"
+            },
+            "operation": "prompt.deliver",
+            "queue_policy": "queue_until_safe",
+            "responsibility_state": "delivered",
+            "retry": {
+              "action": "observe_existing_command",
+              "safe": false
+            },
+            "revision": "4",
+            "target": {
+              "runtime_instance_id": "run_fixture",
+              "session_id": "ses_fixture"
+            }
+          },
+          "schema": "duo.external/v1",
+          "warnings": []
+        },
+        "unchanged": true
+      }
+    },
+    {
+      "sequence": 32,
+      "assertion_id": "stage.completed_within_deadline",
+      "source": "controller",
+      "evidence": {
+        "deadline_ms": 30000,
+        "finished_ms": 20031,
+        "kind": "controller.checkpoint",
+        "monotonic_ms": 20030,
+        "started_ms": 20030
+      }
+    },
+    {
+      "sequence": 32,
+      "assertion_id": "cleanup.complete",
+      "source": "controller",
+      "evidence": {
+        "kind": "controller.checkpoint",
+        "measurements": {
+          "export_complete": true,
+          "panes_remaining": 0,
+          "pids_remaining": 0,
+          "root_removed": true,
+          "sockets_remaining": 0
+        },
+        "monotonic_ms": 20030
+      }
+    }
+  ]
+}

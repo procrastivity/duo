@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-09-17T20:56:15Z",
+  "host": {
+    "kernel": "Linux 6.8.0-136-generic",
+    "architecture": "x86_64"
+  },
+  "duo_checkout": {
+    "path": "/home/dev/Code/duo",
+    "commit": "1437f2f69e71d164b4248ed121803e53e3e1a2ba",
+    "project_agents_directory_present": false
+  },
+  "prior_assessment": {
+    "repository": "duo-lab",
+    "commit": "caf02f7eb325b1c935d0cf793bc53fbb3a3f1a65",
+    "date": "2026-09-17"
+  },
+  "skill": {
+    "name": "duo-delegation-loop",
+    "canonical_path": "skills/duo-delegation-loop/SKILL.md",
+    "size_bytes": 6002,
+    "sha256": "4c84381b7b4a3454abd58a192bd158b3ae14cd7e1bcd7dba4c87d5d5ae9be30e"
+  },
+  "launchers": {
+    "amp": {
+      "version": "0.0.1789675234-g2899fe",
+      "release_time": "2026-09-17T20:00:34.000Z",
+      "command_path": "/home/dev/.local/bin/amp",
+      "resolved_path": "/home/dev/.amp/bin/amp",
+      "sha256": "f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee",
+      "project_copy": true,
+      "project_symlink": true,
+      "nested_cwd": true,
+      "user_home_agents": true,
+      "user_config_agents": true,
+      "native_user_root": "~/.config/amp/skills",
+      "behavioral_invocation": true,
+      "invocation_evidence": "stream JSON skill tool_use followed by correct sequence and 20s timeout"
+    },
+    "opencode": {
+      "version": "1.18.31",
+      "command_path": "/home/dev/.opencode/bin/opencode",
+      "resolved_path": "/home/dev/.opencode/bin/opencode",
+      "sha256": "f9dab32248695e9ebd56b16a1921798fd85112cf5a69c7dfd0cabc1e17be4a11",
+      "project_copy": true,
+      "project_symlink": true,
+      "nested_cwd": true,
+      "user_home_agents": true,
+      "user_config_agents": false,
+      "native_project_root": ".opencode/skills",
+      "native_user_root": "~/.config/opencode/skills",
+      "behavioral_invocation": true,
+      "invocation_evidence": "completed skill tool_use with exact untruncated content followed by correct sequence and 20s timeout"
+    },
+    "codex": {
+      "version": "0.154.0",
+      "command_path": "/home/dev/.local/bin/codex",
+      "javascript_entrypoint": "/home/dev/.npm-global/lib/node_modules/@openai/codex/bin/codex.js",
+      "javascript_entrypoint_sha256": "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70",
+      "native_package_version": "0.154.0-linux-x64",
+      "native_binary_sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+      "project_copy": true,
+      "project_symlink": true,
+      "nested_cwd": true,
+      "user_home_agents": true,
+      "user_config_agents": false,
+      "native_user_root": "$CODEX_HOME/skills",
+      "behavioral_invocation": true,
+      "invocation_evidence": "model-visible skill entry, successful SKILL.md read, correct sequence and 20s timeout"
+    }
+  },
+  "shared_contract": {
+    "project_root": ".agents/skills",
+    "user_root": "~/.agents/skills",
+    "copied_directory_supported": true,
+    "absolute_directory_symlink_supported": true,
+    "relative_directory_symlink_tested": true,
+    "relative_directory_symlink_supported": true,
+    "relative_directory_symlink_target": "../../skills/duo-delegation-loop"
+  },
+  "end_to_end_duo_commands_executed": false,
+  "secrets_in_artifact": false
+}

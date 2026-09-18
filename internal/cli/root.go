@@ -55,6 +55,7 @@ func NewRootCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Com
 
 	root.AddCommand(versionCommand(streams, build))
 	root.AddCommand(manifestCommand(streams, build, root))
+	root.AddCommand(installCommand(streams, build, root))
 	root.AddCommand(doctorCommand(streams))
 	root.AddCommand(sessionCommand(streams))
 	root.AddCommand(conversationCommand(streams))

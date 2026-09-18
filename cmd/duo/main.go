@@ -1,7 +1,6 @@
-// Command duo is the entrypoint for the duo CLI. It does nothing beyond
-// constructing the root command, calling Execute, and mapping the result to
-// an exit code — every other concern belongs to internal/cli and the verb
-// packages it registers.
+// Command duo is the entrypoint for the duo CLI. Apart from the explicitly
+// configured portable-launcher command recorder, it only constructs the root
+// command, calls Execute, and maps the result to an exit code.
 package main
 
 import (
@@ -9,6 +8,7 @@ import (
 
 	"github.com/procrastivity/duo/internal/buildinfo"
 	"github.com/procrastivity/duo/internal/cli"
+	"github.com/procrastivity/duo/internal/conformance/portablelauncher"
 	"github.com/procrastivity/duo/internal/iostreams"
 )
 
@@ -23,6 +23,10 @@ var (
 )
 
 func main() {
+	if recorded, exitCode := portablelauncher.RecordCommandIfConfigured(); recorded {
+		os.Exit(exitCode)
+	}
+	// Keep the ordinary execution path unchanged when recording is disabled.
 	streams := iostreams.System()
 	build := buildinfo.Info{Version: version, Commit: commit, Date: date}
 	root := cli.NewRootCommand(streams, build)

@@ -57,12 +57,55 @@ type Adapter struct {
 }
 
 // HarnessTarget describes one generated-integration harness target — the
-// duo.manifest/v1 contract's "harness_targets" array. No harness renderer
-// exists yet, so Build always emits an empty slice; the shape exists ready
-// for that later work (duo-vnext-installation-contract.md §2).
+// duo.manifest/v1 contract's "harness_targets" array. Build currently emits
+// the one launcher-neutral portable skill target.
 type HarnessTarget struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	Name             string     `json:"name"`
+	Status           string     `json:"status"`
+	Scope            string     `json:"scope"`
+	DiscoveryRoot    string     `json:"discovery_root"`
+	ProjectionRoot   string     `json:"projection_root"`
+	StampFile        string     `json:"stamp_file"`
+	ProjectionFormat string     `json:"projection_format"`
+	Components       []string   `json:"components"`
+	Artifact         Artifact   `json:"artifact"`
+	Launchers        []Launcher `json:"launchers"`
+}
+
+// Artifact is the public identity and placement of a target payload.
+type Artifact struct {
+	Name          string `json:"name"`
+	MediaType     string `json:"media_type"`
+	SourceAsset   string `json:"source_asset"`
+	OutputPath    string `json:"output_path"`
+	ContentDigest string `json:"content_digest"`
+}
+
+// Launcher records one exact launcher-version evidence set.
+type Launcher struct {
+	Name           string   `json:"name"`
+	TestedVersions []string `json:"tested_versions"`
+}
+
+// UnmarshalJSON keeps launcher rows closed even though a projection target's
+// outer object intentionally remains extensible for existing consumers.
+func (l *Launcher) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for key := range fields {
+		if key != "name" && key != "tested_versions" {
+			return fmt.Errorf("manifest: unknown launcher field %q", key)
+		}
+	}
+	type launcherAlias Launcher
+	var decoded launcherAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*l = Launcher(decoded)
+	return nil
 }
 
 // Arg describes one flag a verb declares on itself (its LocalFlags — the
@@ -139,6 +182,10 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 	if assets == nil {
 		assets = []Asset{}
 	}
+	portableTarget, err := portableLauncherTarget(assets)
+	if err != nil {
+		return Manifest{}, err
+	}
 
 	contractDigests, err := loadContracts()
 	if err != nil {
@@ -154,7 +201,7 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 		Operations:           registry.ManifestOperations(),
 		Adapters:             []Adapter{},
 		Assets:               assets,
-		HarnessTargets:       []HarnessTarget{},
+		HarnessTargets:       []HarnessTarget{portableTarget},
 
 		Tool: Tool{
 			Name:    root.Name(),
@@ -174,6 +221,46 @@ func Build(root *cobra.Command, build buildinfo.Info) (Manifest, error) {
 	m.ManifestDigest = digest
 
 	return m, nil
+}
+
+func portableLauncherTarget(assets []Asset) (HarnessTarget, error) {
+	digest := ""
+	for _, a := range assets {
+		if a.Path == PortableSkillAsset {
+			digest = "sha256:" + a.SHA256
+			break
+		}
+	}
+	if digest == "" {
+		return HarnessTarget{}, fmt.Errorf("manifest: required shipped asset %q is absent", PortableSkillAsset)
+	}
+	return HarnessTarget{
+		Name:             PortableTargetName,
+		Status:           "unverified",
+		Scope:            "workspace",
+		DiscoveryRoot:    ".agents/skills",
+		ProjectionRoot:   PortableProjectionRoot,
+		StampFile:        ProjectionStampFile,
+		ProjectionFormat: PortableProjectionFormat,
+		Components:       []string{"filesystem_skill"},
+		Artifact: Artifact{
+			Name:          "duo-delegation-loop",
+			MediaType:     "text/markdown",
+			SourceAsset:   PortableSkillAsset,
+			OutputPath:    PortableSkillFile,
+			ContentDigest: digest,
+		},
+		Launchers: cloneLaunchers(portableLaunchers),
+	}, nil
+}
+
+func cloneLaunchers(in []Launcher) []Launcher {
+	out := make([]Launcher, len(in))
+	for i, launcher := range in {
+		out[i] = launcher
+		out[i].TestedVersions = cloneStrings(launcher.TestedVersions)
+	}
+	return out
 }
 
 func cloneStrings(s []string) []string {

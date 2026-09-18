@@ -13,6 +13,7 @@ import (
 	"github.com/procrastivity/duo/internal/asset"
 
 	rootassets "github.com/procrastivity/duo/assets"
+	rootskills "github.com/procrastivity/duo/skills"
 )
 
 // walkAssets lists every file under the shipped assets/ tree with a sha256
@@ -66,22 +67,27 @@ func walkDiskDir(dir string) ([]Asset, bool, error) {
 
 func walkEmbedded() ([]Asset, error) {
 	var out []Asset
-	err := fs.WalkDir(rootassets.FS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || !isShippedAsset(path) {
+	walk := func(fsys fs.FS, prefix string) error {
+		return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() || !isShippedAsset(path) {
+				return nil
+			}
+			data, err := fs.ReadFile(fsys, path)
+			if err != nil {
+				return err
+			}
+			out = append(out, Asset{Path: prefix + path, SHA256: Checksum(data)})
 			return nil
-		}
-		data, err := rootassets.FS.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		out = append(out, Asset{Path: path, SHA256: Checksum(data)})
-		return nil
-	})
-	if err != nil {
+		})
+	}
+	if err := walk(rootassets.FS, ""); err != nil {
 		return nil, fmt.Errorf("manifest: walking embedded asset fallback: %w", err)
+	}
+	if err := walk(rootskills.FS, "skills/"); err != nil {
+		return nil, fmt.Errorf("manifest: walking embedded skill fallback: %w", err)
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })

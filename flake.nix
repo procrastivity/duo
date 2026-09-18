@@ -43,6 +43,9 @@
           postInstall = ''
             mkdir -p $out/share/duo
             cp -r assets $out/share/duo/assets
+            mkdir -p $out/share/duo/assets/skills/duo-delegation-loop
+            cp skills/duo-delegation-loop/SKILL.md \
+              $out/share/duo/assets/skills/duo-delegation-loop/SKILL.md
             # assets.go only exists so `assets/` can embed itself as the
             # binary's last-resort fallback; it is source, not a shipped
             # asset, and must not appear in the installed share tree.

@@ -163,6 +163,24 @@ var table = []Descriptor{
 		Milestone:      true,
 	},
 	{
+		Name:           "projection.install",
+		Projectability: LocalAdmin,
+		RequestSchema:  externalV1,
+		ResultSchema:   externalV1,
+		Permissions:    []string{"harness.manage"},
+		Idempotency:    IdempotencyNotApplicable,
+		Audit:          AuditNone,
+		CLI:            []string{"install", "portable-launchers"},
+		MCPTool:        "",
+		Route:          nil,
+		ErrorCodes: []string{
+			"invalid.precondition",
+			"projection.modified",
+			"projection.incompatible",
+			"projection.user_file_conflict",
+		},
+	},
+	{
 		// "config.migrate" is an authored operation name for the
 		// duo-vnext-installation-contract.md §1.3 `duo config migrate`
 		// verb (workplan Step 07). It is not a dogfood-milestone
@@ -498,6 +516,7 @@ var stableErrorCodes = map[string]ErrorClass{
 	"operation.unsupported":             "unsupported",
 	"operation.realization_unsupported": "unsupported",
 	"projection.component_unverified":   "unsupported",
+	"projection.incompatible":           "unsupported",
 	"lease.unsupported_topology":        "unsupported",
 
 	"operation.temporarily_unavailable": "unavailable",

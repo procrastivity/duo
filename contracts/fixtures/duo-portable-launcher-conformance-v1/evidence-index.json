@@ -1,0 +1,14 @@
+{
+  "schema": "duo.portable-launcher-conformance-evidence-index/v1",
+  "policy": "portable-launcher-evidence/v1",
+  "blobs": [
+    {
+      "ref": "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec",
+      "media_type": "application/json",
+      "bytes": 35348,
+      "sha256": "sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec",
+      "scrub_status": "pass",
+      "producer": "common_collector"
+    }
+  ]
+}
