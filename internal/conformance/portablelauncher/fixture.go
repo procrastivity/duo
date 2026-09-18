@@ -2,6 +2,7 @@ package portablelauncher
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/procrastivity/duo/internal/manifest"
 )
+
+const launcherPinRelativePath = "workspace/.duo-conformance/launcher-pin.json"
 
 // Artifact identifies one immutable executable used by a suite run.
 type Artifact struct {
@@ -76,9 +79,8 @@ func CheckSetupPrerequisites(in SetupInput) error {
 		}
 	}
 	if launcher, ok := in.Artifacts["launcher"]; ok {
-		want, accepted := AcceptedLauncherPin(launcher.Name)
-		if !accepted || launcher.Version != want.Version || launcher.Digest != want.Digest {
-			p.Add("launcher: exact accepted version and executable digest required")
+		if !validLauncherPin(LauncherPin{Name: launcher.Name, Version: launcher.Version, ExecutableSHA256: launcher.Digest}) {
+			p.Add("launcher: recognized name and exact per-run version and executable digest required")
 		}
 	}
 	if duo, ok := in.Artifacts["duo"]; ok {
@@ -208,9 +210,43 @@ func (f *Fixture) materialize(in SetupInput) error {
 	}
 	f.InstallationID = installed.InstallationID
 	for key, artifact := range in.Artifacts {
-		if err := copyFile(artifact.Path, filepath.Join(f.Root, "bin", artifact.Name), 0o700); err != nil {
+		destination := filepath.Join(f.Root, "bin", artifact.Name)
+		// Hash the run-owned copy rather than trusting the earlier source check:
+		// rolling launchers can self-update between prerequisite validation and
+		// this copy.
+		if err := copyPinnedArtifact(artifact.Path, destination, 0o700, artifact.Digest); err != nil {
 			return fmt.Errorf("copy %s: %w", key, err)
 		}
+	}
+	launcher := in.Artifacts["launcher"]
+	pinBytes, err := json.MarshalIndent(LauncherPin{Name: launcher.Name, Version: launcher.Version, ExecutableSHA256: launcher.Digest}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode run launcher pin: %w", err)
+	}
+	pinPath, err := f.Path(launcherPinRelativePath)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(pinPath, append(pinBytes, '\n'), 0o600); err != nil {
+		return fmt.Errorf("write run launcher pin: %w", err)
+	}
+	return nil
+}
+
+func validateCopiedArtifact(path, digest string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("copy is not a regular file")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if Digest(b) != digest {
+		return fmt.Errorf("copied executable digest mismatch")
 	}
 	return nil
 }
@@ -266,7 +302,7 @@ func validatePrivateTempDir(path string) (string, error) {
 	return resolved, nil
 }
 
-func copyFile(src, dst string, mode os.FileMode) error {
+func copyPinnedArtifact(src, dst string, mode os.FileMode, digest string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -276,7 +312,10 @@ func copyFile(src, dst string, mode os.FileMode) error {
 		return errors.Join(err, in.Close())
 	}
 	_, copyErr := io.Copy(out, in)
-	return errors.Join(copyErr, out.Close(), in.Close())
+	if err := errors.Join(copyErr, out.Close(), in.Close()); err != nil {
+		return err
+	}
+	return validateCopiedArtifact(dst, digest)
 }
 
 // ResourceInspector verifies that no run-owned resources remain active before

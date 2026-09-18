@@ -131,9 +131,15 @@ func validateDriverRequest(spec DriverSpec, r DriverRequest) error {
 	if err != nil {
 		return fmt.Errorf("driver run root must exist as a private directory")
 	}
-	want, ok := AcceptedLauncherPin(spec.Name)
-	if !ok {
+	if !RecognizedLauncher(spec.Name) {
 		return fmt.Errorf("driver names an unsupported launcher")
+	}
+	pin, err := loadRunLauncherPin(root)
+	if err != nil {
+		return err
+	}
+	if pin.Name != spec.Name {
+		return fmt.Errorf("driver launcher identity disagrees with setup")
 	}
 	for label, path := range map[string]string{"executable": spec.Executable, "workspace": r.Workspace, "scenario": r.ScenarioPath} {
 		resolved, resolveErr := filepath.EvalSymlinks(path)
@@ -149,7 +155,7 @@ func validateDriverRequest(spec DriverSpec, r DriverRequest) error {
 		return fmt.Errorf("driver executable is missing or not a regular file")
 	}
 	executable, err := os.ReadFile(spec.Executable)
-	if err != nil || Digest(executable) != want.Digest {
+	if err != nil || Digest(executable) != pin.ExecutableSHA256 {
 		return fmt.Errorf("driver executable does not match the pinned digest")
 	}
 	scenario, err := os.ReadFile(r.ScenarioPath)
@@ -167,6 +173,23 @@ func validateDriverRequest(spec DriverSpec, r DriverRequest) error {
 		}
 	}
 	return nil
+}
+
+func loadRunLauncherPin(root string) (LauncherPin, error) {
+	path := filepath.Join(root, filepath.FromSlash(launcherPinRelativePath))
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return LauncherPin{}, fmt.Errorf("driver run launcher identity is unavailable")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return LauncherPin{}, fmt.Errorf("driver read run launcher identity: %w", err)
+	}
+	var pin LauncherPin
+	if err := decodeStrict(data, &pin); err != nil || !validLauncherPin(pin) {
+		return LauncherPin{}, fmt.Errorf("driver run launcher identity is malformed")
+	}
+	return pin, nil
 }
 
 func validateRunOrigin(value string) error {

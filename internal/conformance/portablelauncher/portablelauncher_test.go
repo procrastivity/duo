@@ -35,7 +35,7 @@ func buildContractFixture(t *testing.T) builtFixture {
 	}
 	result := Result{
 		Schema:  ResultSchema,
-		Suite:   SuiteIdentity{Name: ScenarioName, Revision: 1, ManifestDigest: Digest(scenarioJSON), OracleDigest: OracleDigest()},
+		Suite:   SuiteIdentity{Name: ScenarioName, Revision: scenario.Revision, ManifestDigest: Digest(scenarioJSON), OracleDigest: OracleDigest()},
 		Run:     RunIdentity{RunID: "fixture-structural-blocked", ObservedAt: "2026-09-17T00:00:00Z", HostOS: "linux", HostArch: "x86_64", FixtureRoot: "$RUN"},
 		Pins:    fixturePins(),
 		Summary: Summary{Verdict: "fail", FirstFailedStage: stringPointer("launch"), FirstFailedCase: stringPointer("blocked")},
@@ -234,9 +234,8 @@ func duoEvidenceDocument(t *testing.T, id string, sequence int, actual map[strin
 }
 
 func fixturePins() Pins {
-	launcher, _ := AcceptedLauncherPin("amp")
 	return Pins{
-		Launcher:       LauncherPin{Name: "amp", Version: launcher.Version, ExecutableSHA256: launcher.Digest},
+		Launcher:       LauncherPin{Name: "amp", Version: "fixture-fresh-not-in-history", ExecutableSHA256: Digest([]byte("fixture launcher executable\n"))},
 		Duo:            DuoPin{Version: "fixture", Commit: fixtureDuoCommit, BuildDate: "2026-09-17T00:00:00Z", ExecutableSHA256: Digest([]byte("fixture duo executable\n"))},
 		Skill:          SkillPin{Name: SkillName, FormatVersion: SkillFormat, ContentDigest: SkillContentDigest, InstallationID: "fixture-installation"},
 		Config:         ConfigPin{Schema: "duo.config/v3", EffectiveDigest: Digest([]byte("fixture effective config\n"))},
@@ -319,6 +318,16 @@ func TestDeterministicConstantsAndScenarioMatrix(t *testing.T) {
 		assertDigest(t, data, want)
 	}
 	s := CanonicalScenario()
+	if s.Revision != ScenarioRevision || s.LauncherEligibility != LauncherEligibilityCapabilityEvidence || !reflect.DeepEqual(s.Launchers, []string{"amp", "opencode", "codex"}) {
+		t.Fatalf("scenario launcher policy = revision %d policy %q launchers %v", s.Revision, s.LauncherEligibility, s.Launchers)
+	}
+	scenarioJSON, err := ScenarioJSON(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytesContainsAny(scenarioJSON, []string{"executable_sha256", "0.0.1789675234-g2899fe", "1.18.31", "0.154.0"}) {
+		t.Fatalf("canonical scenario contains an exact outer-launcher allowlist: %s", scenarioJSON)
+	}
 	if len(s.Steps) != 32 {
 		t.Fatalf("stage/case rows = %d, want 32", len(s.Steps))
 	}
@@ -335,6 +344,47 @@ func TestDeterministicConstantsAndScenarioMatrix(t *testing.T) {
 	task := strings.ToLower(string(CanonicalTaskBytes))
 	if strings.Contains(task, "result") || strings.Contains(task, "verdict") || strings.Contains(task, "duo_conformance_result_path") {
 		t.Fatalf("canonical task assigns final-result ownership to the launcher: %q", CanonicalTaskBytes)
+	}
+}
+
+func bytesContainsAny(data []byte, values []string) bool {
+	for _, value := range values {
+		if strings.Contains(string(data), value) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestLauncherCapabilityEvidencePolicy(t *testing.T) {
+	freshDigest := Digest([]byte("fresh rolling launcher"))
+	for _, name := range []string{"amp", "opencode", "codex"} {
+		if !validLauncherPin(LauncherPin{Name: name, Version: "9999.fresh-not-in-history", ExecutableSHA256: freshDigest}) {
+			t.Errorf("fresh %s run identity was rejected", name)
+		}
+	}
+	for _, pin := range []LauncherPin{
+		{Name: "unknown", Version: "1", ExecutableSHA256: freshDigest},
+		{Name: "amp", Version: "", ExecutableSHA256: freshDigest},
+		{Name: "amp", Version: " 1 ", ExecutableSHA256: freshDigest},
+		{Name: "amp", Version: "1", ExecutableSHA256: ""},
+		{Name: "amp", Version: "1", ExecutableSHA256: "sha256:not-a-digest"},
+	} {
+		if validLauncherPin(pin) {
+			t.Errorf("malformed run identity was accepted: %#v", pin)
+		}
+	}
+}
+
+func TestCopiedArtifactMustMatchDeclaredRunDigest(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "launcher")
+	if err := os.WriteFile(source, []byte("rolling launcher bytes"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(t.TempDir(), "launcher")
+	err := copyPinnedArtifact(source, destination, 0o700, Digest([]byte("different declared bytes")))
+	if err == nil || !strings.Contains(err.Error(), "copied executable digest mismatch") {
+		t.Fatalf("copy mismatch error = %v", err)
 	}
 }
 
@@ -358,6 +408,9 @@ func TestOfflineValidatorRejectsContractDrift(t *testing.T) {
 		{"plugin enabled", "plugins, MCP", func(f *builtFixture) { f.Result.Run.PluginsEnabled = true }},
 		{"MCP enabled", "plugins, MCP", func(f *builtFixture) { f.Result.Run.MCPEnabled = true }},
 		{"unpinned identity", "pins.runtime", func(f *builtFixture) { f.Result.Pins.Runtime.ExecutableSHA256 = "" }},
+		{"unknown launcher", "pins.launcher", func(f *builtFixture) { f.Result.Pins.Launcher.Name = "unknown" }},
+		{"empty launcher version", "pins.launcher", func(f *builtFixture) { f.Result.Pins.Launcher.Version = "" }},
+		{"malformed launcher digest", "pins.launcher", func(f *builtFixture) { f.Result.Pins.Launcher.ExecutableSHA256 = "sha256:nope" }},
 		{"wrong current runtime", "Pi 0.83.0", func(f *builtFixture) { f.Result.Pins.Runtime.Version = "0.84.4" }},
 		{"wrong current host", "Herdr 0.8.2", func(f *builtFixture) { f.Result.Pins.Host.Version = "0.9.0" }},
 		{"missing assertions", "passing stage has 0 assertions", func(f *builtFixture) { f.Result.Stages[0].Assertions = nil }},
@@ -671,12 +724,11 @@ func prepareDriverFixture(t *testing.T, launcher string, script []byte) (string,
 			t.Fatal(err)
 		}
 	}
-	executable := filepath.Join(root, "bin", "fixture-launcher")
+	executable := filepath.Join(root, "bin", launcher)
 	if err := os.WriteFile(executable, script, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	acceptedLaunchers[launcher] = AcceptedLauncher{Version: "fixture", Digest: Digest(script)}
-	t.Cleanup(func() { delete(acceptedLaunchers, launcher) })
+	writeDriverLauncherPin(t, root, LauncherPin{Name: launcher, Version: "fixture-fresh-not-in-history", ExecutableSHA256: Digest(script)})
 	scenario, err := ScenarioJSON(CanonicalScenario())
 	if err != nil {
 		t.Fatal(err)
@@ -687,9 +739,60 @@ func prepareDriverFixture(t *testing.T, launcher string, script []byte) (string,
 	return root, DriverSpec{Name: launcher, Executable: executable, Arguments: []string{TaskArgument}}
 }
 
+func writeDriverLauncherPin(t *testing.T, root string, pin LauncherPin) {
+	t.Helper()
+	b, err := json.Marshal(pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(launcherPinRelativePath)), b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDriverRequiresRunLocalLauncherIdentity(t *testing.T) {
+	script := []byte("#!/bin/sh\nexit 0\n")
+	for _, name := range []string{"amp", "opencode", "codex"} {
+		t.Run("fresh_"+name, func(t *testing.T) {
+			root, spec := prepareDriverFixture(t, name, script)
+			if _, err := RunDriver(context.Background(), spec, RequestFromRunRoot(root, "123")); err != nil {
+				t.Fatalf("fresh recognized launcher rejected: %v", err)
+			}
+		})
+	}
+
+	tests := []struct {
+		name string
+		want string
+		edit func(string, *DriverSpec)
+	}{
+		{name: "unknown launcher", want: "unsupported launcher", edit: func(_ string, spec *DriverSpec) { spec.Name = "unknown" }},
+		{name: "malformed identity", want: "identity is malformed", edit: func(root string, _ *DriverSpec) {
+			writeDriverLauncherPin(t, root, LauncherPin{Name: "amp", ExecutableSHA256: Digest(script)})
+		}},
+		{name: "setup driver disagreement", want: "disagrees with setup", edit: func(root string, _ *DriverSpec) {
+			writeDriverLauncherPin(t, root, LauncherPin{Name: "codex", Version: "fresh", ExecutableSHA256: Digest(script)})
+		}},
+		{name: "copied binary digest mismatch", want: "pinned digest", edit: func(_ string, spec *DriverSpec) {
+			if err := os.WriteFile(spec.Executable, []byte("#!/bin/sh\nexit 9\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root, spec := prepareDriverFixture(t, "amp", script)
+			test.edit(root, &spec)
+			if _, err := RunDriver(context.Background(), spec, RequestFromRunRoot(root, "123")); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestRunOriginValidationRejectsBeforeLauncher(t *testing.T) {
 	script := []byte("#!/bin/sh\nprintf launched > launched\n")
-	root, spec := prepareDriverFixture(t, "fixture-invalid-origin", script)
+	root, spec := prepareDriverFixture(t, "amp", script)
 	t.Setenv(CommandRunOriginEnv, "987654321")
 	for _, test := range []struct {
 		name   string
@@ -736,7 +839,7 @@ func TestRecorderEnvironmentUsesExactRunConfiguration(t *testing.T) {
 
 func TestDriverEnvironmentCannotOverrideRecorderConfiguration(t *testing.T) {
 	script := []byte("#!/bin/sh\nprintf launched > launched\n")
-	root, spec := prepareDriverFixture(t, "fixture-recorder-override", script)
+	root, spec := prepareDriverFixture(t, "amp", script)
 	for _, key := range []string{CommandCaptureDirectoryEnv, CommandRunOriginEnv} {
 		t.Run(key, func(t *testing.T) {
 			request := RequestFromRunRoot(root, "123456789")
@@ -762,14 +865,13 @@ func TestRunDriverSucceedsWithoutResultFileOrResultPathEnvironment(t *testing.T)
 			t.Fatal(err)
 		}
 	}
-	executable := filepath.Join(root, "bin", "fixture-launcher")
+	executable := filepath.Join(root, "bin", "amp")
 	script := []byte("#!/bin/sh\nif [ \"${DUO_CONFORMANCE_RESULT_PATH+x}\" = x ]; then\n  printf 'unexpected result path\\n' >&2\n  exit 9\nfi\n[ \"$#\" -eq 1 ] || exit 8\nprintf '%s\\n%s\\n%s' \"$DUO_CONFORMANCE_COMMAND_CAPTURE_DIR\" \"$DUO_CONFORMANCE_RUN_ORIGIN_BOOTTIME_NS\" \"$1\"\n")
 	if err := os.WriteFile(executable, script, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	const launcher = "fixture-success"
-	acceptedLaunchers[launcher] = AcceptedLauncher{Version: "fixture", Digest: Digest(script)}
-	t.Cleanup(func() { delete(acceptedLaunchers, launcher) })
+	const launcher = "amp"
+	writeDriverLauncherPin(t, root, LauncherPin{Name: launcher, Version: "9999.rolling-fresh", ExecutableSHA256: Digest(script)})
 	scenario, err := ScenarioJSON(CanonicalScenario())
 	if err != nil {
 		t.Fatal(err)
@@ -807,14 +909,13 @@ func TestRunDriverPreservesStreamsFromFailedLauncher(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	executable := filepath.Join(root, "bin", "fixture-launcher")
+	executable := filepath.Join(root, "bin", "codex")
 	script := []byte("#!/bin/sh\nprintf 'event\\n'\nprintf 'stderr\\n' >&2\nexit 7\n")
 	if err := os.WriteFile(executable, script, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	const launcher = "fixture-failure"
-	acceptedLaunchers[launcher] = AcceptedLauncher{Version: "fixture", Digest: Digest(script)}
-	t.Cleanup(func() { delete(acceptedLaunchers, launcher) })
+	const launcher = "codex"
+	writeDriverLauncherPin(t, root, LauncherPin{Name: launcher, Version: "9999.rolling-fresh", ExecutableSHA256: Digest(script)})
 	scenario, err := ScenarioJSON(CanonicalScenario())
 	if err != nil {
 		t.Fatal(err)
@@ -903,6 +1004,11 @@ func TestPublicSchemaParsesAndIsClosed(t *testing.T) {
 	if !reflect.DeepEqual(gotIDs, wantIDs) {
 		t.Errorf("schema assertion enum = %v, oracle = %v", gotIDs, wantIDs)
 	}
+	suite := defs["suite"].(map[string]any)
+	revisions := suite["properties"].(map[string]any)["revision"].(map[string]any)["enum"].([]any)
+	if !reflect.DeepEqual(revisions, []any{float64(1), float64(2)}) {
+		t.Fatalf("result schema revisions = %v, want archived 1 and current 2", revisions)
+	}
 	for _, name := range []string{"result-structural-blocked.json", "result-rejected-fabricated-pass.json"} {
 		data, err := os.ReadFile(filepath.Join(fixtureDir, name))
 		if err != nil {
@@ -917,6 +1023,20 @@ func TestPublicSchemaParsesAndIsClosed(t *testing.T) {
 		if err := problems.Err(); err != nil {
 			t.Errorf("%s does not satisfy the public schema: %v", name, err)
 		}
+	}
+	archived := buildContractFixture(t)
+	archived.Result.Suite.Revision = 1
+	var archivedDocument any
+	if err := json.Unmarshal(marshalFixture(t, archived.Result), &archivedDocument); err != nil {
+		t.Fatal(err)
+	}
+	var archivedProblems Problems
+	validateSchemaNode(schema, schema, archivedDocument, "$", &archivedProblems)
+	if err := archivedProblems.Err(); err != nil {
+		t.Fatalf("archived revision-1 result is not schema-readable: %v", err)
+	}
+	if _, err := validateFixture(archived); err == nil || !strings.Contains(err.Error(), "wrong name or revision") {
+		t.Fatalf("current semantic validator accepted archived revision: %v", err)
 	}
 }
 

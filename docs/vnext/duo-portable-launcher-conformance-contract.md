@@ -29,6 +29,13 @@ the three launcher support claims still require live evidence.
   host. The repository-relative symlink target
   `../../skills/duo-delegation-loop` was also live-confirmed. The checkout did
   not itself contain `.agents/`.
+- The 2026-09-18 Amp Step 07 follow-up in
+  [`../../evidence/portable-launcher-conformance/step-07/attempt-02/report.md`](../../evidence/portable-launcher-conformance/step-07/attempt-02/report.md)
+  recorded Amp `0.0.1789724374-g0d2ed0` (released
+  `2026-09-18T09:39:34.000Z`, executable SHA-256
+  `7c45e90d54d8a46adf8069077341e85471c6bff3e2a881afc00f0ab35b188f91`)
+  passing installed-skill discovery and reachable/unreachable preflight. It did
+  not run the full launcher suite or establish launcher support.
 - `internal/asset` resolves shipped or embedded assets. `internal/manifest`
   declares and installs the `portable_launchers` target with the normative
   `duo.projection-stamp/v1` ownership record. Its older `Stamp` and `Drift`
@@ -147,9 +154,10 @@ The stamp is `duo.projection-stamp/v1` with this specialization:
   "projection_format": "duo.skill/duo-delegation-loop/v1",
   "target": {
     "harness": "portable_launchers",
-    "tested_version_range": "amp=0.0.1789675234-g2899fe;opencode=1.18.31;codex=0.154.0",
+    "tested_version_range": "amp=0.0.1789675234-g2899fe,0.0.1789724374-g0d2ed0;opencode=1.18.31;codex=0.154.0",
+    "launcher_eligibility": "capability_evidence",
     "launchers": [
-      {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe"]},
+      {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"]},
       {"name": "opencode", "tested_versions": ["1.18.31"]},
       {"name": "codex", "tested_versions": ["0.154.0"]}
     ]
@@ -170,13 +178,20 @@ The stamp is `duo.projection-stamp/v1` with this specialization:
 ```
 
 The `launchers` array is ordered `amp`, `opencode`, `codex`; `tested_versions`
-contains exact live pins, not inferred ranges. Stage 2 widens the existing
-stamp schema's `target.harness` enum to include `portable_launchers`, schemas
-the launcher rows, and adds the required closed `components` array. For this
-target it contains only `filesystem_skill`. Slash-separated stamp paths are
-relative to the projection root and must be clean, non-empty, non-absolute,
-and contain no `..`. An implementation must reject duplicate paths and any
-stamp that tries to claim the stamp itself or a path outside the root.
+is ordered historical tested-observation metadata, not an eligibility gate.
+`tested_version_range` is display metadata derived from those rows; it is not
+parsed as a range. `launcher_eligibility: capability_evidence` means every
+recognized launcher is eligible to run the current common suite with an exact
+per-run name, version, and copied-executable SHA-256, whether or not that
+version appears in history. The policy field is optional for backward reading:
+a valid older stamp without it remains current when its install-affecting skill
+identity matches. Stage 2 widens the existing stamp schema's `target.harness`
+enum to include `portable_launchers`, schemas the launcher rows, and adds the
+required closed `components` array. For this target it contains only
+`filesystem_skill`. Slash-separated stamp paths are relative to the projection
+root and must be clean, non-empty, non-absolute, and contain no `..`. An
+implementation must reject duplicate paths and any stamp that tries to claim
+the stamp itself or a path outside the root.
 
 ## 4. States, precedence, and non-destructive transitions
 
@@ -196,8 +211,8 @@ below prevents a mixed tree from receiving an optimistic state.
    This includes a stamped symlink where the product requires a copied regular
    file. No write is allowed. This specializes the general installation
    contract for a shared target with no singular harness executable: outer
-   launcher-version compatibility is evaluated separately against the
-   manifest pins and does not change ownership or byte drift.
+   launcher eligibility is evaluated separately from current capability
+   evidence and does not change ownership or byte drift.
 2. **`modified`** — a valid recognized stamp claims an existing regular file,
    but its bytes do not match the digest in that stamp. No write is allowed.
 3. **`unowned_conflict`** — an expected destination exists but no valid stamp
@@ -301,6 +316,7 @@ stable fields:
   "projection_root": ".agents/skills/duo-delegation-loop",
   "stamp_file": ".duo-generated.json",
   "projection_format": "duo.skill/duo-delegation-loop/v1",
+  "launcher_eligibility": "capability_evidence",
   "components": ["filesystem_skill"],
   "artifact": {
     "name": "duo-delegation-loop",
@@ -310,7 +326,7 @@ stable fields:
     "content_digest": "sha256:<64 lowercase hex>"
   },
   "launchers": [
-    {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe"]},
+    {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"]},
     {"name": "opencode", "tested_versions": ["1.18.31"]},
     {"name": "codex", "tested_versions": ["0.154.0"]}
   ]
@@ -327,13 +343,15 @@ wire compatibility.
 
 Stage 2 emits `unverified`: discovery is pinned and the filesystem component
 exists, but the full launch/send/observe suite has not passed. Stage 6 may
-change it to `supported` only after all three pinned launchers pass the common
-suite and the release matrix is sealed. Manifest status therefore cannot be
-mistaken for an end-to-end support claim.
+change it to `supported` only after all three recognized launchers pass the
+current common suite and the release matrix is sealed. Manifest status
+therefore cannot be mistaken for an end-to-end support claim.
 
-The manifest declares tested launcher pins, not installed launcher presence
-or live authority readiness. No hook, plugin, MCP component, terminal paste,
-or launcher-specific operation appears in this target.
+The manifest declares historical tested launcher observations, not an
+installed launcher allowlist, installed launcher presence, or live authority
+readiness. Eligibility is the single `capability_evidence` policy for Amp,
+OpenCode, and Codex. No hook, plugin, MCP component, terminal paste, or
+launcher-specific operation appears in this target.
 
 ## 6. Reachable local-authority preflight
 
@@ -557,15 +575,18 @@ allowed. Install and cleanup remain explicit write operations.
    writes the new stamp last.
 4. **Unknown/newer formats never downgrade.** An old Duo binary seeing an
    unknown projection format reports `incompatible` and writes nothing.
-5. **Product upgrades are digest-driven.** A changed product/manifest alone
-   makes an intact owned projection `stale`; a changed canonical skill digest
-   also makes it `stale`. Repair never needs a launcher-specific migration.
-6. **Launcher support is evidence-pinned.** The three exact versions in this
-   document are the initial supported matrix. A newer launcher is not assumed
-   compatible merely because it still finds `.agents/skills`; re-run live
-   discovery and the launcher-neutral suite, then append the exact version to
-   `tested_versions` without changing the skill format unless its consumed
-   contract changed.
+5. **Projection currency is payload-driven.** Product version, product-manifest
+   digest, launcher history, and launcher policy provenance do not make an
+   intact byte-identical projected skill stale. A changed source-skill or owned
+   file identity does. Ownership, path, and stamped file-digest checks remain
+   mandatory before this comparison.
+6. **Launcher support is capability-evidenced.** Amp, OpenCode, and Codex use
+   one policy. Every run captures an exact launcher version and executable
+   SHA-256, and setup, driver, and result must agree. A recognized newer version
+   may run without first changing compiled data; a pass is established only by
+   the current launcher-neutral suite. After observation, append its exact
+   version to ordered `tested_versions` as history without changing the skill
+   format unless its consumed contract changed.
 7. **The manual-install prose must converge.** When Stage 2 lands the
    installer, the normative skill and operator guidance must stop claiming
    that no renderer exists. Hand-managed Claude Code/Cursor instructions are
@@ -595,8 +616,9 @@ not end-to-end launcher conformance.
 
 ## 9. Conservative assumptions and open evidence
 
-- Exact launcher versions are deliberately pins rather than semantic ranges;
-  there is not enough live evidence to claim wider ranges.
+- Exact launcher versions and executable digests are immutable per-run
+  provenance. They are deliberately not semantic ranges or permanent compiled
+  eligibility pins; current capability evidence determines eligibility.
 - The current skill digest is retained as a baseline, while allowing Stage 2
   to update obsolete hand-install wording. The post-change digest becomes the
   identity everywhere in one commit.

@@ -107,7 +107,7 @@ func validateHeader(r Result, scenarioJSON []byte, p *Problems) {
 	if r.Schema != ResultSchema {
 		p.Add("schema: wrong result identity")
 	}
-	if r.Suite.Name != ScenarioName || r.Suite.Revision != 1 {
+	if r.Suite.Name != ScenarioName || r.Suite.Revision != ScenarioRevision {
 		p.Add("suite: wrong name or revision")
 	}
 	if r.Suite.ManifestDigest != Digest(scenarioJSON) {
@@ -134,9 +134,8 @@ func validateHeader(r Result, scenarioJSON []byte, p *Problems) {
 }
 
 func validatePins(v Pins, p *Problems) {
-	wantLauncher, ok := AcceptedLauncherPin(v.Launcher.Name)
-	if !ok || v.Launcher.Version != wantLauncher.Version || v.Launcher.ExecutableSHA256 != wantLauncher.Digest {
-		p.Add("pins.launcher: identity is absent or not an exact accepted pin")
+	if !validLauncherPin(v.Launcher) {
+		p.Add("pins.launcher: recognized name and exact per-run version and executable digest required")
 	}
 	if !validDuoPin(v.Duo) {
 		p.Add("pins.duo: incomplete or mismatched build identity")

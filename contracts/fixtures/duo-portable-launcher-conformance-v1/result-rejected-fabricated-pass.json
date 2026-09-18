@@ -2,8 +2,8 @@
   "schema": "duo.portable-launcher-conformance-result/v1",
   "suite": {
     "name": "portable-launcher-delegation",
-    "revision": 1,
-    "manifest_digest": "sha256:01e8e6bd80ceb441be6dc128aca023a1bede31b655e74b12ee3da0c2fc6cc204",
+    "revision": 2,
+    "manifest_digest": "sha256:b08b8a4f715137e60d098e725442f925f28b8b66970e3188428927ab447820d4",
     "oracle_digest": "sha256:a305744fc34af96b5bbd916b9de3aa1bc94f59ce4ea9316b62bb0a8dd5dd22c5"
   },
   "run": {
@@ -19,8 +19,8 @@
   "pins": {
     "launcher": {
       "name": "amp",
-      "version": "0.0.1789675234-g2899fe",
-      "executable_sha256": "sha256:f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee"
+      "version": "fixture-fresh-not-in-history",
+      "executable_sha256": "sha256:93ef9d19e92f0810712f646d1dfe7fe4cf8f65efa6ee31b515a920442b421e95"
     },
     "duo": {
       "version": "fixture",
@@ -108,7 +108,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -147,7 +147,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -186,7 +186,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -227,7 +227,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -266,7 +266,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -317,7 +317,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -356,7 +356,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -405,7 +405,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -446,7 +446,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -485,7 +485,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -522,7 +522,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -571,7 +571,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -610,7 +610,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -649,7 +649,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -698,7 +698,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -739,7 +739,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -780,7 +780,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -819,7 +819,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -870,7 +870,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -911,7 +911,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -960,7 +960,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1001,7 +1001,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1040,7 +1040,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1091,7 +1091,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1132,7 +1132,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1181,7 +1181,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1222,7 +1222,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1261,7 +1261,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1312,7 +1312,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1363,7 +1363,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1412,7 +1412,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     },
@@ -1455,7 +1455,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+        "blob:sha256:a6ab09d227a835c3fa20eebc20c86e09ea8a6926bd0cb75f13d71b47fe4d4e20"
       ],
       "error": null
     }

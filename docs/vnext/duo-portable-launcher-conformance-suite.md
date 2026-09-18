@@ -25,9 +25,12 @@ prompt socket, and `RuntimeReadyProvider`.
 
 ### 1.1 Accepted fixture matrix
 
-The following values are exact, not minimum versions or compatible ranges.
-A live capture with any other value is ineligible, even if an adapter can run
-it as `unverified`.
+The inner fixture, Duo/schema/skill identities, and every run's captured
+identities are exact, not minimum versions or compatible ranges. Outer
+launcher eligibility is different: the recognized names `amp`, `opencode`,
+and `codex` use `launcher_eligibility: capability_evidence`. Their historical
+observations are not a compiled allowlist; a fresh version is eligible to run
+the current suite when its exact version and executable SHA-256 are captured.
 
 | Component | Required identity | Source in this checkout |
 |---|---|---|
@@ -42,7 +45,7 @@ it as `unverified`.
 | Host adapter | adapter `herdr`, build `stage1`, conformance record `notes/19-herdr-probes.md@2026-08-23` | `internal/host/herdr/factory.go` |
 | Skill baseline | `duo.skill/duo-delegation-loop/v1@sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182` | `skills/duo-delegation-loop/SKILL.md` and the companion installation contract |
 | Inner model selection | provider `openai-codex`, model line `gpt-5.6-luna`; this is captured as fixture input, not represented as an adapter compatibility claim | existing v3 dogfood configuration in `evidence/dogfood/2026-08-24/duo.config.yaml` |
-| Outer launchers | Amp `0.0.1789675234-g2899fe`; OpenCode `1.18.31`; Codex CLI `0.154.0`, with the executable digests from Step 01 | `evidence/portable-launcher-conformance/step-01/probe-summary.json` |
+| Outer launchers | recognized names Amp, OpenCode, and Codex; exact name/version/executable SHA-256 immutable per run; ordered historical observations are Amp `0.0.1789675234-g2899fe`, Amp `0.0.1789724374-g0d2ed0`, OpenCode `1.18.31`, and Codex CLI `0.154.0` | current common-suite capability evidence; historical metadata originated in `evidence/portable-launcher-conformance/step-01/probe-summary.json` and the Amp follow-up in `evidence/portable-launcher-conformance/step-07/attempt-02/probe-summary.json` |
 
 The skill digest is a baseline. If Stage 2 changes its obsolete hand-install
 wording, the installed projection, manifest, doctor output, scenario
@@ -216,7 +219,9 @@ recording that failure, but may not rewrite it as success.
 
 ## 3. Ownership: one scenario and thin launcher drivers
 
-The canonical scenario is `portable-launcher-delegation/v1`. Its task text,
+The canonical scenario is `portable-launcher-delegation/v1`, current revision
+`2`. It declares `launcher_eligibility: capability_evidence` and the three
+recognized names, with no exact outer version/digest allowlist. Its task text,
 fixture manifest, state machine, executable action instructions, deadlines,
 assertions, and oracle live in the common suite. Every launcher receives the
 same bytes. Each stage names its executor, operation, argv template, allowed
@@ -224,11 +229,13 @@ auxiliary polling operations, and invocation cardinality. The task tells the
 outer agent only to load the shared `duo-delegation-loop` skill and execute
 the canonical scenario manifest in order. It does not ask the launcher to
 author a result or verdict; the common collector is the sole final-result
-authority.
+authority. The assertion oracle remains revision `1`: its evidence derivation
+and assertion semantics did not change; revision `2` is required only for the
+scenario's launcher-policy wire change.
 
 A per-launcher driver may do exactly four things:
 
-1. start the pinned outer launcher in `$RUN/workspace` with its isolated
+1. start the exact run-pinned outer launcher in `$RUN/workspace` with its isolated
    HOME/config and plugin/MCP-disabled flags;
 2. make the already installed canonical project skill visible through
    `.agents/skills/duo-delegation-loop` (the common installer owns its bytes);
@@ -249,6 +256,13 @@ missed step. The oracle reads captured Duo envelopes, the read-only authority
 projection, process/host evidence, and controller checkpoints. The launcher's
 self-reported `pass` field is never trusted.
 
+Setup validates the source launcher identity, copies the executable into
+`$RUN/bin`, hashes the copy after placement to close the rolling self-update
+race, and records that exact run pin for the thin driver. The driver rejects an
+unknown name, malformed pin, name disagreement, or copied-byte digest mismatch
+before execution. The authoritative result repeats the same pin, and common
+orchestration rejects any setup/result disagreement.
+
 ## 4. Versioned result contract
 
 Stage 2 must add a JSON Schema whose identity is
@@ -260,7 +274,7 @@ shape; prose fields may be added only by a v2 schema, not opportunistically.
   "schema": "duo.portable-launcher-conformance-result/v1",
   "suite": {
     "name": "portable-launcher-delegation",
-    "revision": 1,
+    "revision": 2,
     "manifest_digest": "sha256:<64 lowercase hex>",
     "oracle_digest": "sha256:<64 lowercase hex>"
   },
@@ -360,8 +374,12 @@ launcher tool events, controller checkpoints, and process identities. It
 does not keep raw vendor transcripts, reasoning, auth files, environment
 dumps, Herdr screen contents, or arbitrary launcher state.
 
-Offline validation requires all pin fields above, the exact outer executable
-identity from Step 01, the post-Stage-2 skill and manifest identities, every
+The v1 result schema remains structurally backward-readable for archived
+revision-1 fixtures, while current collection and semantic validation require
+canonical scenario revision 2 and its recomputed digest.
+
+Offline validation requires all pin fields above, the exact per-run outer
+executable identity, the post-Stage-2 skill and manifest identities, every
 required stage, monotonically increasing `sequence`, valid timing fields,
 blob hashes, schema-valid `duo.external/v1` envelopes, and a passing scrub
 record. Absolute fixture paths in blobs are rewritten to `$RUN`, `$HOME`,
@@ -707,9 +725,11 @@ The offline validator rejects the entire capture if any of these is true:
 3. **Launcher semantics:** a driver contains Duo command names, stage logic,
    expected text/digests, polling, retries, state induction, or result repair;
    task bytes or scenario/oracle digests differ between launchers.
-4. **Unpinned inputs:** exact launcher, Duo, skill, config, host triple,
-   runtime version/format/asset, model selection, external schema, or binary
-   digest is absent or differs. `unverified` compatibility is never pass.
+4. **Unpinned inputs:** the launcher name is unknown; its exact run version or
+   digest is malformed; setup, driver, copied bytes, and result disagree; or an
+   exact Duo, skill, config, host triple, runtime version/format/asset, model
+   selection, external schema, or binary digest is absent or differs. Absence
+   from historical `tested_versions` is not a rejection reason.
 5. **Forbidden integrations:** plugins or MCP are enabled, a fake/unfinished
    adapter appears, a user/production socket/store/workspace is touched, or
    credentials are missing and a fallback provider was selected.
@@ -775,7 +795,8 @@ outcome, stage attribution for every deadline, cleanup after each failure
 point, scrub rejection, binary/version drift, missing evidence, terminal
 paste, launcher-semantic contamination, duplicate effects, and fabricated
 passes. Live launcher evidence remains for Stages 3–5; Stage 2 must not embed
-launcher inference in ordinary unit tests.
+launcher-specific inference in ordinary unit tests. It does test the common
+capability policy uniformly for Amp, OpenCode, and Codex.
 
 ## 12. Decision summary
 
@@ -787,6 +808,9 @@ launcher inference in ordinary unit tests.
 - One scenario/oracle/result schema for all outer launchers; drivers only
   launch, submit, and capture raw events/stderr. The common collector alone
   authors the final result.
+- One outer-launcher policy: recognized names are admitted by current
+  capability evidence, while exact version and copied-executable digest remain
+  immutable run provenance and historical observations remain metadata.
 - Exact delivery, semantic observation, exit, timeout, authority-restart, and
   asymmetric idempotency assertions are grounded in current operations and
   fixtures, including effect and retry semantics.

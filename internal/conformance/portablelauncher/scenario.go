@@ -24,15 +24,16 @@ var (
 
 // Scenario is the launcher-neutral ordered conformance contract.
 type Scenario struct {
-	Schema        string                      `json:"schema"`
-	Name          string                      `json:"name"`
-	Revision      int                         `json:"revision"`
-	TaskDigest    string                      `json:"task_digest"`
-	Fixture       ScenarioFixture             `json:"fixture"`
-	Prerequisites []Prerequisite              `json:"prerequisites"`
-	Launchers     map[string]AcceptedLauncher `json:"launchers"`
-	DeadlinesMS   map[string]int64            `json:"deadlines_ms"`
-	Steps         []StepSpec                  `json:"steps"`
+	Schema              string           `json:"schema"`
+	Name                string           `json:"name"`
+	Revision            int              `json:"revision"`
+	TaskDigest          string           `json:"task_digest"`
+	Fixture             ScenarioFixture  `json:"fixture"`
+	Prerequisites       []Prerequisite   `json:"prerequisites"`
+	LauncherEligibility string           `json:"launcher_eligibility"`
+	Launchers           []string         `json:"launchers"`
+	DeadlinesMS         map[string]int64 `json:"deadlines_ms"`
+	Steps               []StepSpec       `json:"steps"`
 }
 
 // ScenarioFixture describes the deterministic workspace and runtime inputs.
@@ -122,7 +123,7 @@ func CanonicalScenario() Scenario {
 	s := Scenario{
 		Schema:     ScenarioSchema,
 		Name:       ScenarioName,
-		Revision:   1,
+		Revision:   ScenarioRevision,
 		TaskDigest: Digest(CanonicalTaskBytes),
 		Fixture: ScenarioFixture{
 			Workspace: "$WORKSPACE", ConfigPath: "$RUN/xdg/config/duo/duo.config.yaml",
@@ -143,8 +144,9 @@ func CanonicalScenario() Scenario {
 			{Name: "timeout_induction_socket_probe", Status: "required", PreSetup: false},
 			{Name: "supported_admitted_then_blocked_producer", Status: "unavailable", PreSetup: false},
 		},
-		Launchers:   cloneLauncherPins(),
-		DeadlinesMS: cloneDeadlines(),
+		LauncherEligibility: LauncherEligibilityCapabilityEvidence,
+		Launchers:           []string{"amp", "opencode", "codex"},
+		DeadlinesMS:         cloneDeadlines(),
 	}
 	sequence := 0
 	for _, group := range caseMatrix {
@@ -231,14 +233,6 @@ func registeredOperationName(cli ...string) string {
 		}
 	}
 	panic(fmt.Sprintf("portable launcher scenario: no registered operation for CLI path %v", cli))
-}
-
-func cloneLauncherPins() map[string]AcceptedLauncher {
-	out := make(map[string]AcceptedLauncher, len(acceptedLaunchers))
-	for name, pin := range acceptedLaunchers {
-		out[name] = pin
-	}
-	return out
 }
 
 func cloneDeadlines() map[string]int64 {

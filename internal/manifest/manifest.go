@@ -60,16 +60,17 @@ type Adapter struct {
 // duo.manifest/v1 contract's "harness_targets" array. Build currently emits
 // the one launcher-neutral portable skill target.
 type HarnessTarget struct {
-	Name             string     `json:"name"`
-	Status           string     `json:"status"`
-	Scope            string     `json:"scope"`
-	DiscoveryRoot    string     `json:"discovery_root"`
-	ProjectionRoot   string     `json:"projection_root"`
-	StampFile        string     `json:"stamp_file"`
-	ProjectionFormat string     `json:"projection_format"`
-	Components       []string   `json:"components"`
-	Artifact         Artifact   `json:"artifact"`
-	Launchers        []Launcher `json:"launchers"`
+	Name                string     `json:"name"`
+	Status              string     `json:"status"`
+	Scope               string     `json:"scope"`
+	DiscoveryRoot       string     `json:"discovery_root"`
+	ProjectionRoot      string     `json:"projection_root"`
+	StampFile           string     `json:"stamp_file"`
+	ProjectionFormat    string     `json:"projection_format"`
+	LauncherEligibility string     `json:"launcher_eligibility"`
+	Components          []string   `json:"components"`
+	Artifact            Artifact   `json:"artifact"`
+	Launchers           []Launcher `json:"launchers"`
 }
 
 // Artifact is the public identity and placement of a target payload.
@@ -81,7 +82,8 @@ type Artifact struct {
 	ContentDigest string `json:"content_digest"`
 }
 
-// Launcher records one exact launcher-version evidence set.
+// Launcher records ordered historical tested observations for one launcher.
+// Current eligibility is declared separately by LauncherEligibility.
 type Launcher struct {
 	Name           string   `json:"name"`
 	TestedVersions []string `json:"tested_versions"`
@@ -235,14 +237,15 @@ func portableLauncherTarget(assets []Asset) (HarnessTarget, error) {
 		return HarnessTarget{}, fmt.Errorf("manifest: required shipped asset %q is absent", PortableSkillAsset)
 	}
 	return HarnessTarget{
-		Name:             PortableTargetName,
-		Status:           "unverified",
-		Scope:            "workspace",
-		DiscoveryRoot:    ".agents/skills",
-		ProjectionRoot:   PortableProjectionRoot,
-		StampFile:        ProjectionStampFile,
-		ProjectionFormat: PortableProjectionFormat,
-		Components:       []string{"filesystem_skill"},
+		Name:                PortableTargetName,
+		Status:              "unverified",
+		Scope:               "workspace",
+		DiscoveryRoot:       ".agents/skills",
+		ProjectionRoot:      PortableProjectionRoot,
+		StampFile:           ProjectionStampFile,
+		ProjectionFormat:    PortableProjectionFormat,
+		LauncherEligibility: LauncherEligibilityCapabilityEvidence,
+		Components:          []string{"filesystem_skill"},
 		Artifact: Artifact{
 			Name:          "duo-delegation-loop",
 			MediaType:     "text/markdown",

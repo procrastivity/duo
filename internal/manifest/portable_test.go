@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -89,16 +90,22 @@ func TestPortableManifestTargetAndAssetIdentity(t *testing.T) {
 	if target.DiscoveryRoot != ".agents/skills" || target.ProjectionRoot != PortableProjectionRoot || target.StampFile != ProjectionStampFile {
 		t.Fatalf("target paths = %#v", target)
 	}
+	if target.LauncherEligibility != LauncherEligibilityCapabilityEvidence {
+		t.Fatalf("launcher eligibility = %q", target.LauncherEligibility)
+	}
 	if !reflect.DeepEqual(target.Components, []string{"filesystem_skill"}) {
 		t.Fatalf("components = %v", target.Components)
 	}
 	wantLaunchers := []Launcher{
-		{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe"}},
+		{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"}},
 		{Name: "opencode", TestedVersions: []string{"1.18.31"}},
 		{Name: "codex", TestedVersions: []string{"0.154.0"}},
 	}
 	if !reflect.DeepEqual(target.Launchers, wantLaunchers) {
 		t.Fatalf("launchers = %#v", target.Launchers)
+	}
+	if got := testedVersionDisplay(target.Launchers); got != "amp=0.0.1789675234-g2899fe,0.0.1789724374-g0d2ed0;opencode=1.18.31;codex=0.154.0" {
+		t.Fatalf("tested version display = %q", got)
 	}
 	authored, err := os.ReadFile(filepath.Join("..", "..", "skills", "duo-delegation-loop", "SKILL.md"))
 	if err != nil {
@@ -177,6 +184,35 @@ func TestPortableFreshCurrentIdempotentAndByteIdentical(t *testing.T) {
 	stampAfter, _ := os.ReadFile(filepath.Join(portableRoot(workspace), ProjectionStampFile))
 	if second.Changed || second.InstallationID != first.InstallationID || !bytes.Equal(stampBefore, stampAfter) {
 		t.Fatalf("current install was not an exact no-op: %#v", second)
+	}
+}
+
+func TestPortableCurrentIgnoresHistoricalAndProvenanceMetadata(t *testing.T) {
+	workspace := t.TempDir()
+	m := portableTestManifest(t)
+	if _, err := InstallPortableLaunchers(workspace, false, m); err != nil {
+		t.Fatal(err)
+	}
+	stamp := loadStamp(t, workspace)
+	stamp.ProductVersion = "historical-product-version"
+	stamp.ManifestDigest = "sha256:" + strings.Repeat("a", 64)
+	stamp.Target.TestedVersionRange = "historical-display-only"
+	stamp.Target.Launchers = []Launcher{
+		{Name: "amp", TestedVersions: []string{"brand-new-observation", "older-observation"}},
+		{Name: "opencode", TestedVersions: []string{"another-observation"}},
+		{Name: "codex", TestedVersions: []string{"yet-another-observation"}},
+	}
+	stamp.Target.LauncherEligibility = "" // Legacy v1 stamp before the optional policy field.
+	saveStamp(t, workspace, stamp)
+	if got := inspectState(t, workspace, m); got != StateCurrent {
+		t.Fatalf("history/provenance-only changes made identical payload %s", got)
+	}
+
+	stamp = loadStamp(t, workspace)
+	stamp.SourceAssets[0].Digest = "sha256:" + strings.Repeat("b", 64)
+	saveStamp(t, workspace, stamp)
+	if got := inspectState(t, workspace, m); got != StateStale {
+		t.Fatalf("source skill identity drift state = %s, want stale", got)
 	}
 }
 
@@ -389,7 +425,7 @@ func TestPortablePlainVersusRepairAndPreservation(t *testing.T) {
 	}
 
 	stamp = loadStamp(t, workspace)
-	stamp.ManifestDigest = "sha256:" + string(bytes.Repeat([]byte("a"), 64))
+	stamp.SourceAssets[0].Digest = "sha256:" + string(bytes.Repeat([]byte("a"), 64))
 	saveStamp(t, workspace, stamp)
 	if got := inspectState(t, workspace, m); got != StateStale {
 		t.Fatalf("stale state = %s", got)
@@ -418,6 +454,7 @@ func TestPortableRejectsUnsafeDuplicateAndSymlinkStampedPaths(t *testing.T) {
 		{name: "duplicate", mutate: func(s *ProjectionStamp) { s.Files = append(s.Files, s.Files[0]) }},
 		{name: "stamp_claim", mutate: func(s *ProjectionStamp) { s.Files[0].Path = ProjectionStampFile }},
 		{name: "source_stamp_claim", mutate: func(s *ProjectionStamp) { s.SourceAssets[0].Path = ProjectionStampFile }},
+		{name: "unknown_launcher_policy", mutate: func(s *ProjectionStamp) { s.Target.LauncherEligibility = "version_allowlist" }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
