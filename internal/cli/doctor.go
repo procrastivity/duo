@@ -5,27 +5,34 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/procrastivity/duo/internal/adapter"
 
+	"github.com/procrastivity/duo/internal/buildinfo"
 	"github.com/procrastivity/duo/internal/cliflags"
 	"github.com/procrastivity/duo/internal/config"
 	"github.com/procrastivity/duo/internal/doctor"
 	"github.com/procrastivity/duo/internal/domain"
+	"github.com/procrastivity/duo/internal/domain/storerepo"
 	"github.com/procrastivity/duo/internal/duoerr"
 	hostfake "github.com/procrastivity/duo/internal/host/fake"
 	"github.com/procrastivity/duo/internal/host/herdr"
 	"github.com/procrastivity/duo/internal/iostreams"
 	"github.com/procrastivity/duo/internal/launch"
 	"github.com/procrastivity/duo/internal/launch/materialize"
+	"github.com/procrastivity/duo/internal/manifest"
 	runtimedevin "github.com/procrastivity/duo/internal/runtime/devin"
 	runtimefake "github.com/procrastivity/duo/internal/runtime/fake"
 	"github.com/procrastivity/duo/internal/scrub"
+	"github.com/procrastivity/duo/internal/store"
 	"github.com/procrastivity/duo/internal/surface"
 )
 
@@ -60,15 +67,14 @@ func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 }
 
 // doctorCommand constructs the `duo doctor` verb: internal/registry's
-// "doctor.run" operation, CLI path {"doctor"}. Step 10 wired the core
-// checks — authority-store health and the registered-adapters section;
-// docs/doctor/decisions.md records what a later step still owes
-// (generated-artifact drift, harness trust, live socket checks).
+// "doctor.run" operation, CLI path {"doctor"}. It preserves the original
+// authority, adapter, and visibility sections and adds the portable-launcher
+// readiness contract as a stable top-level sibling.
 //
-// The visibility rail is a diagnostic read. The harness-directory sweep
-// (notes/51 9a) is the one filesystem write: it deletes orphan close-on-exit
-// dirs whose launch-resolution id is not live. It does not write the
-// authority store and does not dial a socket (I-3).
+// The visibility rail and launcher preflight are diagnostic reads. Harness
+// directories are reported but never reaped; the authority opens through
+// SQLite mode=ro; projection inspection never repairs; the only live request
+// is a bounded, non-mutating ping to the selected host.
 //
 // Step 15 (config-v3) adds the visibility rail: the cwd workspace's (or
 // --workspace's) current host correlation, what M1 would deduce right now
@@ -87,8 +93,12 @@ func registeredAdapters(cmd *cobra.Command) []doctor.Adapter {
 // --store-path flag, which no spec for this step asks for. The launch
 // config path resolves the same way session.launch's own default does
 // (defaultLaunchConfigPath, session_launch.go).
-func doctorCommand(streams *iostreams.Streams) *cobra.Command {
-	var workspace string
+func doctorCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Command {
+	var (
+		workspace  string
+		configPath string
+		hostFlag   string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "doctor",
@@ -109,39 +119,69 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 
 			base := doctor.Run(storePath, registeredAdapters(cmd))
 
-			root, err := workspaceRoot(workspace)
-			if err != nil {
-				return err
-			}
+			root, workspaceStatus, workspaceErr := doctorWorkspace(workspace)
 
-			// openReadAuthority never creates a store that was not already
-			// there (session.go), the same "a missing store is not an
-			// error" discipline doctor.Run's own probeStore applies — a
-			// fresh installation reports an unbound workspace and no
-			// standing provider facts, not a freshly-created database.
-			a, closer, err := openReadAuthority(cmd.Context())
-			if err != nil {
-				return err
+			// Doctor has a stricter read seam than ordinary legacy read
+			// commands: SQLite mode=ro, no migration, and no lease. A replay
+			// failure becomes an authority finding while the remaining
+			// independent checks continue against an empty read model.
+			a, closer, replayErr := openDoctorAuthority(cmd.Context(), storePath)
+			if replayErr != nil {
+				base.Store.Healthy = false
+				if base.Store.Error == "" {
+					base.Store.Error = replayErr.Error()
+				}
+				a, err = emptyDoctorAuthority(cmd.Context())
+				if err != nil {
+					return duoerr.New("internal.authority_open_failed", fmt.Sprintf("opening fallback diagnostic authority: %v", err))
+				}
+				closer = nopCloser{}
 			}
 			defer func() { _ = closer.Close() }()
 
-			configPath, err := defaultLaunchConfigPath()
-			if err != nil {
-				return duoerr.New("internal.config_path_unresolved", fmt.Sprintf("resolving the default duo.config path: %v", err))
+			selectedConfigPath := configPath
+			if selectedConfigPath == "" {
+				selectedConfigPath, err = defaultLaunchConfigPath()
+				if err != nil {
+					return duoerr.New("internal.config_path_unresolved", fmt.Sprintf("resolving the default duo.config path: %v", err))
+				}
 			}
-			configSection, policy := doctorConfigStatus(configPath)
+			selectedConfigPath, err = filepath.Abs(selectedConfigPath)
+			if err != nil {
+				return duoerr.New("internal.config_path_unresolved", fmt.Sprintf("resolving the selected duo.config path: %v", err))
+			}
+			selectedConfigPath = filepath.Clean(selectedConfigPath)
+			configSection, policy, configDoc := doctorConfigStatus(selectedConfigPath)
 
-			deduction := doctorHostDeduction(cmd.Context(), a, root, policy)
+			deduction := doctorHostDeduction(cmd.Context(), a, root, hostFlag, policy)
 			harnessRoot, err := doctor.DefaultHarnessRoot()
 			if err != nil {
 				return duoerr.New("internal.doctor_harness_path_unresolved", fmt.Sprintf("resolving the harness directory: %v", err))
 			}
-			sweep, err := doctor.SweepHarnessDirs(harnessRoot, keepLiveHarness(a))
+			sweep, err := doctor.InspectHarnessDirs(harnessRoot, keepLiveHarness(a))
 			if err != nil {
-				return duoerr.New("internal.doctor_harness_sweep_failed", fmt.Sprintf("reaping orphan harness directories: %v", err))
+				sweep = doctor.HarnessSweep{IDs: []string{}, ReadOnly: true, Error: err.Error()}
+			}
+
+			m, err := manifest.Build(cmd.Root(), build)
+			if err != nil {
+				return duoerr.New("internal.manifest_build_failed", fmt.Sprintf("building the diagnostic manifest: %v", err))
+			}
+			preflight := doctorLauncherPreflight(cmd.Context(), doctorPreflightInput{
+				Build: build, Store: base.Store, ReplayError: replayErr,
+				ConfigPath: selectedConfigPath, ConfigSection: configSection, Config: configDoc,
+				Workspace: workspaceStatus, WorkspaceError: workspaceErr,
+				Deduction: deduction, Manifest: m,
+			})
+			if workspaceErr != nil {
+				// Legacy sections remain useful and shape-compatible. They use
+				// the selected (possibly invalid) absolute path but do not turn
+				// workspace invalidity into a command-level failure.
+				deduction.Detail = workspaceErr.Error()
 			}
 			report := doctorReport{
 				Report:              base,
+				LauncherPreflight:   preflight,
 				HostBinding:         doctorHostBinding(a, root),
 				HostDeduction:       deduction,
 				Providers:           doctorProviders(a),
@@ -166,6 +206,8 @@ func doctorCommand(streams *iostreams.Streams) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&workspace, "workspace", "", "workspace root path (defaults to the current directory)")
+	cmd.Flags().StringVar(&configPath, "config", "", "path to the duo.config/v3 document (defaults to $XDG_CONFIG_HOME/duo/duo.config.yaml)")
+	cmd.Flags().StringVar(&hostFlag, "host", "", `the session host to diagnose, "<kind>" or "<kind>:<instance>", using launch precedence`)
 	surface.Annotate(cmd, surface.Plumbing)
 	return cmd
 }
@@ -177,6 +219,7 @@ func humanReport(report doctorReport) string {
 	var b strings.Builder
 
 	b.WriteString("duo doctor\n")
+	writeLauncherPreflightSection(&b, report.LauncherPreflight)
 	fmt.Fprintf(&b, "  store: %s\n", report.Store.Path)
 	switch {
 	case !report.Store.Present:
@@ -228,12 +271,15 @@ func humanReport(report doctorReport) string {
 			report.RecoveringInstances, noun)
 	}
 
-	if report.HarnessSweep.Reaped > 0 {
+	if report.HarnessSweep.Orphaned > 0 {
 		noun := "directories"
-		if report.HarnessSweep.Reaped == 1 {
+		if report.HarnessSweep.Orphaned == 1 {
 			noun = "directory"
 		}
-		fmt.Fprintf(&b, "  harness: reaped %d orphan %s\n", report.HarnessSweep.Reaped, noun)
+		fmt.Fprintf(&b, "  harness: found %d orphan %s (read-only; nothing reaped)\n", report.HarnessSweep.Orphaned, noun)
+	}
+	if report.HarnessSweep.Error != "" {
+		fmt.Fprintf(&b, "  harness: inspection unavailable (%s)\n", report.HarnessSweep.Error)
 	}
 
 	return b.String()
@@ -267,6 +313,7 @@ func humanReport(report doctorReport) string {
 // an additive top-level key, never a rename.
 type doctorReport struct {
 	doctor.Report
+	LauncherPreflight   doctor.LauncherPreflight   `json:"launcher_preflight"`
 	HostBinding         workspaceHostShowResult    `json:"host_binding"`
 	HostDeduction       doctorHostDeductionSection `json:"host_deduction"`
 	Providers           []doctorProviderStanding   `json:"providers"`
@@ -277,15 +324,31 @@ type doctorReport struct {
 	// no host was deduced / the listener environ could not be observed.
 	// Doctor warns; launch still refuses.
 	ScrubGate *doctorScrubGateWarning `json:"scrub_gate,omitempty"`
-	// HarnessSweep is the notes/51 9a reaper: directories under
-	// $XDG_DATA_HOME/duo/harness/<lrr>/ whose launch-resolution id has no
-	// matching live (non-terminal) runtime instance, including dirs whose
-	// launch never committed a record. Filesystem-only; no socket dial.
+	// HarnessSweep preserves the legacy key while now carrying a read-only
+	// inspection: orphan directories are named but Reaped remains zero.
 	HarnessSweep doctor.HarnessSweep `json:"harness_sweep"`
 	// DevinProjection is the launch-workspace hook projection and its
 	// session-start drift status. It is additive so existing doctor readers
 	// keep their store/adapters and visibility sections unchanged.
 	DevinProjection runtimedevin.ProjectionInspection `json:"devin_projection"`
+}
+
+func writeLauncherPreflightSection(b *strings.Builder, p doctor.LauncherPreflight) {
+	status := strings.ReplaceAll(p.Status, "_", " ")
+	fmt.Fprintf(b, "launcher preflight: %s\n", status)
+	for _, check := range p.Checks {
+		label := strings.ReplaceAll(check.Status, "_", " ")
+		fmt.Fprintf(b, "[%s] %s: %s", label, check.ID, check.Summary)
+		if check.ID == doctor.CheckSkillProjection {
+			fmt.Fprintf(b, " (state=%s, identity=%s@%s, file=%s)",
+				p.SkillProjection.State, p.SkillProjection.FormatVersion,
+				p.SkillProjection.ContentDigest, p.SkillProjection.File)
+		}
+		b.WriteByte('\n')
+		if check.Required && check.Status != "pass" && check.Action != "" {
+			fmt.Fprintf(b, "  action: %s\n", check.Action)
+		}
+	}
 }
 
 // doctorHostDeductionSection is what M1 would deduce right now for the
@@ -555,7 +618,7 @@ func doctorDevinProjection(a *domain.Authority, root string) runtimedevin.Projec
 // launch would deduce, and a doctor that deduced from a smaller set of
 // inputs than the launcher would report a different answer than the one
 // the operator is about to get.
-func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, policy config.SessionHostPolicy) doctorHostDeductionSection {
+func doctorHostDeduction(ctx context.Context, a *domain.Authority, root, hostFlag string, policy config.SessionHostPolicy) doctorHostDeductionSection {
 	section := doctorHostDeductionSection{
 		OutrankedEvidence: []doctorOutrankedEvidence{},
 		Ranking:           doctorRanking(),
@@ -563,6 +626,7 @@ func doctorHostDeduction(ctx context.Context, a *domain.Authority, root string, 
 
 	result, mErr := materialize.Materialize(ctx, materialize.Options{
 		WorkspaceFlag: root,
+		HostFlag:      hostFlag,
 		Policy:        policy,
 		Correlations:  a,
 		Providers:     a,
@@ -663,10 +727,11 @@ func doctorScrubGate(d doctorHostDeductionSection) *doctorScrubGateWarning {
 	}
 }
 
-// keepLiveHarness is the doctor sweep's keep predicate: a harness directory
+// keepLiveHarness is the doctor inspection's keep predicate: a harness directory
 // named for a launch-resolution id stays only when that id still has a
 // committed record whose minted runtime instance is not terminal. No record
-// (a refused launch, or any dir whose launch never committed) is reaped.
+// (a refused launch, or any dir whose launch never committed) is reported
+// orphaned, never reaped.
 // Terminal is InstanceState.Terminal — exited — not the recovering view
 // Open() derives on every load, which would otherwise reap every live
 // session the moment doctor opened the store. Session.Current is not
@@ -708,30 +773,30 @@ func doctorProviders(a *domain.Authority) []doctorProviderStanding {
 // treats an empty SessionHostPolicy as "no enabled kind" at the
 // policy-default rung, which is the honest answer when there is no policy
 // to read.
-func doctorConfigStatus(path string) (doctorConfigSection, config.SessionHostPolicy) {
+func doctorConfigStatus(path string) (doctorConfigSection, config.SessionHostPolicy, config.DocumentV3) {
 	section := doctorConfigSection{Path: path}
 
 	if _, statErr := os.Stat(path); errors.Is(statErr, os.ErrNotExist) {
 		section.Schema = "missing"
 		section.Detail = fmt.Sprintf("no config file at %s", path)
-		return section, config.SessionHostPolicy{}
+		return section, config.SessionHostPolicy{}, config.DocumentV3{}
 	} else if statErr != nil {
 		section.Schema = "unreadable"
 		section.Detail = statErr.Error()
-		return section, config.SessionHostPolicy{}
+		return section, config.SessionHostPolicy{}, config.DocumentV3{}
 	}
 
 	doc, err := config.LoadV3(path)
 	if err == nil {
 		section.Schema = config.SchemaV3
-		return section, doc.SessionHosts
+		return section, doc.SessionHosts, doc
 	}
 
 	de, ok := err.(*duoerr.Error)
 	if !ok {
 		section.Schema = "unreadable"
 		section.Detail = err.Error()
-		return section, config.SessionHostPolicy{}
+		return section, config.SessionHostPolicy{}, config.DocumentV3{}
 	}
 
 	switch de.Code {
@@ -755,5 +820,318 @@ func doctorConfigStatus(path string) (doctorConfigSection, config.SessionHostPol
 		section.Schema = "unreadable"
 		section.Detail = de.Message
 	}
-	return section, config.SessionHostPolicy{}
+	return section, config.SessionHostPolicy{}, config.DocumentV3{}
+}
+
+// doctorWorkspace applies launch's --workspace > cwd precedence, then makes
+// the selected path absolute and clean for the preflight wire report.
+func doctorWorkspace(requested string) (string, doctor.WorkspacePreflight, error) {
+	status := doctor.WorkspacePreflight{RequestedPath: requested, Source: "cwd"}
+	if requested != "" {
+		status.Source = "flag"
+	}
+	selected, err := workspaceRoot(requested)
+	if err != nil {
+		return "", status, err
+	}
+	selected, err = filepath.Abs(selected)
+	if err != nil {
+		return "", status, fmt.Errorf("resolving selected workspace %q: %w", selected, err)
+	}
+	selected = filepath.Clean(selected)
+	status.SelectedPath = selected
+	info, err := os.Stat(selected)
+	if err != nil {
+		return selected, status, fmt.Errorf("workspace %q is not locally accessible: %w", selected, err)
+	}
+	status.Exists = true
+	status.Directory = info.IsDir()
+	if !status.Directory {
+		return selected, status, fmt.Errorf("workspace %q is not a directory", selected)
+	}
+	return selected, status, nil
+}
+
+// openDoctorAuthority is diagnosis's zero-write authority seam. Unlike the
+// older general read helper it cannot create/migrate a database because the
+// SQLite handle itself is mode=ro.
+func openDoctorAuthority(ctx context.Context, path string) (*domain.Authority, io.Closer, error) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		a, openErr := emptyDoctorAuthority(ctx)
+		return a, nopCloser{}, openErr
+	} else if err != nil {
+		return nil, nil, err
+	}
+	s, err := store.OpenReadOnly(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	a, err := domain.Open(ctx, storerepo.New(s))
+	if err != nil {
+		_ = s.Close()
+		return nil, nil, fmt.Errorf("replaying authority store: %w", err)
+	}
+	return a, s, nil
+}
+
+func emptyDoctorAuthority(ctx context.Context) (*domain.Authority, error) {
+	return domain.Open(ctx, emptyRepository{})
+}
+
+type doctorPreflightInput struct {
+	Build          buildinfo.Info
+	Store          doctor.StoreStatus
+	ReplayError    error
+	ConfigPath     string
+	ConfigSection  doctorConfigSection
+	Config         config.DocumentV3
+	Workspace      doctor.WorkspacePreflight
+	WorkspaceError error
+	Deduction      doctorHostDeductionSection
+	Manifest       manifest.Manifest
+}
+
+func doctorLauncherPreflight(ctx context.Context, in doctorPreflightInput) doctor.LauncherPreflight {
+	p := doctor.NewLauncherPreflight()
+	doctorExecutableCheck(&p, in.Build)
+	doctorEffectiveConfigCheck(&p, in)
+	doctorAuthorityCheck(&p, in.Store, in.ReplayError)
+	doctorWorkspaceCheck(&p, in.Workspace, in.WorkspaceError)
+	doctorHostChecks(ctx, &p, in)
+	doctorProjectionCheck(&p, in)
+	p.Finalize()
+	return p
+}
+
+func doctorExecutableCheck(p *doctor.LauncherPreflight, build buildinfo.Info) {
+	p.Duo.Version, p.Duo.Commit, p.Duo.BuildDate = build.Version, build.Commit, build.Date
+	executable, err := os.Executable()
+	if err == nil {
+		executable, err = filepath.Abs(executable)
+	}
+	if err == nil {
+		executable, err = filepath.EvalSymlinks(executable)
+	}
+	if err == nil {
+		var info os.FileInfo
+		info, err = os.Stat(executable)
+		if err == nil && info.IsDir() {
+			err = fmt.Errorf("resolved executable is a directory")
+		}
+	}
+	if err == nil {
+		p.Duo.ExecutablePath = filepath.Clean(executable)
+	}
+	if err != nil || build.Version == "" || build.Commit == "" || build.Date == "" {
+		summary := "running Duo executable does not have a complete local build identity"
+		action := "Executable stage: run the intended installed Duo binary and record its version, commit, and build date."
+		p.SetCheck(doctor.CheckDuoExecutable, "fail", "executable.identity_unavailable", summary, action)
+		return
+	}
+	p.SetCheck(doctor.CheckDuoExecutable, "pass", "ok", "running Duo executable has a reportable build identity", "")
+}
+
+func doctorEffectiveConfigCheck(p *doctor.LauncherPreflight, in doctorPreflightInput) {
+	p.Config.Path = in.ConfigPath
+	p.Config.Schema = in.ConfigSection.Schema
+	if in.ConfigSection.Schema != config.SchemaV3 {
+		code := "config.invalid"
+		if in.ConfigSection.Schema == "missing" {
+			code = "config.missing"
+		}
+		p.SetCheck(doctor.CheckEffectiveConfig, "fail", code,
+			"effective launch config is not a valid duo.config/v3 document",
+			fmt.Sprintf("Config stage: install or fix duo.config/v3 at %s, or migrate a v2 document with duo config migrate --to duo.config/v3.", in.ConfigPath))
+		return
+	}
+	digest, err := launch.ConfigurationDigest(in.Config)
+	if err != nil {
+		p.SetCheck(doctor.CheckEffectiveConfig, "fail", "config.invalid", "effective launch config could not be identified",
+			fmt.Sprintf("Config stage: fix the validated configuration at %s and rerun doctor.", in.ConfigPath))
+		return
+	}
+	presets := make([]string, 0, len(in.Config.Presets))
+	for name := range in.Config.Presets {
+		presets = append(presets, name)
+	}
+	sort.Strings(presets)
+	p.Config.Valid = true
+	p.Config.EffectiveDigest = digest
+	p.Config.Presets = presets
+	p.SetCheck(doctor.CheckEffectiveConfig, "pass", "ok", "effective duo.config/v3 intent is valid and deterministically identified", "")
+}
+
+func doctorAuthorityCheck(p *doctor.LauncherPreflight, status doctor.StoreStatus, replayErr error) {
+	p.Authority = doctor.AuthorityPreflight{
+		Path: status.Path, State: "unavailable", Present: status.Present,
+		Healthy: status.Healthy, SchemaVersion: status.SchemaVersion,
+	}
+	if status.Writer != nil {
+		p.Authority.WriterActive = status.Writer.Active
+	}
+	switch {
+	case !status.Present && status.Error == "" && replayErr == nil:
+		p.Authority.State = "initializable"
+		p.Authority.Healthy = true
+		p.SetCheck(doctor.CheckAuthorityStore, "pass", "ok", "authority store is absent and locally initializable by the first real write", "")
+	case status.Writer != nil && status.Writer.Active:
+		p.Authority.State = "writer_active"
+		p.Authority.Healthy = true
+		p.SetCheck(doctor.CheckAuthorityStore, "fail", "authority.writer_active", "authority store is held by an unexpired writer lease",
+			fmt.Sprintf("Authority stage: wait for or normally stop writer pid %d on %s for %s, then rerun doctor.", status.Writer.PID, status.Writer.Hostname, status.Path))
+	case strings.Contains(status.Error, "unsupported schema"):
+		p.Authority.State = "incompatible"
+		p.SetCheck(doctor.CheckAuthorityStore, "fail", "authority.incompatible", "authority store schema is incompatible with this Duo build",
+			fmt.Sprintf("Authority stage: use a compatible Duo build for %s; doctor will not migrate it.", status.Path))
+	case !status.Present && status.Error != "":
+		p.Authority.State = "unavailable"
+		p.SetCheck(doctor.CheckAuthorityStore, "fail", "authority.unavailable", "authority store path is not locally addressable",
+			fmt.Sprintf("Authority stage: make the XDG-selected path %s locally accessible, then rerun doctor.", status.Path))
+	case replayErr != nil || (status.Present && status.Error != ""):
+		p.Authority.State = "unhealthy"
+		p.SetCheck(doctor.CheckAuthorityStore, "fail", "authority.unhealthy", "authority store is not readable and replayable",
+			fmt.Sprintf("Authority stage: inspect and repair or restore the local store at %s, then rerun doctor.", status.Path))
+	default:
+		p.Authority.State = "ready"
+		p.SetCheck(doctor.CheckAuthorityStore, "pass", "ok", "authority store is readable, compatible, replayable, and has no active writer", "")
+	}
+}
+
+func doctorWorkspaceCheck(p *doctor.LauncherPreflight, status doctor.WorkspacePreflight, err error) {
+	p.Workspace = status
+	if err != nil || status.SelectedPath == "" || !filepath.IsAbs(status.SelectedPath) || !status.Exists || !status.Directory {
+		p.SetCheck(doctor.CheckWorkspace, "fail", "workspace.invalid", "selected workspace is not an absolute accessible directory",
+			fmt.Sprintf("Workspace stage: pass the actual existing project root with --workspace; selected resource was %q.", status.SelectedPath))
+		return
+	}
+	p.SetCheck(doctor.CheckWorkspace, "pass", "ok", "selected workspace is the absolute project root used for launch and skill lookup", "")
+}
+
+func checkPassed(p *doctor.LauncherPreflight, id string) bool {
+	for _, check := range p.Checks {
+		if check.ID == id {
+			return check.Status == "pass"
+		}
+	}
+	return false
+}
+
+// doctorProbeHerdr is injectable so CLI tests can pin the compatibility
+// boundary without relying on an installed herdr schema-export binary.
+var doctorProbeHerdr = func(ctx context.Context, cfg herdr.Config) (adapter.Probe, error) {
+	return (herdr.Factory{Config: cfg}).Probe(ctx)
+}
+
+func doctorHostChecks(ctx context.Context, p *doctor.LauncherPreflight, in doctorPreflightInput) {
+	prerequisites := checkPassed(p, doctor.CheckEffectiveConfig) && checkPassed(p, doctor.CheckWorkspace)
+	if !prerequisites {
+		p.SetCheck(doctor.CheckHostSelection, "not_checked", "prerequisite.not_reached", "host selection was not evaluated because config or workspace failed",
+			"Host selection stage: fix the config and workspace findings, then rerun doctor with the intended --host value.")
+		p.SetCheck(doctor.CheckHostReachability, "not_checked", "prerequisite.not_reached", "host reachability was not checked because no trustworthy host was selected",
+			"Host reachability stage: resolve the prerequisite findings, then start or select the intended host.")
+		p.SetCheck(doctor.CheckHostCompatibility, "not_checked", "prerequisite.not_reached", "host compatibility was not checked because no host answered", "")
+		return
+	}
+	if in.Deduction.Host == nil {
+		p.SetCheck(doctor.CheckHostSelection, "fail", "launch.host_unresolved", "launch materialization did not deduce exactly one enabled host",
+			fmt.Sprintf("Host selection stage: supply --host, repair the workspace correlation, or correct host policy for %s.", in.Workspace.SelectedPath))
+		p.SetCheck(doctor.CheckHostReachability, "not_checked", "prerequisite.not_reached", "host reachability was not checked because host selection failed",
+			"Host reachability stage: resolve host selection and rerun doctor.")
+		p.SetCheck(doctor.CheckHostCompatibility, "not_checked", "prerequisite.not_reached", "host compatibility was not checked because no host answered", "")
+		return
+	}
+	host := in.Deduction.Host
+	p.Host.Selected = true
+	p.Host.Kind = host.Kind
+	p.Host.InstanceID = host.InstanceID
+	p.Host.InstanceLabel = host.InstanceLabel
+	p.Host.HostSource = host.HostSource
+	p.SetCheck(doctor.CheckHostSelection, "pass", "ok", "launch materialization selected exactly one enabled host", "")
+
+	if host.Kind != herdr.AdapterID {
+		p.Host.Compatibility = "unknown"
+		p.SetCheck(doctor.CheckHostReachability, "fail", "host.unreachable", "selected host has no bounded reachability probe in this build",
+			fmt.Sprintf("Host reachability stage: select a supported Herdr host for %s and rerun doctor.", host.InstanceLabel))
+		p.SetCheck(doctor.CheckHostCompatibility, "not_checked", "prerequisite.not_reached", "host compatibility was not checked because no host answered", "")
+		return
+	}
+	probeID := host.InstanceID
+	if probeID == "" {
+		probeID = herdr.AdapterID + ":selected"
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
+	defer cancel()
+	probe, err := doctorProbeHerdr(probeCtx, herdr.Config{
+		IntegrationInstanceID: probeID,
+		SocketPath:            host.InstanceLabel,
+		CallTimeout:           500 * time.Millisecond,
+	})
+	if err != nil || probe.ConnectionState != "connected" {
+		p.Host.Compatibility = "unavailable"
+		p.SetCheck(doctor.CheckHostReachability, "fail", "host.unreachable", "selected Herdr host did not answer the bounded ping",
+			fmt.Sprintf("Host reachability stage: start or select the Herdr server at %s and make its socket reachable.", host.InstanceLabel))
+		p.SetCheck(doctor.CheckHostCompatibility, "not_checked", "prerequisite.not_reached", "host compatibility was not checked because no host answered", "")
+		return
+	}
+	p.Host.Reachable = true
+	p.Host.DetectedVersion = probe.DetectedVersion
+	p.Host.ProtocolIdentity = probe.ProtocolOrFormatIdentity
+	p.Host.Compatibility = string(probe.Compatibility)
+	if p.Host.Compatibility == "" {
+		p.Host.Compatibility = "unknown"
+	}
+	p.SetCheck(doctor.CheckHostReachability, "pass", "ok", "selected Herdr host answered the bounded non-mutating ping", "")
+	if probe.Compatibility == adapter.CompatibilitySupported {
+		p.SetCheck(doctor.CheckHostCompatibility, "pass", "ok", "reachable host matches the pinned version, protocol, and schema evidence", "")
+		return
+	}
+	code := "host.compatibility_unverified"
+	if probe.Compatibility == adapter.CompatibilityIncompatible {
+		code = "host.compatibility_incompatible"
+	}
+	p.SetCheck(doctor.CheckHostCompatibility, "warning", code, "reachable host does not match the complete pinned compatibility evidence", "")
+}
+
+func doctorProjectionCheck(p *doctor.LauncherPreflight, in doctorPreflightInput) {
+	target := in.Manifest.HarnessTargets[0]
+	root := filepath.Join(in.Workspace.SelectedPath, filepath.FromSlash(target.ProjectionRoot))
+	p.SkillProjection = doctor.SkillProjection{
+		Target: target.Name, Name: target.Artifact.Name, FormatVersion: target.ProjectionFormat,
+		ContentDigest: target.Artifact.ContentDigest, Root: root,
+		File:  filepath.Join(root, filepath.FromSlash(target.Artifact.OutputPath)),
+		Stamp: filepath.Join(root, filepath.FromSlash(target.StampFile)), State: "incompatible",
+	}
+	if !checkPassed(p, doctor.CheckWorkspace) {
+		p.SetCheck(doctor.CheckSkillProjection, "not_checked", "prerequisite.not_reached", "portable skill projection was not inspected because workspace selection failed",
+			"Skill projection stage: pass an accessible project root with --workspace, then rerun doctor.")
+		return
+	}
+	inspection, err := manifest.InspectPortableLaunchers(in.Workspace.SelectedPath, in.Manifest)
+	if err != nil {
+		p.SetCheck(doctor.CheckSkillProjection, "fail", "projection.incompatible", "portable skill projection could not be safely inspected",
+			fmt.Sprintf("Skill projection stage: inspect or move the projection at %s, then run the installer when allowed.", root))
+		return
+	}
+	p.SkillProjection.State = string(inspection.State)
+	p.SkillProjection.Root = inspection.Root
+	p.SkillProjection.File = filepath.Join(inspection.Root, manifest.PortableSkillFile)
+	p.SkillProjection.Stamp = filepath.Join(inspection.Root, manifest.ProjectionStampFile)
+	p.SkillProjection.InstallationID = inspection.InstallationID
+	if inspection.State == manifest.StateCurrent {
+		p.SetCheck(doctor.CheckSkillProjection, "pass", "ok", "portable skill projection is current for this Duo manifest", "")
+		return
+	}
+	code := map[manifest.ProjectionState]string{
+		manifest.StateMissing:         "projection.missing",
+		manifest.StateStale:           "projection.stale",
+		manifest.StateModified:        "projection.modified",
+		manifest.StateIncompatible:    "projection.incompatible",
+		manifest.StateUnownedConflict: "projection.user_file_conflict",
+	}[inspection.State]
+	if code == "" {
+		code = "projection.incompatible"
+	}
+	p.SetCheck(doctor.CheckSkillProjection, "fail", code,
+		fmt.Sprintf("portable skill projection is %s for this Duo manifest", inspection.State),
+		fmt.Sprintf("Skill projection stage: inspect %s and run duo install portable-launchers --workspace %s --repair when allowed; move modified or unowned content first.", inspection.Root, in.Workspace.SelectedPath))
 }

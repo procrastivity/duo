@@ -113,7 +113,7 @@ func NewResolver(doc config.DocumentV3, mat materialize.Result, opts Options) (*
 		opts.NewID = mintRecordID
 	}
 
-	digest, err := configurationDigest(doc)
+	digest, err := ConfigurationDigest(doc)
 	if err != nil {
 		return nil, err
 	}

@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	rootassets "github.com/procrastivity/duo/assets"
+	rootskills "github.com/procrastivity/duo/skills"
 )
 
 // appName names both the XDG config subdirectory and the installed share
@@ -128,6 +130,11 @@ func ReadDefault(relativeName string) (Resolved, error) {
 
 	if data, err := rootassets.FS.ReadFile(relativeName); err == nil {
 		return Resolved{Source: SourceEmbedded, data: data}, nil
+	}
+	if skillName, ok := strings.CutPrefix(filepath.ToSlash(relativeName), "skills/"); ok {
+		if data, err := rootskills.FS.ReadFile(skillName); err == nil {
+			return Resolved{Source: SourceEmbedded, data: data}, nil
+		}
 	}
 
 	return Resolved{}, fmt.Errorf("asset: %q not found in default directory or embedded fallback", relativeName)

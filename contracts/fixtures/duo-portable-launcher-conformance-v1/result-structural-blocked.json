@@ -1,0 +1,1417 @@
+{
+  "schema": "duo.portable-launcher-conformance-result/v1",
+  "suite": {
+    "name": "portable-launcher-delegation",
+    "revision": 1,
+    "manifest_digest": "sha256:01e8e6bd80ceb441be6dc128aca023a1bede31b655e74b12ee3da0c2fc6cc204",
+    "oracle_digest": "sha256:a305744fc34af96b5bbd916b9de3aa1bc94f59ce4ea9316b62bb0a8dd5dd22c5"
+  },
+  "run": {
+    "run_id": "fixture-structural-blocked",
+    "observed_at": "2026-09-17T00:00:00Z",
+    "host_os": "linux",
+    "host_arch": "x86_64",
+    "fixture_root": "$RUN",
+    "plugins_enabled": false,
+    "mcp_enabled": false,
+    "terminal_input_used": false
+  },
+  "pins": {
+    "launcher": {
+      "name": "amp",
+      "version": "0.0.1789675234-g2899fe",
+      "executable_sha256": "sha256:f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee"
+    },
+    "duo": {
+      "version": "fixture",
+      "commit": "0123456789abcdef0123456789abcdef01234567",
+      "build_date": "2026-09-17T00:00:00Z",
+      "executable_sha256": "sha256:2af74f65db28670aa9a5439c4eb48137c63dea3db07f31b3143f672dffddaf11"
+    },
+    "skill": {
+      "name": "duo-delegation-loop",
+      "format_version": "duo.skill/duo-delegation-loop/v1",
+      "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+      "installation_id": "fixture-installation"
+    },
+    "config": {
+      "schema": "duo.config/v3",
+      "effective_digest": "sha256:dc3fbd7d29934bfcb08cf280ac04b77e6bde9a5da091e3a892062f757a71ced0"
+    },
+    "authority": {
+      "schema_version": 1,
+      "store_digest_before": "sha256:b58d01a3400fbcf9af5b8f043c5e4bf2411631be0a51c7d8b7e466875289ab02",
+      "store_digest_after": "sha256:49a2b38653a56a91b6664cb633dd9918da8d6a47d0f79e75814bb8381c16e36b"
+    },
+    "host": {
+      "name": "herdr",
+      "version": "0.8.2",
+      "protocol": "herdr-socket-api/20",
+      "schema_digest": "sha256:c48f1f54ee0150ca27e11fd44455fe94aeadb20fdf4e4a62393ed822a4e5b150",
+      "executable_sha256": "sha256:7db471d26dcc133939e1fc80074b7f1f90bf181eebaacf48bfbb2ad2962964da"
+    },
+    "runtime": {
+      "name": "pi",
+      "version": "0.83.0",
+      "format": "pi-session-jsonl/v3",
+      "adapter_build": "stage1",
+      "conformance_record": "pi-0.83.0-2026-08-23",
+      "executable_sha256": "sha256:9b5e9b1aa2486835b24f7842b027d187d940986b020f584736af7a4927f47d4c",
+      "delivery_asset_sha256": "sha256:2708a3435821fb2e72302ee56d8a07fe62c265214ae8fd342e385c03ef245a23"
+    },
+    "model": {
+      "provider": "openai-codex",
+      "model_line": "gpt-5.6-luna"
+    },
+    "external_schema": {
+      "identity": "duo.external/v1",
+      "digest": "sha256:8b055ff60f0ca5f3da46302671591aa0dae61185cd9f1f15fcceb36d841e7497"
+    }
+  },
+  "stages": [
+    {
+      "sequence": 1,
+      "stage": "setup",
+      "case": "run",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 0,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "setup.fixture_isolated_and_pinned",
+          "expected": {
+            "fixture_root": "$RUN",
+            "mcp_enabled": false,
+            "plugins_enabled": false,
+            "shared_state": false,
+            "terminal_input_used": false
+          },
+          "actual": {
+            "fixture_root": "$RUN",
+            "mcp_enabled": false,
+            "plugins_enabled": false,
+            "shared_state": false,
+            "terminal_input_used": false
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 2,
+      "stage": "discovery",
+      "case": "run",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 1,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "discovery.skill_identity",
+          "expected": {
+            "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+            "format_version": "duo.skill/duo-delegation-loop/v1",
+            "name": "duo-delegation-loop"
+          },
+          "actual": {
+            "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+            "format_version": "duo.skill/duo-delegation-loop/v1",
+            "name": "duo-delegation-loop"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 3,
+      "stage": "preflight",
+      "case": "run",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 2,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "preflight.ready",
+          "expected": {
+            "all_required_pass": true,
+            "required_checks": 7,
+            "status": "ready"
+          },
+          "actual": {
+            "all_required_pass": true,
+            "required_checks": 7,
+            "status": "ready"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 4,
+      "stage": "launch",
+      "case": "happy",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 3,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "launch.resolution",
+          "expected": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "actual": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 5,
+      "stage": "bind",
+      "case": "happy",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 4,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "bind.runtime_identity",
+          "expected": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "actual": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 6,
+      "stage": "send",
+      "case": "happy",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 5,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "send.delivery",
+          "expected": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "actual": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 7,
+      "stage": "observe",
+      "case": "happy",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 6,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "observe.assistant_text",
+          "expected": {
+            "assistant_blocks": 1,
+            "source_complete": true,
+            "text_digest": "sha256:b3300f2f6e0338d2b672891be66827d95779a2eabf4a75dcae1b6f56c9a4dc98"
+          },
+          "actual": {
+            "assistant_blocks": 1,
+            "source_complete": true,
+            "text_digest": "sha256:b3300f2f6e0338d2b672891be66827d95779a2eabf4a75dcae1b6f56c9a4dc98"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 8,
+      "stage": "command_inspection",
+      "case": "happy",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 7,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.delivery_integrity",
+          "expected": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "actual": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 9,
+      "stage": "restart",
+      "case": "restart",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 8,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "restart.authority_continuity",
+          "expected": {
+            "attempts": 1,
+            "distinct_processes": true,
+            "outcome": "same_live",
+            "same_store": true
+          },
+          "actual": {
+            "attempts": 1,
+            "distinct_processes": true,
+            "outcome": "same_live",
+            "same_store": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 10,
+      "stage": "bind",
+      "case": "restart",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 9,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "bind.runtime_identity",
+          "expected": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "actual": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 11,
+      "stage": "observe",
+      "case": "restart",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 10,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "observe.restart_text",
+          "expected": {
+            "same_record": true,
+            "text_digest": "sha256:b3300f2f6e0338d2b672891be66827d95779a2eabf4a75dcae1b6f56c9a4dc98"
+          },
+          "actual": {
+            "same_record": true,
+            "text_digest": "sha256:b3300f2f6e0338d2b672891be66827d95779a2eabf4a75dcae1b6f56c9a4dc98"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 12,
+      "stage": "command_inspection",
+      "case": "restart",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 11,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.delivery_integrity",
+          "expected": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "actual": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 13,
+      "stage": "send",
+      "case": "same_key_same_text",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 12,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "send.idempotent_replay",
+          "expected": {
+            "attempts": 1,
+            "new_turns": 0,
+            "same_command": true
+          },
+          "actual": {
+            "attempts": 1,
+            "new_turns": 0,
+            "same_command": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 14,
+      "stage": "command_inspection",
+      "case": "same_key_same_text",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 13,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.idempotent_no_duplication",
+          "expected": {
+            "attempts_delta": 0,
+            "commands_delta": 0,
+            "turns_delta": 0
+          },
+          "actual": {
+            "attempts_delta": 0,
+            "commands_delta": 0,
+            "turns_delta": 0
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 15,
+      "stage": "send",
+      "case": "same_key_different_text",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 14,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "send.idempotency_conflict",
+          "expected": {
+            "code": "command.idempotency_conflict",
+            "effect": "no_effect",
+            "existing_digest": "sha256:b40d3a68eb33083b92199d734da2dece28395a6acc6d5e2cb9d7032dae4d11c7",
+            "idempotency_key": "portable-launcher-v1-primary",
+            "request_digest": "sha256:dbe904a42a9d9d9cdf7908508fa393ce43c9c53ea16a8cb8c9b82e7005f602bc",
+            "retry_action": "use_new_idempotency_key",
+            "retry_safe": false,
+            "target_original": true
+          },
+          "actual": {
+            "code": "command.idempotency_conflict",
+            "effect": "no_effect",
+            "existing_digest": "sha256:b40d3a68eb33083b92199d734da2dece28395a6acc6d5e2cb9d7032dae4d11c7",
+            "idempotency_key": "portable-launcher-v1-primary",
+            "request_digest": "sha256:dbe904a42a9d9d9cdf7908508fa393ce43c9c53ea16a8cb8c9b82e7005f602bc",
+            "retry_action": "use_new_idempotency_key",
+            "retry_safe": false,
+            "target_original": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 16,
+      "stage": "command_inspection",
+      "case": "same_key_different_text",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 15,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.idempotency_no_drift",
+          "expected": {
+            "attempts_delta": 0,
+            "commands_delta": 0,
+            "queue_delta": 0,
+            "turns_delta": 0
+          },
+          "actual": {
+            "attempts_delta": 0,
+            "commands_delta": 0,
+            "queue_delta": 0,
+            "turns_delta": 0
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 17,
+      "stage": "launch",
+      "case": "blocked",
+      "verdict": "fail",
+      "outcome": "error",
+      "started_offset_ms": 16,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "blocked.induction_available",
+          "expected": {
+            "available": true
+          },
+          "actual": {
+            "available": false
+          },
+          "matched": false
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": {
+        "code": "prerequisite.blocked_induction_unavailable",
+        "message": "supported admitted-then-blocked evidence is unavailable",
+        "effect": "no_effect",
+        "retry": {
+          "safe": false,
+          "action": "add_supported_blocked_evidence"
+        }
+      }
+    },
+    {
+      "sequence": 18,
+      "stage": "bind",
+      "case": "blocked",
+      "verdict": "fail",
+      "outcome": "error",
+      "started_offset_ms": 17,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "prerequisite.not_reached",
+          "expected": {
+            "reached": true
+          },
+          "actual": {
+            "reached": false
+          },
+          "matched": false
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": {
+        "code": "prerequisite.not_reached",
+        "message": "blocked induction prerequisite failed",
+        "effect": "no_effect",
+        "retry": {
+          "safe": false,
+          "action": "inspect_originating_failure"
+        }
+      }
+    },
+    {
+      "sequence": 19,
+      "stage": "send",
+      "case": "blocked",
+      "verdict": "fail",
+      "outcome": "error",
+      "started_offset_ms": 18,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "prerequisite.not_reached",
+          "expected": {
+            "reached": true
+          },
+          "actual": {
+            "reached": false
+          },
+          "matched": false
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": {
+        "code": "prerequisite.not_reached",
+        "message": "blocked induction prerequisite failed",
+        "effect": "no_effect",
+        "retry": {
+          "safe": false,
+          "action": "inspect_originating_failure"
+        }
+      }
+    },
+    {
+      "sequence": 20,
+      "stage": "observe",
+      "case": "blocked",
+      "verdict": "fail",
+      "outcome": "error",
+      "started_offset_ms": 19,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "prerequisite.not_reached",
+          "expected": {
+            "reached": true
+          },
+          "actual": {
+            "reached": false
+          },
+          "matched": false
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": {
+        "code": "prerequisite.not_reached",
+        "message": "blocked induction prerequisite failed",
+        "effect": "no_effect",
+        "retry": {
+          "safe": false,
+          "action": "inspect_originating_failure"
+        }
+      }
+    },
+    {
+      "sequence": 21,
+      "stage": "command_inspection",
+      "case": "blocked",
+      "verdict": "fail",
+      "outcome": "error",
+      "started_offset_ms": 20,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "prerequisite.not_reached",
+          "expected": {
+            "reached": true
+          },
+          "actual": {
+            "reached": false
+          },
+          "matched": false
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": {
+        "code": "prerequisite.not_reached",
+        "message": "blocked induction prerequisite failed",
+        "effect": "no_effect",
+        "retry": {
+          "safe": false,
+          "action": "inspect_originating_failure"
+        }
+      }
+    },
+    {
+      "sequence": 22,
+      "stage": "launch",
+      "case": "exited",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 21,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "launch.resolution",
+          "expected": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "actual": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 23,
+      "stage": "bind",
+      "case": "exited",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 22,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "bind.runtime_identity",
+          "expected": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "actual": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 24,
+      "stage": "send",
+      "case": "exited",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 23,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "send.delivery",
+          "expected": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "actual": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 25,
+      "stage": "observe",
+      "case": "exited",
+      "verdict": "pass",
+      "outcome": "exited",
+      "started_offset_ms": 24,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "observe.exited",
+          "expected": {
+            "attempts": 1,
+            "condition": "exited",
+            "process_success": true,
+            "same_instance": true
+          },
+          "actual": {
+            "attempts": 1,
+            "condition": "exited",
+            "process_success": true,
+            "same_instance": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 26,
+      "stage": "command_inspection",
+      "case": "exited",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 25,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.delivery_integrity",
+          "expected": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "actual": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 27,
+      "stage": "launch",
+      "case": "timeout",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 26,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "launch.resolution",
+          "expected": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "actual": {
+            "host": "herdr",
+            "prelaunch_prompt": false,
+            "runtime": "pi",
+            "selected_leaves": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 28,
+      "stage": "bind",
+      "case": "timeout",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 27,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "bind.runtime_identity",
+          "expected": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "actual": {
+            "attachment_claimed": true,
+            "correlations": 1,
+            "instances": 1
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 29,
+      "stage": "send",
+      "case": "timeout",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 28,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "send.delivery",
+          "expected": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "actual": {
+            "acknowledged": false,
+            "activity_observed": false,
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered"
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 30,
+      "stage": "observe",
+      "case": "timeout",
+      "verdict": "pass",
+      "outcome": "timeout",
+      "started_offset_ms": 29,
+      "duration_ms": 20000,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "observe.timeout",
+          "expected": {
+            "assistant_blocks": 0,
+            "attempts": 1,
+            "delivered": true,
+            "elapsed_max_ms": 22500,
+            "elapsed_min_ms": 20000,
+            "elapsed_ms": 20000,
+            "outer_timed_out": false,
+            "process_success": true,
+            "stopped_verified": true
+          },
+          "actual": {
+            "assistant_blocks": 0,
+            "attempts": 1,
+            "delivered": true,
+            "elapsed_max_ms": 22500,
+            "elapsed_min_ms": 20000,
+            "elapsed_ms": 20000,
+            "outer_timed_out": false,
+            "process_success": true,
+            "stopped_verified": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 31,
+      "stage": "command_inspection",
+      "case": "timeout",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 20029,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "command.delivery_integrity",
+          "expected": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "actual": {
+            "attempts": 1,
+            "queue_policy": "queue_until_safe",
+            "realization": "native",
+            "recorded_result": "delivered",
+            "retry_action": "observe_existing_command",
+            "retry_safe": false,
+            "state": "delivered",
+            "unchanged": true
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    },
+    {
+      "sequence": 32,
+      "stage": "cleanup",
+      "case": "run",
+      "verdict": "pass",
+      "outcome": "success",
+      "started_offset_ms": 20030,
+      "duration_ms": 1,
+      "assertions": [
+        {
+          "id": "stage.completed_within_deadline",
+          "expected": {
+            "within_deadline": true
+          },
+          "actual": {
+            "within_deadline": true
+          },
+          "matched": true
+        },
+        {
+          "id": "cleanup.complete",
+          "expected": {
+            "export_complete": true,
+            "panes_remaining": 0,
+            "pids_remaining": 0,
+            "root_removed": true,
+            "sockets_remaining": 0
+          },
+          "actual": {
+            "export_complete": true,
+            "panes_remaining": 0,
+            "pids_remaining": 0,
+            "root_removed": true,
+            "sockets_remaining": 0
+          },
+          "matched": true
+        }
+      ],
+      "evidence": [
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
+      ],
+      "error": null
+    }
+  ],
+  "summary": {
+    "verdict": "fail",
+    "first_failed_stage": "launch",
+    "first_failed_case": "blocked"
+  },
+  "scrub": {
+    "status": "pass",
+    "policy": "portable-launcher-evidence/v1",
+    "findings": []
+  }
+}

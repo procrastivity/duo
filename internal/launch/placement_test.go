@@ -111,18 +111,18 @@ func TestConfigurationDigestPinsLaunchTarget(t *testing.T) {
 		},
 	}
 
-	baseDigest, err := configurationDigest(base)
+	baseDigest, err := ConfigurationDigest(base)
 	if err != nil {
 		t.Fatalf("configurationDigest(base): %v", err)
 	}
-	withDigest, err := configurationDigest(withTarget)
+	withDigest, err := ConfigurationDigest(withTarget)
 	if err != nil {
 		t.Fatalf("configurationDigest(withTarget): %v", err)
 	}
 	if baseDigest == withDigest {
 		t.Fatalf("launch_target did not change configurationDigest: both %q", baseDigest)
 	}
-	again, err := configurationDigest(withTarget)
+	again, err := ConfigurationDigest(withTarget)
 	if err != nil {
 		t.Fatalf("configurationDigest(withTarget) again: %v", err)
 	}
@@ -238,18 +238,18 @@ func TestConfigurationDigestPinsCloseOnExit(t *testing.T) {
 		},
 	}
 
-	baseDigest, err := configurationDigest(base)
+	baseDigest, err := ConfigurationDigest(base)
 	if err != nil {
 		t.Fatalf("configurationDigest(base): %v", err)
 	}
-	withDigest, err := configurationDigest(withClose)
+	withDigest, err := ConfigurationDigest(withClose)
 	if err != nil {
 		t.Fatalf("configurationDigest(withClose): %v", err)
 	}
 	if baseDigest == withDigest {
 		t.Fatalf("close_on_exit did not change configurationDigest: both %q", baseDigest)
 	}
-	again, err := configurationDigest(withClose)
+	again, err := ConfigurationDigest(withClose)
 	if err != nil {
 		t.Fatalf("configurationDigest(withClose) again: %v", err)
 	}

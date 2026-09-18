@@ -358,10 +358,8 @@ func TestDoctorVisibility_DisabledProvider(t *testing.T) {
 }
 
 // TestDoctorVisibility_ConfigMissing covers the plainly-stated "missing"
-// config case: no --config flag exists on `duo doctor`, and this test's
-// isolated XDG_CONFIG_HOME never has a duo.config document written into
-// it, so the default launch-config path resolves to a file that is not
-// there.
+// default config case: this test's isolated XDG_CONFIG_HOME never has a
+// duo.config document written into it.
 func TestDoctorVisibility_ConfigMissing(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

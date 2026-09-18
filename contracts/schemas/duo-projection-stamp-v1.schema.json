@@ -13,10 +13,21 @@
       "type": "object",
       "required": ["harness", "tested_version_range"],
       "properties": {
-        "harness": {"enum": ["claude_code", "codex", "devin", "opencode", "pi"]},
-        "tested_version_range": {"type": "string", "minLength": 1}
+        "harness": {"enum": ["claude_code", "codex", "devin", "opencode", "pi", "portable_launchers"]},
+        "tested_version_range": {"type": "string", "minLength": 1},
+        "launchers": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/launcher"},
+          "minItems": 1
+        }
       },
       "additionalProperties": true
+    },
+    "components": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
     },
     "installation_id": {"type": "string", "minLength": 1},
     "generated_at": {"type": "string", "format": "date-time"},
@@ -24,7 +35,44 @@
     "files": {"$ref": "#/$defs/digested_paths"}
   },
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "target": {
+            "properties": {"harness": {"const": "portable_launchers"}},
+            "required": ["harness"]
+          }
+        },
+        "required": ["target"]
+      },
+      "then": {
+        "required": ["components"],
+        "properties": {
+          "target": {"required": ["launchers"]},
+          "components": {
+            "items": {"const": "filesystem_skill"},
+            "maxItems": 1
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "launcher": {
+      "type": "object",
+      "required": ["name", "tested_versions"],
+      "properties": {
+        "name": {"enum": ["amp", "opencode", "codex"]},
+        "tested_versions": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
     "digested_paths": {
       "type": "array",
       "items": {

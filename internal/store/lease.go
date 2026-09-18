@@ -42,6 +42,38 @@ func (e *WriterActiveError) Error() string {
 		e.Incarnation, e.PID, e.Hostname, e.ExpiresAt)
 }
 
+// WriterLease is a read-only snapshot of the singleton authority-writer
+// lease. Active means the row exists and its lease has not expired at the
+// supplied observation time. InspectWriterLease never performs takeover or
+// process-liveness probing: diagnosis observes the durable lease exactly as
+// written and leaves normal writer acquisition to decide whether a local
+// holder is provably dead.
+type WriterLease struct {
+	Active      bool
+	Incarnation string
+	PID         int
+	Hostname    string
+	ExpiresAt   string
+}
+
+// InspectWriterLease reads the current writer lease through this handle.
+// It is safe on an OpenReadOnly handle and performs no writes, including no
+// transient lease acquisition.
+func (s *Store) InspectWriterLease(ctx context.Context, now time.Time) (WriterLease, error) {
+	var lease WriterLease
+	err := s.db.QueryRowContext(ctx,
+		`SELECT incarnation, pid, hostname, expires_at FROM writer_lease WHERE id = 1`,
+	).Scan(&lease.Incarnation, &lease.PID, &lease.Hostname, &lease.ExpiresAt)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return WriterLease{}, nil
+	case err != nil:
+		return WriterLease{}, fmt.Errorf("store: inspecting writer lease: %w", err)
+	}
+	lease.Active = lease.ExpiresAt > timestamp(now)
+	return lease, nil
+}
+
 // OpenAuthority opens the store at path and acquires the exclusive
 // authority-writer lease, minting a fresh incarnation ID. When a live writer
 // already holds the lease it fails with *WriterActiveError. See

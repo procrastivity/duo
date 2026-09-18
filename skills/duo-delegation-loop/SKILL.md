@@ -85,7 +85,7 @@ Extract condition and assistant text with:
 
 ```
 jq -r '.result.condition.value // "absent"'
-jq -r '.result.items[]? | select(.author_role=="assistant") | .blocks[0].content.text'
+jq -r '.result.items[]? | select(.author_role=="agent") | .blocks[0].content.text'
 ```
 
 Do not print `result["condition"]` — that is an object; a `case` on it never matches `idle`.
@@ -116,14 +116,20 @@ Optional `--after` pages `duo conversation list` from `next_page`. Optional `--l
 - Stop, interrupt, or terminal paste
 - Composer-lease verbs
 - MCP tools and presentation routes
-- Stage 5 generated projection
+- Launcher-specific hooks, plugins, and runtime adapters
 - `duo wait`, `--block-for` (parked; notes/54)
 
-## Install by hand
+## Installation
 
-This file is the normative source. Install it by hand into the orchestrating harness. There is no Stage 5 renderer in this milestone.
+This file is the normative source. For Amp, OpenCode, and Codex project discovery, install the product-owned copied projection with:
 
-Do not run these installs as part of authoring this skill.
+```
+duo install portable-launchers --workspace <project-root>
+```
+
+Use `--repair` only when Duo reports an owned missing or stale projection. Duo does not overwrite modified or unowned content.
+
+The hand-managed integrations below remain outside that shared product target. Do not run them as part of authoring this skill.
 
 ### Claude Code (first)
 

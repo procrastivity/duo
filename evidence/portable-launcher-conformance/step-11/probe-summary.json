@@ -1,0 +1,203 @@
+{
+  "schema": "duo.portable-launcher-step11-evidence/v1",
+  "observed_at_utc": {"start": "2026-09-18T08:28:56Z", "finish": "2026-09-18T08:33:22Z"},
+  "host": {"kernel": "Linux 6.8.0-136-generic", "architecture": "x86_64"},
+  "checkout": {
+    "path": "$CHECKOUT",
+    "branch": "feat/portable-launcher-conformance",
+    "commit": "40a2d24652c2543b4cde3bc1ebbd164c7b8952c9",
+    "describe": "40a2d24-dirty",
+    "preexisting_out_of_scope_changes": true
+  },
+  "codex": {
+    "version": "0.154.0",
+    "version_output": "codex-cli 0.154.0",
+    "command_path": "$CODEX_COMMAND",
+    "javascript_entrypoint": "$CODEX_JS_ENTRYPOINT",
+    "javascript_entrypoint_bytes": 8790,
+    "javascript_entrypoint_sha256": "sha256:61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70",
+    "native_package_name": "@openai/codex",
+    "native_package_version": "0.154.0-linux-x64",
+    "native_executable_path": "$CODEX_NATIVE",
+    "native_executable_bytes": 262858016,
+    "native_executable_sha256": "sha256:3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+    "accepted_version": "0.154.0",
+    "accepted_native_executable_sha256": "sha256:3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+    "matches_accepted_pin": true,
+    "matches_manifest_tested_version": true,
+    "diagnostic_executable": "$CODEX_NATIVE"
+  },
+  "duo": {
+    "version": "40a2d24-dirty",
+    "commit": "40a2d24652c2543b4cde3bc1ebbd164c7b8952c9",
+    "build_date": "2026-09-18T08:28:56Z",
+    "build_command": "CGO_ENABLED=0 go build -trimpath -ldflags <version,full-commit,date> -o $RUN/bin/duo ./cmd/duo",
+    "executable_path": "$RUN/bin/duo",
+    "executable_bytes": 14369268,
+    "executable_sha256": "sha256:546be61fc15d0744d9d0758e6e2629cf154dfbdc2df1eebf72aa5884787de2c7",
+    "manifest_digest": "sha256:5d247c2033264777e20566c0bbc53842ebed5078f4135ca6a899ecfea8bf7404"
+  },
+  "skill": {
+    "name": "duo-delegation-loop",
+    "format_version": "duo.skill/duo-delegation-loop/v1",
+    "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+    "size_bytes": 6284,
+    "canonical_path": "$CHECKOUT/skills/duo-delegation-loop/SKILL.md",
+    "installation_id": "7e04a954a123f6fc2e1129d5f8e9e752",
+    "installed_root": "$RUN/workspace/.agents/skills/duo-delegation-loop",
+    "installed_file": "$RUN/workspace/.agents/skills/duo-delegation-loop/SKILL.md",
+    "installed_stamp": "$RUN/workspace/.agents/skills/duo-delegation-loop/.duo-generated.json",
+    "stamp_schema": "duo.projection-stamp/v1",
+    "stamp_target": "portable_launchers",
+    "stamp_tested_version_range": "amp=0.0.1789675234-g2899fe;opencode=1.18.31;codex=0.154.0",
+    "stamp_sha256": "sha256:2a3e5e88d714cfa737e5d8d50a96d1dfb0bf1ecee7edcc02dc3ea59af236fb9d",
+    "installed_bytes_match_canonical": true
+  },
+  "config": {
+    "schema": "duo.config/v3",
+    "path": "$RUN/xdg/config/duo/duo.config.yaml",
+    "source_bytes_sha256": "sha256:1b4cb5fafef7a324beb46b8d8529ee76d4cc1218c41d5da24251b0872b293840",
+    "effective_digest": "sha256:92db1583823b8d8ce7384449896cea6c641b3b4c7df5d50ce56d43a0092826ae",
+    "presets": ["builder"]
+  },
+  "authority": {
+    "path": "$RUN/xdg/data/duo/duo.db",
+    "state": "initializable",
+    "present": false,
+    "healthy": true,
+    "schema_version": 0,
+    "writer_active": false
+  },
+  "herdr": {
+    "version": "0.9.0",
+    "command_path": "$HERDR_COMMAND",
+    "resolved_path": "$HERDR_RESOLVED",
+    "executable_bytes": 39728936,
+    "executable_sha256": "sha256:5ef212a3f142f902b1a4eb3f7a76827ded9f313804c580c48297c060ac1fcac0",
+    "protocol_identity": "herdr-socket-api/22",
+    "schema_export_sha256": "sha256:226d4ecbd128d2e6bc84e4c8ddcec21ba9c7e51a0aafffcf087111ead3f1fa9a",
+    "compatibility": "unverified",
+    "required_full_suite_pin_available": false,
+    "required_full_suite_pin": {
+      "version": "0.8.2",
+      "protocol_identity": "herdr-socket-api/20",
+      "schema_digest": "sha256:c48f1f54ee0150ca27e11fd44455fe94aeadb20fdf4e4a62393ed822a4e5b150"
+    }
+  },
+  "installation": {
+    "exit_code": 0,
+    "schema": "duo.external/v1",
+    "operation": "projection.install",
+    "target": "portable_launchers",
+    "state": "current",
+    "changed": true
+  },
+  "codex_discovery": {
+    "command": "$CODEX_NATIVE debug prompt-input Use-the-duo-delegation-loop-skill",
+    "exit_code": 0,
+    "matching_skill_records": 1,
+    "name": "duo-delegation-loop",
+    "skill_root": "$RUN/workspace/.agents/skills",
+    "location": "$RUN/workspace/.agents/skills/duo-delegation-loop/SKILL.md",
+    "description_sha256": "sha256:47c044a8e999289d69dd7912f007af0d7f11b6e10a8f5ffe28e730c7139cb85e",
+    "canonical_file_digest_matches": true,
+    "loader_invoked": true,
+    "model_visible_entry_injected": true,
+    "invocation_boundary": "Codex debug prompt-input invoked deterministic project skill discovery and frontmatter parsing, then injected the canonical skill name, description, and installed SKILL.md locator into model-visible prompt input; it did not run a model or load behavioral adherence evidence.",
+    "model_turn_invoked": false,
+    "behavioral_model_adherence_claimed": false,
+    "threads_created": 0,
+    "sessions_created": 0,
+    "credentials_used": false
+  },
+  "isolation": {
+    "run_root": "$RUN",
+    "home": "$RUN/noauth/home",
+    "codex_home": "$RUN/noauth/codex",
+    "workspace": "$RUN/workspace",
+    "clean_environment_used": true,
+    "real_user_skill_tree_written": false,
+    "account_credentials_used": false,
+    "installed_plugins": [],
+    "configured_mcp_servers": [],
+    "plugins_enabled": false,
+    "mcp_enabled": false,
+    "terminal_input_used": false,
+    "system_skills_bootstrapped_in_disposable_codex_home": true
+  },
+  "positive_preflight": {
+    "exit_code": 0,
+    "schema": "duo.launcher-preflight/v1",
+    "status": "ready",
+    "authority_scope": "local",
+    "host_source": "explicit-flag",
+    "checks": [
+      {"id": "duo_executable", "stage": "executable", "required": true, "status": "pass", "code": "ok"},
+      {"id": "effective_config", "stage": "config", "required": true, "status": "pass", "code": "ok"},
+      {"id": "authority_store", "stage": "authority", "required": true, "status": "pass", "code": "ok"},
+      {"id": "workspace", "stage": "workspace", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_selection", "stage": "host_selection", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_reachability", "stage": "host_reachability", "required": true, "status": "pass", "code": "ok"},
+      {"id": "skill_projection", "stage": "skill_projection", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_compatibility", "stage": "host_reachability", "required": false, "status": "warning", "code": "host.compatibility_unverified"}
+    ],
+    "skill_projection_state": "current",
+    "host_reachable": true,
+    "duo_authority_entries_before": 0,
+    "duo_authority_entries_after": 0,
+    "workspace_payload_manifest_sha256_before": "sha256:bbf0034693c602bd9ecebe65a6f21caf0e8c1556cac49c9cbb46628cb385efc2",
+    "workspace_payload_manifest_sha256_after": "sha256:bbf0034693c602bd9ecebe65a6f21caf0e8c1556cac49c9cbb46628cb385efc2",
+    "authority_store_created": false,
+    "workspace_changed": false
+  },
+  "negative_preflight": {
+    "exit_code": 0,
+    "schema": "duo.launcher-preflight/v1",
+    "status": "not_ready",
+    "authority_scope": "unavailable",
+    "failed_check": {
+      "id": "host_reachability",
+      "stage": "host_reachability",
+      "required": true,
+      "status": "fail",
+      "code": "host.unreachable",
+      "summary": "selected Herdr host did not answer the bounded ping",
+      "action": "Host reachability stage: start or select the Herdr server at $RUN/xdg/runtime/no-server/herdr.sock and make its socket reachable."
+    },
+    "compatibility_check": {"status": "not_checked", "code": "prerequisite.not_reached"},
+    "duo_authority_entries_before": 0,
+    "duo_authority_entries_after": 0,
+    "workspace_payload_manifest_sha256_before": "sha256:bbf0034693c602bd9ecebe65a6f21caf0e8c1556cac49c9cbb46628cb385efc2",
+    "workspace_payload_manifest_sha256_after": "sha256:bbf0034693c602bd9ecebe65a6f21caf0e8c1556cac49c9cbb46628cb385efc2",
+    "launch_command_invoked": false,
+    "authority_store_created": false,
+    "workspace_changed": false
+  },
+  "host_state": {
+    "fixture_objects_before": {"workspaces": 0, "tabs": 0, "panes": 0, "agents": 0},
+    "fixture_objects_after": {"workspaces": 0, "tabs": 0, "panes": 0, "agents": 0},
+    "launch_observed": false
+  },
+  "scope_result": {
+    "step11": "pass",
+    "seal_condition_met": true,
+    "exact_accepted_native_launcher_used": true,
+    "full_codex_suite_claimed": false,
+    "launcher_support_claimed": false,
+    "compatibility_warnings": ["Reachable Herdr 0.9.0/protocol 22 is unverified, not the later full-suite Herdr 0.8.2/protocol 20 pin."]
+  },
+  "cleanup": {
+    "server_stopped_via_local_control": true,
+    "server_process_exited": true,
+    "socket_removed": true,
+    "run_root_removed": true
+  },
+  "scrub": {
+    "status": "pass",
+    "run_paths_replaced": true,
+    "credentials_present": false,
+    "private_transcripts_present": false,
+    "raw_vendor_state_present": false,
+    "unsanitized_environment_values_present": false
+  }
+}

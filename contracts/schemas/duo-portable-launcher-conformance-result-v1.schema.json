@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:duo:schema:portable-launcher-conformance-result:v1",
+  "title": "Duo portable launcher conformance result v1",
+  "type": "object",
+  "required": ["schema", "suite", "run", "pins", "stages", "summary", "scrub"],
+  "properties": {
+    "schema": {"const": "duo.portable-launcher-conformance-result/v1"},
+    "suite": {"$ref": "#/$defs/suite"},
+    "run": {"$ref": "#/$defs/run"},
+    "pins": {"$ref": "#/$defs/pins"},
+    "stages": {"type": "array", "minItems": 32, "maxItems": 32, "items": {"$ref": "#/$defs/stage"}},
+    "summary": {"$ref": "#/$defs/summary"},
+    "scrub": {"$ref": "#/$defs/scrub"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "blob": {"type": "string", "pattern": "^blob:sha256:[0-9a-f]{64}$"},
+    "suite": {
+      "type": "object",
+      "required": ["name", "revision", "manifest_digest", "oracle_digest"],
+      "properties": {
+        "name": {"const": "portable-launcher-delegation"},
+        "revision": {"const": 1},
+        "manifest_digest": {"$ref": "#/$defs/digest"},
+        "oracle_digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["run_id", "observed_at", "host_os", "host_arch", "fixture_root", "plugins_enabled", "mcp_enabled", "terminal_input_used"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "host_os": {"const": "linux"},
+        "host_arch": {"const": "x86_64"},
+        "fixture_root": {"const": "$RUN"},
+        "plugins_enabled": {"const": false},
+        "mcp_enabled": {"const": false},
+        "terminal_input_used": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "binary": {
+      "type": "object",
+      "required": ["name", "version", "executable_sha256"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "executable_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "pins": {
+      "type": "object",
+      "required": ["launcher", "duo", "skill", "config", "authority", "host", "runtime", "model", "external_schema"],
+      "properties": {
+        "launcher": {
+          "allOf": [
+            {"$ref": "#/$defs/binary"},
+            {"properties": {"name": {"enum": ["amp", "opencode", "codex"]}}}
+          ]
+        },
+        "duo": {
+          "type": "object",
+          "required": ["version", "commit", "build_date", "executable_sha256"],
+          "properties": {
+            "version": {"type": "string", "minLength": 1},
+            "commit": {"type": "string", "minLength": 1},
+            "build_date": {"type": "string", "minLength": 1},
+            "executable_sha256": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        },
+        "skill": {
+          "type": "object",
+          "required": ["name", "format_version", "content_digest", "installation_id"],
+          "properties": {
+            "name": {"const": "duo-delegation-loop"},
+            "format_version": {"const": "duo.skill/duo-delegation-loop/v1"},
+            "content_digest": {"$ref": "#/$defs/digest"},
+            "installation_id": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "config": {
+          "type": "object",
+          "required": ["schema", "effective_digest"],
+          "properties": {"schema": {"const": "duo.config/v3"}, "effective_digest": {"$ref": "#/$defs/digest"}},
+          "additionalProperties": false
+        },
+        "authority": {
+          "type": "object",
+          "required": ["schema_version", "store_digest_before", "store_digest_after"],
+          "properties": {"schema_version": {"const": 1}, "store_digest_before": {"$ref": "#/$defs/digest"}, "store_digest_after": {"$ref": "#/$defs/digest"}},
+          "additionalProperties": false
+        },
+        "host": {
+          "type": "object",
+          "required": ["name", "version", "protocol", "schema_digest", "executable_sha256"],
+          "properties": {
+            "name": {"const": "herdr"},
+            "version": {"const": "0.8.2"},
+            "protocol": {"const": "herdr-socket-api/20"},
+            "schema_digest": {"const": "sha256:c48f1f54ee0150ca27e11fd44455fe94aeadb20fdf4e4a62393ed822a4e5b150"},
+            "executable_sha256": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        },
+        "runtime": {
+          "type": "object",
+          "required": ["name", "version", "format", "adapter_build", "conformance_record", "executable_sha256", "delivery_asset_sha256"],
+          "properties": {
+            "name": {"const": "pi"},
+            "version": {"const": "0.83.0"},
+            "format": {"const": "pi-session-jsonl/v3"},
+            "adapter_build": {"const": "stage1"},
+            "conformance_record": {"const": "pi-0.83.0-2026-08-23"},
+            "executable_sha256": {"$ref": "#/$defs/digest"},
+            "delivery_asset_sha256": {"const": "sha256:2708a3435821fb2e72302ee56d8a07fe62c265214ae8fd342e385c03ef245a23"}
+          },
+          "additionalProperties": false
+        },
+        "model": {
+          "type": "object",
+          "required": ["provider", "model_line"],
+          "properties": {"provider": {"const": "openai-codex"}, "model_line": {"const": "gpt-5.6-luna"}},
+          "additionalProperties": false
+        },
+        "external_schema": {
+          "type": "object",
+          "required": ["identity", "digest"],
+          "properties": {"identity": {"const": "duo.external/v1"}, "digest": {"const": "sha256:8b055ff60f0ca5f3da46302671591aa0dae61185cd9f1f15fcceb36d841e7497"}},
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "assertion": {
+      "type": "object",
+      "required": ["id", "expected", "actual", "matched"],
+      "properties": {
+        "id": {
+          "enum": [
+            "bind.runtime_identity", "blocked.induction_available", "cleanup.complete",
+            "command.delivery_integrity", "command.idempotency_no_drift", "command.idempotent_no_duplication",
+            "discovery.skill_identity", "launch.resolution", "observe.assistant_text", "observe.blocked",
+            "observe.exited", "observe.restart_text", "observe.timeout", "preflight.ready",
+            "prerequisite.not_reached", "restart.authority_continuity", "send.delivery",
+            "send.idempotency_conflict", "send.idempotent_replay", "setup.fixture_isolated_and_pinned",
+            "stage.completed_within_deadline", "stage.failure"
+          ]
+        },
+        "expected": {"type": "object"},
+        "actual": {"type": "object"},
+        "matched": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "required": ["safe", "action"],
+      "properties": {"safe": {"type": "boolean"}, "action": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "effect", "retry"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "effect": {"enum": ["no_effect", "possible_effect", "unknown_effect"]},
+        "retry": {"$ref": "#/$defs/retry"}
+      },
+      "additionalProperties": false
+    },
+    "stage": {
+      "type": "object",
+      "required": ["sequence", "stage", "case", "verdict", "outcome", "started_offset_ms", "duration_ms", "assertions", "evidence", "error"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "stage": {"enum": ["setup", "discovery", "preflight", "launch", "bind", "send", "observe", "command_inspection", "restart", "cleanup"]},
+        "case": {"enum": ["run", "happy", "blocked", "exited", "timeout", "restart", "same_key_same_text", "same_key_different_text"]},
+        "verdict": {"enum": ["pass", "fail"]},
+        "outcome": {"enum": ["success", "blocked", "exited", "timeout", "error"]},
+        "started_offset_ms": {"type": "integer", "minimum": 0},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "assertions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/assertion"}},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/blob"}},
+        "error": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/error"}]}
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["verdict", "first_failed_stage", "first_failed_case"],
+      "properties": {
+        "verdict": {"enum": ["pass", "fail"]},
+        "first_failed_stage": {"enum": [null, "setup", "discovery", "preflight", "launch", "bind", "send", "observe", "command_inspection", "restart", "cleanup"]},
+        "first_failed_case": {"enum": [null, "run", "happy", "blocked", "exited", "timeout", "restart", "same_key_same_text", "same_key_different_text"]}
+      },
+      "additionalProperties": false
+    },
+    "scrub": {
+      "type": "object",
+      "required": ["status", "policy", "findings"],
+      "properties": {
+        "status": {"enum": ["pass", "fail"]},
+        "policy": {"const": "portable-launcher-evidence/v1"},
+        "findings": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

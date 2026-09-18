@@ -3,8 +3,8 @@
 # repo and write contracts/MANIFEST.
 #
 # Hashes:
-#   contracts/schemas/                    -> schemas/...
-#   contracts/fixtures/duo-external-v1/   -> fixtures/duo-external-v1/...
+#   contracts/schemas/    -> schemas/...
+#   contracts/fixtures/   -> fixtures/...
 #
 # and writes contracts/MANIFEST: one "sha256  path" line per file (paths
 # relative to contracts/), sorted, so the output is deterministic and a
@@ -20,7 +20,7 @@ dst="$repo_root/contracts"
 	echo "# Regenerate with contrib/gen-contracts-manifest; do not edit by hand."
 	(
 		cd "$dst"
-		find schemas fixtures/duo-external-v1 -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+		find schemas fixtures -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
 	)
 } > "$dst/MANIFEST"
 

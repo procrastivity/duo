@@ -1,6 +1,8 @@
 package doctor
 
 import (
+	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -43,6 +45,14 @@ func TestRun_PresentNoWriter(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close (setup): %v", err)
 	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile before doctor: %v", err)
+	}
+	beforeInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat before doctor: %v", err)
+	}
 
 	report := Run(path, nil)
 
@@ -60,6 +70,17 @@ func TestRun_PresentNoWriter(t *testing.T) {
 	}
 	if report.Store.Writer.Active {
 		t.Errorf("Writer.Active = true, want false: %+v", report.Store.Writer)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile after doctor: %v", err)
+	}
+	afterInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat after doctor: %v", err)
+	}
+	if !bytes.Equal(before, after) || !beforeInfo.ModTime().Equal(afterInfo.ModTime()) || beforeInfo.Size() != afterInfo.Size() {
+		t.Fatal("doctor store probe changed database bytes or metadata")
 	}
 
 	// The probe must not have left a lingering lease: a second probe must
