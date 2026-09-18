@@ -92,6 +92,15 @@
       "case": "run",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "common_controller",
+        "operation": "fixture.prepare",
+        "arguments": [],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Use the prepared isolated fixture and its exact per-run pins; do not use shared user state."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -117,6 +126,17 @@
       "case": "run",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "launcher",
+        "operation": "skill.discover",
+        "arguments": [
+          "duo-delegation-loop"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Load the installed project skill and emit the launcher discovery event for its exact identity before invoking Duo."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -140,6 +160,21 @@
       "case": "run",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "doctor.run",
+        "arguments": [
+          "doctor",
+          "--workspace",
+          "$WORKSPACE",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Run the read-only launcher preflight once and continue only when its seven required checks report ready."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -163,6 +198,27 @@
       "case": "happy",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.launch",
+        "arguments": [
+          "session",
+          "launch",
+          "builder",
+          "--require",
+          "agent_runtime=pi",
+          "--workspace",
+          "$WORKSPACE",
+          "--host",
+          "herdr:$RUN/herdr/herdr.sock",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Launch one fresh canonical Pi session without a pre-launch prompt and retain its session identifier."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -187,6 +243,21 @@
       "case": "happy",
       "expected_outcome": "success",
       "deadline_ms": 12000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.inspect",
+        "arguments": [
+          "session",
+          "show",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -210,6 +281,27 @@
       "case": "happy",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$CASE_SESSION_ID",
+          "--text",
+          "$CANONICAL_PROMPT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Deliver the canonical prompt exactly once to this case's bound session with the primary idempotency key and finite expiry."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -239,6 +331,23 @@
       "case": "happy",
       "expected_outcome": "success",
       "deadline_ms": 20000,
+      "action": {
+        "executor": "duo",
+        "operation": "conversation.list",
+        "arguments": [
+          "conversation",
+          "list",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [
+          "session.inspect"
+        ],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Poll session show and conversation list as distinct commands at approximately one-second intervals; stop on the declared outcome or the stage deadline and retain the final semantic conversation page."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -262,6 +371,21 @@
       "case": "happy",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -290,6 +414,21 @@
       "case": "restart",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.reconcile",
+        "arguments": [
+          "session",
+          "reconcile",
+          "$HAPPY_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Open the same authority store in a new Duo process, reconcile the still-live happy session, and retain same-live continuity."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -314,6 +453,21 @@
       "case": "restart",
       "expected_outcome": "success",
       "deadline_ms": 12000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.inspect",
+        "arguments": [
+          "session",
+          "show",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -337,6 +491,23 @@
       "case": "restart",
       "expected_outcome": "success",
       "deadline_ms": 20000,
+      "action": {
+        "executor": "duo",
+        "operation": "conversation.list",
+        "arguments": [
+          "conversation",
+          "list",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [
+          "session.inspect"
+        ],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Poll session show and conversation list as distinct commands at approximately one-second intervals; stop on the declared outcome or the stage deadline and retain the final semantic conversation page."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -359,6 +530,21 @@
       "case": "restart",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -387,6 +573,27 @@
       "case": "same_key_same_text",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$HAPPY_SESSION_ID",
+          "--text",
+          "$CANONICAL_PROMPT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Resend the canonical text with the primary idempotency key and retain the original command identity."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -410,6 +617,21 @@
       "case": "same_key_same_text",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -433,6 +655,27 @@
       "case": "same_key_different_text",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$HAPPY_SESSION_ID",
+          "--text",
+          "$CONFLICT_TEXT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Send the conflict text with the primary idempotency key and retain the schema-valid conflict envelope; do not retry it."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -461,6 +704,21 @@
       "case": "same_key_different_text",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -485,6 +743,15 @@
       "case": "blocked",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "common_controller",
+        "operation": "prerequisite.require_admitted_then_blocked",
+        "arguments": [],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Record prerequisite.blocked_induction_unavailable and do not launch or fabricate the admitted-then-blocked case while the canonical prerequisite is unavailable."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -509,6 +776,21 @@
       "case": "blocked",
       "expected_outcome": "success",
       "deadline_ms": 12000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.inspect",
+        "arguments": [
+          "session",
+          "show",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -532,6 +814,27 @@
       "case": "blocked",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$CASE_SESSION_ID",
+          "--text",
+          "$CANONICAL_PROMPT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Deliver the canonical prompt exactly once to this case's bound session with the primary idempotency key and finite expiry."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -561,6 +864,23 @@
       "case": "blocked",
       "expected_outcome": "blocked",
       "deadline_ms": 20000,
+      "action": {
+        "executor": "duo",
+        "operation": "conversation.list",
+        "arguments": [
+          "conversation",
+          "list",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [
+          "session.inspect"
+        ],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Poll session show and conversation list as distinct commands at approximately one-second intervals; stop on the declared outcome or the stage deadline and retain the final semantic conversation page."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -585,6 +905,21 @@
       "case": "blocked",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -613,6 +948,27 @@
       "case": "exited",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.launch",
+        "arguments": [
+          "session",
+          "launch",
+          "builder",
+          "--require",
+          "agent_runtime=pi",
+          "--workspace",
+          "$WORKSPACE",
+          "--host",
+          "herdr:$RUN/herdr/herdr.sock",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Launch one fresh canonical Pi session without a pre-launch prompt and retain its session identifier."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -637,6 +993,21 @@
       "case": "exited",
       "expected_outcome": "success",
       "deadline_ms": 12000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.inspect",
+        "arguments": [
+          "session",
+          "show",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command. Emit the exact attachment-bound checkpoint so the common controller verifies and suspends that process before send."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -660,6 +1031,27 @@
       "case": "exited",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$CASE_SESSION_ID",
+          "--text",
+          "$CANONICAL_PROMPT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Deliver the canonical prompt exactly once to this case's bound session with the primary idempotency key and finite expiry. Emit the durable-delivery checkpoint for common controller verification."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -689,6 +1081,21 @@
       "case": "exited",
       "expected_outcome": "exited",
       "deadline_ms": 20000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.reconcile",
+        "arguments": [
+          "session",
+          "reconcile",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "After the common controller closes the exact suspended pane, reconcile this session once and retain the exited observation."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -713,6 +1120,21 @@
       "case": "exited",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -741,6 +1163,27 @@
       "case": "timeout",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.launch",
+        "arguments": [
+          "session",
+          "launch",
+          "builder",
+          "--require",
+          "agent_runtime=pi",
+          "--workspace",
+          "$WORKSPACE",
+          "--host",
+          "herdr:$RUN/herdr/herdr.sock",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Launch one fresh canonical Pi session without a pre-launch prompt and retain its session identifier."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -765,6 +1208,21 @@
       "case": "timeout",
       "expected_outcome": "success",
       "deadline_ms": 12000,
+      "action": {
+        "executor": "duo",
+        "operation": "session.inspect",
+        "arguments": [
+          "session",
+          "show",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command. Emit the exact attachment-bound checkpoint so the common controller verifies and suspends that process before send."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -788,6 +1246,27 @@
       "case": "timeout",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "duo",
+        "operation": "prompt.deliver",
+        "arguments": [
+          "prompt",
+          "send",
+          "$CASE_SESSION_ID",
+          "--text",
+          "$CANONICAL_PROMPT",
+          "--idempotency-key",
+          "$PRIMARY_KEY",
+          "--expires-at",
+          "$EXPIRES_AT",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Deliver the canonical prompt exactly once to this case's bound session with the primary idempotency key and finite expiry. Emit the durable-delivery checkpoint for common controller verification."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -817,6 +1296,23 @@
       "case": "timeout",
       "expected_outcome": "timeout",
       "deadline_ms": 20000,
+      "action": {
+        "executor": "duo",
+        "operation": "conversation.list",
+        "arguments": [
+          "conversation",
+          "list",
+          "$CASE_SESSION_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [
+          "session.inspect"
+        ],
+        "minimum_invocations": 1,
+        "maximum_invocations": 0,
+        "instruction": "Poll session show and conversation list as distinct commands at approximately one-second intervals; stop on the declared outcome or the stage deadline and retain the final semantic conversation page."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -846,6 +1342,21 @@
       "case": "timeout",
       "expected_outcome": "success",
       "deadline_ms": 15000,
+      "action": {
+        "executor": "duo",
+        "operation": "command.inspect",
+        "arguments": [
+          "prompt",
+          "show",
+          "$CASE_COMMAND_ID",
+          "--output",
+          "json"
+        ],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Inspect the case's original prompt command and retain its durable state and attempt list."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",
@@ -874,6 +1385,15 @@
       "case": "run",
       "expected_outcome": "success",
       "deadline_ms": 30000,
+      "action": {
+        "executor": "common_controller",
+        "operation": "fixture.cleanup",
+        "arguments": [],
+        "auxiliary_operations": [],
+        "minimum_invocations": 1,
+        "maximum_invocations": 1,
+        "instruction": "Run common controller cleanup, independently inspect/export the fixture, and remove only the run root; cleanup is always last."
+      },
       "assertions": [
         {
           "id": "stage.completed_within_deadline",

@@ -15,6 +15,8 @@ import (
 
 const fixtureDir = "../../../contracts/fixtures/duo-portable-launcher-conformance-v1"
 
+const fixtureDuoCommit = "0123456789abcdef0123456789abcdef01234567"
+
 type builtFixture struct {
 	Scenario []byte
 	Result   Result
@@ -235,7 +237,7 @@ func fixturePins() Pins {
 	launcher, _ := AcceptedLauncherPin("amp")
 	return Pins{
 		Launcher:       LauncherPin{Name: "amp", Version: launcher.Version, ExecutableSHA256: launcher.Digest},
-		Duo:            DuoPin{Version: "fixture", Commit: DuoSourceCommit, BuildDate: "2026-09-17T00:00:00Z", ExecutableSHA256: Digest([]byte("fixture duo executable\n"))},
+		Duo:            DuoPin{Version: "fixture", Commit: fixtureDuoCommit, BuildDate: "2026-09-17T00:00:00Z", ExecutableSHA256: Digest([]byte("fixture duo executable\n"))},
 		Skill:          SkillPin{Name: SkillName, FormatVersion: SkillFormat, ContentDigest: SkillContentDigest, InstallationID: "fixture-installation"},
 		Config:         ConfigPin{Schema: "duo.config/v3", EffectiveDigest: Digest([]byte("fixture effective config\n"))},
 		Authority:      AuthorityPin{SchemaVersion: 1, StoreDigestBefore: Digest([]byte("fixture empty authority\n")), StoreDigestAfter: Digest([]byte("fixture populated authority\n"))},
@@ -562,12 +564,13 @@ func TestFixtureFailsClosedAndCleanupSurfacesFailures(t *testing.T) {
 		BaseDir: base,
 		Artifacts: map[string]Artifact{
 			"launcher": {Name: "amp", Path: artifact, Version: "0.0.1789675234-g2899fe", Digest: Digest([]byte("not a pinned binary"))},
-			"duo":      {Name: "duo", Path: artifact, Version: "fixture", Commit: DuoSourceCommit, Digest: Digest([]byte("not a pinned binary"))},
+			"duo":      {Name: "duo", Path: artifact, Version: "fixture", Commit: fixtureDuoCommit, BuildDate: "2026-09-17T00:00:00Z", Digest: Digest([]byte("not a pinned binary"))},
 			"host":     {Name: "herdr", Path: artifact, Version: "0.9.0", Digest: Digest([]byte("not a pinned binary"))},
 			"runtime":  {Name: "pi", Path: artifact, Version: "0.84.4", Digest: Digest([]byte("not a pinned binary"))},
 		},
 		HostProtocol: "herdr-socket-api/22", HostSchemaDigest: "sha256:" + strings.Repeat("2", 64),
 		ConfigBytes: []byte("schema: duo.config/v3\n"), EffectiveConfigDigest: "sha256:" + strings.Repeat("3", 64),
+		Duo: DuoPin{Version: "fixture", Commit: fixtureDuoCommit, BuildDate: "2026-09-17T00:00:00Z", ExecutableSHA256: Digest([]byte("not a pinned binary"))},
 	}
 	before := directoryNames(t, base)
 	if _, err := PrepareFixture(in); err == nil || !strings.Contains(err.Error(), "Pi 0.83.0") || !strings.Contains(err.Error(), "Herdr 0.8.2") {

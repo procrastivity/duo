@@ -1,8 +1,9 @@
 package portablelauncher
 
+import "regexp"
+
 // Pinned suite identities and canonical payload digests.
 const (
-	DuoSourceCommit      = "1437f2f69e71d164b4248ed121803e53e3e1a2ba"
 	SkillName            = "duo-delegation-loop"
 	SkillFormat          = "duo.skill/duo-delegation-loop/v1"
 	SkillContentDigest   = "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182"
@@ -15,6 +16,8 @@ const (
 	PromptDigest         = "sha256:b40d3a68eb33083b92199d734da2dece28395a6acc6d5e2cb9d7032dae4d11c7"
 	ConflictDigest       = "sha256:dbe904a42a9d9d9cdf7908508fa393ce43c9c53ea16a8cb8c9b82e7005f602bc"
 )
+
+var exactCommitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // AcceptedLauncher is an exact launcher version and executable digest admitted
 // by the suite.

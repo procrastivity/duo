@@ -40,6 +40,14 @@ type RecordedExecutable struct {
 	SHA256 string
 }
 
+func recordedExecutableForPath(path string) (RecordedExecutable, error) {
+	executable, err := identifyCommandExecutable(path)
+	if err != nil {
+		return RecordedExecutable{}, err
+	}
+	return RecordedExecutable(executable), nil
+}
+
 // RecordedCommand is one validated raw command fact. It deliberately carries
 // no scenario, stage, case, assertion, verdict, environment, or host path.
 type RecordedCommand struct {

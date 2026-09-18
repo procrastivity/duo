@@ -138,7 +138,7 @@ func validatePins(v Pins, p *Problems) {
 	if !ok || v.Launcher.Version != wantLauncher.Version || v.Launcher.ExecutableSHA256 != wantLauncher.Digest {
 		p.Add("pins.launcher: identity is absent or not an exact accepted pin")
 	}
-	if v.Duo.Version == "" || v.Duo.BuildDate == "" || v.Duo.Commit != DuoSourceCommit || !digestPattern.MatchString(v.Duo.ExecutableSHA256) {
+	if !validDuoPin(v.Duo) {
 		p.Add("pins.duo: incomplete or mismatched build identity")
 	}
 	if v.Skill.Name != SkillName || v.Skill.FormatVersion != SkillFormat || v.Skill.ContentDigest != SkillContentDigest || v.Skill.InstallationID == "" {
@@ -173,6 +173,7 @@ func validateStages(r Result, scenario Scenario, p *Problems) {
 		limit = len(scenario.Steps)
 	}
 	var priorEnd int64
+	completeDeadlineFailed := false
 	for i := 0; i < limit; i++ {
 		got, want := r.Stages[i], scenario.Steps[i]
 		if got.Sequence != i+1 || got.Sequence != want.Sequence {
@@ -191,10 +192,14 @@ func validateStages(r Result, scenario Scenario, p *Problems) {
 		if got.Case == "timeout" && got.Stage == "observe" {
 			stageMaximum = CanonicalOracle().TimeoutMaximumMS
 		}
-		if got.DurationMS > stageMaximum {
+		deadlineFailure := got.Verdict == "fail" && got.Error != nil && (got.Error.Code == "stage.deadline_exceeded" || got.Error.Code == "run.deadline_exceeded")
+		if got.DurationMS > stageMaximum && !deadlineFailure {
 			p.Add(fmt.Sprintf("stages[%d]: stage deadline exceeded", i))
 		}
-		if got.StartedOffsetMS+got.DurationMS > scenario.DeadlinesMS["complete_run"] {
+		if got.Verdict == "fail" && got.Error != nil && got.Error.Code == "run.deadline_exceeded" {
+			completeDeadlineFailed = true
+		}
+		if got.StartedOffsetMS+got.DurationMS > scenario.DeadlinesMS["complete_run"] && !completeDeadlineFailed {
 			p.Add(fmt.Sprintf("stages[%d]: complete run deadline exceeded", i))
 		}
 		priorEnd = got.StartedOffsetMS + got.DurationMS

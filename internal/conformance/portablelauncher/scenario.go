@@ -5,7 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
+
+	"github.com/procrastivity/duo/internal/registry"
 )
 
 // Canonical request, prompt, conflict, and outer-task payloads.
@@ -66,7 +69,24 @@ type StepSpec struct {
 	Case       string              `json:"case"`
 	Outcome    string              `json:"expected_outcome"`
 	DeadlineMS int64               `json:"deadline_ms"`
+	Action     ActionSpec          `json:"action"`
 	Assertions []ExpectedAssertion `json:"assertions"`
+}
+
+// ActionSpec is the launcher-neutral instruction for one canonical stage.
+// Operation is either a registered Duo operation or a common-suite action.
+// Arguments are executable argv templates; values beginning with '$' are
+// bound from prior canonical outputs. MaximumInvocations zero means bounded
+// by the stage deadline rather than by count. Drivers never construct these
+// values.
+type ActionSpec struct {
+	Executor            string   `json:"executor"`
+	Operation           string   `json:"operation"`
+	Arguments           []string `json:"arguments"`
+	AuxiliaryOperations []string `json:"auxiliary_operations"`
+	MinimumInvocations  int      `json:"minimum_invocations"`
+	MaximumInvocations  int      `json:"maximum_invocations"`
+	Instruction         string   `json:"instruction"`
 }
 
 // ExpectedAssertion is an assertion ID and its canonical expected value.
@@ -139,11 +159,78 @@ func CanonicalScenario() Scenario {
 			}
 			s.Steps = append(s.Steps, StepSpec{
 				Sequence: sequence, Stage: stage, Case: group.Case, Outcome: outcome,
-				DeadlineMS: deadlineByStage[stage], Assertions: expectedAssertions(stage, group.Case),
+				DeadlineMS: deadlineByStage[stage], Action: canonicalAction(stage, group.Case),
+				Assertions: expectedAssertions(stage, group.Case),
 			})
 		}
 	}
 	return s
+}
+
+func canonicalAction(stage, caseName string) ActionSpec {
+	jsonOutput := []string{"--output", "json"}
+	duo := func(operation, instruction string, arguments ...string) ActionSpec {
+		return ActionSpec{Executor: "duo", Operation: operation, Arguments: append(arguments, jsonOutput...), AuxiliaryOperations: []string{}, MinimumInvocations: 1, MaximumInvocations: 1, Instruction: instruction}
+	}
+	controller := func(operation, instruction string) ActionSpec {
+		return ActionSpec{Executor: "common_controller", Operation: operation, Arguments: []string{}, AuxiliaryOperations: []string{}, MinimumInvocations: 1, MaximumInvocations: 1, Instruction: instruction}
+	}
+
+	switch {
+	case stage == "setup":
+		return controller("fixture.prepare", "Use the prepared isolated fixture and its exact per-run pins; do not use shared user state.")
+	case stage == "discovery":
+		return ActionSpec{Executor: "launcher", Operation: "skill.discover", Arguments: []string{SkillName}, AuxiliaryOperations: []string{}, MinimumInvocations: 1, MaximumInvocations: 1, Instruction: "Load the installed project skill and emit the launcher discovery event for its exact identity before invoking Duo."}
+	case stage == "preflight":
+		return duo(registeredOperationName("doctor"), "Run the read-only launcher preflight once and continue only when its seven required checks report ready.", "doctor", "--workspace", "$WORKSPACE")
+	case stage == "launch":
+		if caseName == "blocked" {
+			return controller("prerequisite.require_admitted_then_blocked", "Record prerequisite.blocked_induction_unavailable and do not launch or fabricate the admitted-then-blocked case while the canonical prerequisite is unavailable.")
+		}
+		return duo(registeredOperationName("session", "launch"), "Launch one fresh canonical Pi session without a pre-launch prompt and retain its session identifier.", "session", "launch", "builder", "--require", "agent_runtime=pi", "--workspace", "$WORKSPACE", "--host", "herdr:$RUN/herdr/herdr.sock")
+	case stage == "bind":
+		instruction := "Inspect the just-launched session until the one claimed Pi attachment and durable runtime identity are present; each poll is a separate command."
+		if caseName == "exited" || caseName == "timeout" {
+			instruction += " Emit the exact attachment-bound checkpoint so the common controller verifies and suspends that process before send."
+		}
+		action := duo(registeredOperationName("session", "show"), instruction, "session", "show", "$CASE_SESSION_ID")
+		action.MaximumInvocations = 0
+		return action
+	case stage == "send" && caseName == "same_key_same_text":
+		return duo(registeredOperationName("prompt", "send"), "Resend the canonical text with the primary idempotency key and retain the original command identity.", "prompt", "send", "$HAPPY_SESSION_ID", "--text", "$CANONICAL_PROMPT", "--idempotency-key", "$PRIMARY_KEY", "--expires-at", "$EXPIRES_AT")
+	case stage == "send" && caseName == "same_key_different_text":
+		return duo(registeredOperationName("prompt", "send"), "Send the conflict text with the primary idempotency key and retain the schema-valid conflict envelope; do not retry it.", "prompt", "send", "$HAPPY_SESSION_ID", "--text", "$CONFLICT_TEXT", "--idempotency-key", "$PRIMARY_KEY", "--expires-at", "$EXPIRES_AT")
+	case stage == "send":
+		instruction := "Deliver the canonical prompt exactly once to this case's bound session with the primary idempotency key and finite expiry."
+		if caseName == "exited" || caseName == "timeout" {
+			instruction += " Emit the durable-delivery checkpoint for common controller verification."
+		}
+		return duo(registeredOperationName("prompt", "send"), instruction, "prompt", "send", "$CASE_SESSION_ID", "--text", "$CANONICAL_PROMPT", "--idempotency-key", "$PRIMARY_KEY", "--expires-at", "$EXPIRES_AT")
+	case stage == "observe" && caseName == "exited":
+		return duo(registeredOperationName("session", "reconcile"), "After the common controller closes the exact suspended pane, reconcile this session once and retain the exited observation.", "session", "reconcile", "$CASE_SESSION_ID")
+	case stage == "observe":
+		action := duo(registeredOperationName("conversation", "list"), "Poll session show and conversation list as distinct commands at approximately one-second intervals; stop on the declared outcome or the stage deadline and retain the final semantic conversation page.", "conversation", "list", "$CASE_SESSION_ID")
+		action.AuxiliaryOperations = []string{registeredOperationName("session", "show")}
+		action.MaximumInvocations = 0
+		return action
+	case stage == "command_inspection":
+		return duo(registeredOperationName("prompt", "show"), "Inspect the case's original prompt command and retain its durable state and attempt list.", "prompt", "show", "$CASE_COMMAND_ID")
+	case stage == "restart":
+		return duo(registeredOperationName("session", "reconcile"), "Open the same authority store in a new Duo process, reconcile the still-live happy session, and retain same-live continuity.", "session", "reconcile", "$HAPPY_SESSION_ID")
+	case stage == "cleanup":
+		return controller("fixture.cleanup", "Run common controller cleanup, independently inspect/export the fixture, and remove only the run root; cleanup is always last.")
+	default:
+		panic(fmt.Sprintf("portable launcher scenario: no action for %s/%s", caseName, stage))
+	}
+}
+
+func registeredOperationName(cli ...string) string {
+	for _, descriptor := range registry.All() {
+		if slices.Equal(descriptor.CLI, cli) {
+			return descriptor.Name
+		}
+	}
+	panic(fmt.Sprintf("portable launcher scenario: no registered operation for CLI path %v", cli))
 }
 
 func cloneLauncherPins() map[string]AcceptedLauncher {

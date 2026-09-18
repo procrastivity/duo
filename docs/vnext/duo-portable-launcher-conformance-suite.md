@@ -1,10 +1,8 @@
 # Portable launcher conformance suite and supported builder fixture
 
-> Status: **Stage 1 design for the portable-launcher conformance Matter.**
-> This document defines the Stage 2 suite; it does not claim that the suite,
-> fixture controller, result schema, or launcher drivers exist. In particular,
-> the blocked case has an explicit prerequisite in section 8 and cannot be
-> reported as passing today.
+> Status: **Stage 2 offline suite implemented; live launcher evidence remains
+> for Stages 3–5.** The blocked case has an explicit prerequisite in section 8
+> and cannot be reported as passing today.
 
 This suite tests Amp, OpenCode, and Codex as **outer launchers** of the same
 Duo CLI workflow. It does not use any of them as the launched agent runtime.
@@ -33,7 +31,7 @@ it as `unverified`.
 
 | Component | Required identity | Source in this checkout |
 |---|---|---|
-| Duo source | commit `1437f2f69e71d164b4248ed121803e53e3e1a2ba`; the capture additionally pins the built executable SHA-256 and `duo version` fields | this checkout and `internal/buildinfo` |
+| Duo source/build | one per-run exact 40-character lowercase commit, exact version/build date, and executable SHA-256; setup artifact, recorder executable, setup evidence, and result pin must all agree | captured checkout, `internal/buildinfo`, and the validated command journals |
 | Public Duo wire | `duo.external/v1`; schema SHA-256 `8b055ff60f0ca5f3da46302671591aa0dae61185cd9f1f15fcceb36d841e7497` | `contracts/schemas/duo-external-v1.schema.json` |
 | Effective config | `duo.config/v3`; schema SHA-256 `d1a2fd1be5339c5699a21cf65616a4d09ff932a5495111d02a422b7656086842` | `contracts/schemas/duo-config-v3.schema.json` |
 | Authority store | schema version `1` | `internal/store/migrations.go` and `internal/store/store.go` |
@@ -42,7 +40,7 @@ it as `unverified`.
 | Runtime delivery asset | `duo-inject.ts`, SHA-256 `2708a3435821fb2e72302ee56d8a07fe62c265214ae8fd342e385c03ef245a23` | `internal/runtime/pi/inject/duo-inject.ts` and `internal/runtime/pi/inject.go` |
 | Host | Herdr `0.8.2`, socket protocol `20`, API-schema SHA-256 `c48f1f54ee0150ca27e11fd44455fe94aeadb20fdf4e4a62393ed822a4e5b150` | `internal/host/herdr/factory.go` |
 | Host adapter | adapter `herdr`, build `stage1`, conformance record `notes/19-herdr-probes.md@2026-08-23` | `internal/host/herdr/factory.go` |
-| Skill baseline | `duo.skill/duo-delegation-loop/v1@sha256:4c84381b7b4a3454abd58a192bd158b3ae14cd7e1bcd7dba4c87d5d5ae9be30e` | `skills/duo-delegation-loop/SKILL.md` and the companion installation contract |
+| Skill baseline | `duo.skill/duo-delegation-loop/v1@sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182` | `skills/duo-delegation-loop/SKILL.md` and the companion installation contract |
 | Inner model selection | provider `openai-codex`, model line `gpt-5.6-luna`; this is captured as fixture input, not represented as an adapter compatibility claim | existing v3 dogfood configuration in `evidence/dogfood/2026-08-24/duo.config.yaml` |
 | Outer launchers | Amp `0.0.1789675234-g2899fe`; OpenCode `1.18.31`; Codex CLI `0.154.0`, with the executable digests from Step 01 | `evidence/portable-launcher-conformance/step-01/probe-summary.json` |
 
@@ -86,8 +84,8 @@ The local observations made while authoring this document on 2026-09-17 are:
 | Pi | `0.84.4` | unverified; not the required `0.83.0` |
 | Herdr | `0.9.0`, protocol `22`, API-schema SHA-256 `226d4ecbd128d2e6bc84e4c8ddcec21ba9c7e51a0aafffcf087111ead3f1fa9a` | unverified; not the required `0.8.2`/`20`/`c48f…b150` |
 | Claude Code | `2.1.274` | outside its adapter's literal `2.1.240`, `2.1.241` set; not a fallback fixture |
-| checked-out Duo | source commit `1437f2f…` | authoritative source for this design |
-| `duo` on PATH | commit `36ce118`, built 2026-09-11 | stale relative to the checkout; not eligible for a capture |
+| checked-out Duo | must be captured as an exact full commit for the run | eligible only when it matches the built and recorded executable identity |
+| `duo` on PATH | not implicitly trusted | eligible only when copied into the fixture and bound to the same per-run version, commit, build date, and digest |
 
 Stage 2 therefore needs locally installed, digest-pinned Pi 0.83.0 and Herdr
 0.8.2 artifacts and a Duo binary built from the captured source commit. It
@@ -219,8 +217,10 @@ recording that failure, but may not rewrite it as success.
 ## 3. Ownership: one scenario and thin launcher drivers
 
 The canonical scenario is `portable-launcher-delegation/v1`. Its task text,
-fixture manifest, state machine, deadlines, assertions, and oracle live in the
-common suite. Every launcher receives the same bytes. The task tells the
+fixture manifest, state machine, executable action instructions, deadlines,
+assertions, and oracle live in the common suite. Every launcher receives the
+same bytes. Each stage names its executor, operation, argv template, allowed
+auxiliary polling operations, and invocation cardinality. The task tells the
 outer agent only to load the shared `duo-delegation-loop` skill and execute
 the canonical scenario manifest in order. It does not ask the launcher to
 author a result or verdict; the common collector is the sole final-result
@@ -731,7 +731,11 @@ The offline validator rejects the entire capture if any of these is true:
 
 ## 11. Stage 2 implementation boundaries
 
-This step does not add these files. Stage 2 should keep ownership as follows:
+The implemented offline slice keeps ownership as follows:
+
+`assembly.go` and `orchestrate.go` are Linux-only because their trusted
+command journal and process-control sources are Linux-only. The scenario,
+schemas, collector, oracle, and offline validator remain platform-neutral.
 
 ```text
 internal/conformance/portablelauncher/
@@ -739,6 +743,8 @@ internal/conformance/portablelauncher/
 ├── oracle.go            # assertions; no launcher imports
 ├── fixture.go           # roots, pinned host/runtime, controller, cleanup
 ├── capture.go           # scrubbed content-addressed evidence
+├── assembly.go          # typed raw facts -> canonical observations/stages
+├── orchestrate.go       # prepare/run/load/assemble/validate/atomic-write API
 └── validate.go          # offline schema/pin/rejection validation
 
 contracts/schemas/
@@ -754,16 +760,17 @@ contrib/portable-launcher-conformance/
 └── codex                # thin process/event adapter only
 ```
 
-If a runnable helper binary is needed, it should be a test/conformance entry
-point under `cmd/` that imports the common package; it must not become a
-second Duo protocol or a launcher-specific scenario owner. Runtime fixture
+No helper binary is added until the live normalization/provisioning inputs
+exist; exporting an entry point that invents those inputs would be misleading.
+Any future helper imports the common package and must not become a second Duo
+protocol or a launcher-specific scenario owner. Runtime fixture
 bytes remain owned by `internal/runtime/pi`; Herdr behavior remains owned by
 `internal/host/herdr`; operation names remain owned by
 `internal/registry/table.go`; public operation envelopes remain
 `duo.external/v1`; skill installation/preflight remain owned by the companion
 contract's `internal/manifest`, `internal/doctor`, and `internal/cli` seams.
 
-Stage 2 offline tests must cover schema closure, every expected non-happy
+Stage 2 offline tests cover schema closure, every expected non-happy
 outcome, stage attribution for every deadline, cleanup after each failure
 point, scrub rejection, binary/version drift, missing evidence, terminal
 paste, launcher-semantic contamination, duplicate effects, and fabricated

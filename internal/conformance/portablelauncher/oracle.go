@@ -60,7 +60,7 @@ func portableOperationNames() map[string]string {
 		"launch.resolution":          {"session", "launch"},
 		"observe.assistant_text":     {"conversation", "list"},
 		"observe.restart_text":       {"conversation", "list"},
-		"send.delivery":              {"prompt", "show"},
+		"send.delivery":              {"prompt", "send"},
 		"send.idempotency_conflict":  {"prompt", "send"},
 	}
 	operations := make(map[string]string, len(assertionCLI))

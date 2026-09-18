@@ -3,10 +3,10 @@
   "policy": "portable-launcher-evidence/v1",
   "blobs": [
     {
-      "ref": "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec",
+      "ref": "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1",
       "media_type": "application/json",
-      "bytes": 35348,
-      "sha256": "sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec",
+      "bytes": 35345,
+      "sha256": "sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1",
       "scrub_status": "pass",
       "producer": "common_collector"
     }

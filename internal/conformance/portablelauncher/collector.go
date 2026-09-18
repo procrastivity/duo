@@ -6,8 +6,9 @@ import (
 	"reflect"
 )
 
-// CommonStageCapture is the launcher-neutral input for one stage. Observations
-// are raw, independently captured facts; they cannot carry expectations or a
+// CommonStageCapture is the launcher-neutral input for one stage. Production
+// callers obtain it from AssembleCommonStages; direct construction exists for
+// focused collector tests only. Observations cannot carry expectations or a
 // verdict. Sequence selects the corresponding canonical scenario step.
 type CommonStageCapture struct {
 	Sequence        int
@@ -29,8 +30,9 @@ type CollectorInput struct {
 
 // CollectResult constructs the authoritative result and its in-memory,
 // content-addressed evidence. It always returns the complete canonical stage
-// list. The caller may persist the returned Capture in a later bundle-writing
-// step.
+// list. The production entry point is Orchestrate, which supplies only trusted
+// assembled captures. The caller may persist the returned Capture in a later
+// bundle-writing step.
 func CollectResult(input CollectorInput) (Result, *Capture) {
 	scenario := CanonicalScenario()
 	scenarioJSON, err := ScenarioJSON(scenario)
@@ -71,6 +73,7 @@ func CollectResult(input CollectorInput) (Result, *Capture) {
 	capture := NewCapture()
 	var firstFailure *failureOrigin
 	var origin *failureOrigin
+	var originBeforeBlocked *failureOrigin
 	rememberFailure := func(stage StageResult) {
 		origin = newFailureOrigin(stage)
 		if firstFailure == nil {
@@ -80,7 +83,20 @@ func CollectResult(input CollectorInput) (Result, *Capture) {
 	for i, step := range scenario.Steps {
 		stage := &result.Stages[i]
 		if origin != nil && origin.Case == "blocked" && step.Case != "blocked" {
-			origin = nil
+			origin = originBeforeBlocked
+			originBeforeBlocked = nil
+		}
+		// The known structural blocked prerequisite is canonical and
+		// case-local. Preserve it even when an earlier run failure made other
+		// semantic stages unreachable; otherwise the capture could erase the
+		// suite's mandatory blocker.
+		if blockedPrerequisiteUnavailable() && step.Case == "blocked" && step.Stage == "launch" {
+			if origin != nil && origin.Case != "blocked" {
+				originBeforeBlocked = origin
+			}
+			setBlockedUnavailable(stage, capture, &result.Scrub)
+			rememberFailure(*stage)
+			continue
 		}
 		if origin != nil && step.Stage != "cleanup" {
 			stage.StartedOffsetMS = result.Stages[i-1].StartedOffsetMS + result.Stages[i-1].DurationMS
@@ -91,12 +107,6 @@ func CollectResult(input CollectorInput) (Result, *Capture) {
 
 		if err := recordFailureAt(input.Record, i, len(scenario.Steps)); err != nil {
 			setFailed(stage, collectorError("collector.run_failed", err.Error()), capture, &result.Scrub)
-			rememberFailure(*stage)
-			continue
-		}
-
-		if blockedPrerequisiteUnavailable() && step.Case == "blocked" && step.Stage == "launch" {
-			setBlockedUnavailable(stage, capture, &result.Scrub)
 			rememberFailure(*stage)
 			continue
 		}
@@ -294,23 +304,9 @@ func originEvidence(origin *failureOrigin) []string {
 }
 
 func recordFailureAt(record RunRecord, index, stageCount int) error {
-	if index == 0 {
-		if record.RunnerError != nil {
-			return fmt.Errorf("common runner reported a failure")
-		}
-		if record.LauncherError != nil {
-			return fmt.Errorf("launcher process reported a failure")
-		}
-		if record.CheckpointSourceError != nil {
-			return fmt.Errorf("checkpoint source reported a failure")
-		}
-	}
 	if index == stageCount-1 {
 		if record.CleanupError != nil {
 			return fmt.Errorf("common cleanup reported a failure")
-		}
-		if record.CompleteRunTimedOut {
-			return fmt.Errorf("complete-run deadline exceeded")
 		}
 	}
 	return nil

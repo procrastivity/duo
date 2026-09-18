@@ -3,8 +3,8 @@
   "suite": {
     "name": "portable-launcher-delegation",
     "revision": 1,
-    "manifest_digest": "sha256:de470175432a1804cb5eb406fe97bb460b85798f378c2838c94cd2d8fe1904ea",
-    "oracle_digest": "sha256:d58e2be266ec721370b9ec2d9e2b3142089758a89e04378a0f0f387e536aa280"
+    "manifest_digest": "sha256:01e8e6bd80ceb441be6dc128aca023a1bede31b655e74b12ee3da0c2fc6cc204",
+    "oracle_digest": "sha256:a305744fc34af96b5bbd916b9de3aa1bc94f59ce4ea9316b62bb0a8dd5dd22c5"
   },
   "run": {
     "run_id": "fixture-structural-blocked",
@@ -24,7 +24,7 @@
     },
     "duo": {
       "version": "fixture",
-      "commit": "1437f2f69e71d164b4248ed121803e53e3e1a2ba",
+      "commit": "0123456789abcdef0123456789abcdef01234567",
       "build_date": "2026-09-17T00:00:00Z",
       "executable_sha256": "sha256:2af74f65db28670aa9a5439c4eb48137c63dea3db07f31b3143f672dffddaf11"
     },
@@ -108,7 +108,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -147,7 +147,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -186,7 +186,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -227,7 +227,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -266,7 +266,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -317,7 +317,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -356,7 +356,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -405,7 +405,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -446,7 +446,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -485,7 +485,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -522,7 +522,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -571,7 +571,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -610,7 +610,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -649,7 +649,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -698,7 +698,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -739,7 +739,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -764,7 +764,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": {
         "code": "prerequisite.blocked_induction_unavailable",
@@ -797,7 +797,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": {
         "code": "prerequisite.not_reached",
@@ -830,7 +830,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": {
         "code": "prerequisite.not_reached",
@@ -863,7 +863,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": {
         "code": "prerequisite.not_reached",
@@ -896,7 +896,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": {
         "code": "prerequisite.not_reached",
@@ -945,7 +945,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -984,7 +984,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1035,7 +1035,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1076,7 +1076,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1125,7 +1125,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1166,7 +1166,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1205,7 +1205,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1256,7 +1256,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1307,7 +1307,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1356,7 +1356,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     },
@@ -1399,7 +1399,7 @@
         }
       ],
       "evidence": [
-        "blob:sha256:4134ac5ede23e3f980bba527f415e7437e9ea25e12d2277d61033742031672ec"
+        "blob:sha256:045edb8695b91fd54b3d792ef5cda267f0b812a1d44765ad7290091080ca67e1"
       ],
       "error": null
     }

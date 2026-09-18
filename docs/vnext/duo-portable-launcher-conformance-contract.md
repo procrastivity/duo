@@ -18,10 +18,9 @@ portable projection does not.
 ### 1.1 Existing behavior in this checkout
 
 - [`../../skills/duo-delegation-loop/SKILL.md`](../../skills/duo-delegation-loop/SKILL.md)
-  is the normative authored skill. At commit
-  `1437f2f69e71d164b4248ed121803e53e3e1a2ba` it is 6,002 bytes with SHA-256
-  `4c84381b7b4a3454abd58a192bd158b3ae14cd7e1bcd7dba4c87d5d5ae9be30e`.
-  Its current hand-install section says that no renderer exists.
+  is the normative authored skill. The implemented projection is 6,284 bytes
+  with SHA-256
+  `6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182`.
 - The 2026-09-17 live probe in
   [`../../evidence/portable-launcher-conformance/step-01/report.md`](../../evidence/portable-launcher-conformance/step-01/report.md)
   proved project discovery at
@@ -85,7 +84,7 @@ The public identity uses **both** an authored format version and a digest:
 | `media_type` | `text/markdown` |
 
 The baseline identity is therefore
-`duo.skill/duo-delegation-loop/v1@sha256:4c84381b7b4a3454abd58a192bd158b3ae14cd7e1bcd7dba4c87d5d5ae9be30e`.
+`duo.skill/duo-delegation-loop/v1@sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182`.
 That digest is a baseline pin, not a promise that Stage 2 will leave the
 manual-install prose unchanged. If Stage 2 changes any byte, the manifest,
 stamp, doctor, and evidence must report the new digest.

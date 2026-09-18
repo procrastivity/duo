@@ -32,7 +32,7 @@
         },
         "monotonic_ms": 0,
         "pi_no_extensions": true,
-        "pins_digest": "sha256:51b356011b1f46ea2922218bb5f4c4332a205fd8091b358f12a94ee6e2d9da45"
+        "pins_digest": "sha256:363ad70b0e3151ccc29df72fc7f876899eae2c31668ad2c8ff8b2cf115f66e1d"
       }
     },
     {
@@ -215,7 +215,7 @@
       "evidence": {
         "envelope": {
           "features": [],
-          "operation": "command.inspect",
+          "operation": "prompt.deliver",
           "request_id": "req_fixture_6",
           "result": {
             "attempts": [
@@ -849,7 +849,7 @@
       "evidence": {
         "envelope": {
           "features": [],
-          "operation": "command.inspect",
+          "operation": "prompt.deliver",
           "request_id": "req_fixture_24",
           "result": {
             "attempts": [
@@ -1093,7 +1093,7 @@
       "evidence": {
         "envelope": {
           "features": [],
-          "operation": "command.inspect",
+          "operation": "prompt.deliver",
           "request_id": "req_fixture_29",
           "result": {
             "attempts": [

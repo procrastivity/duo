@@ -51,6 +51,12 @@ func TestCollectorPropagatesFirstFailureWithoutSemanticSuccesses(t *testing.T) {
 		if stage.Stage == "cleanup" {
 			continue
 		}
+		if stage.Case == "blocked" && stage.Stage == "launch" {
+			if stage.Error == nil || stage.Error.Code != "prerequisite.blocked_induction_unavailable" {
+				t.Fatalf("canonical blocked failure was not preserved: %#v", stage)
+			}
+			continue
+		}
 		if stage.Verdict != "fail" || stage.Outcome != "error" || stage.Error == nil || stage.Error.Code != "prerequisite.not_reached" {
 			t.Fatalf("stage %d did not fail closed: %#v", i, stage)
 		}
@@ -58,7 +64,12 @@ func TestCollectorPropagatesFirstFailureWithoutSemanticSuccesses(t *testing.T) {
 			t.Fatalf("stage %d fabricated or retained semantic assertions: %#v", i, stage.Assertions)
 		}
 		actual := stage.Assertions[0].Actual
-		if actual["origin_sequence"] != float64(origin.Sequence) || actual["origin_stage"] != origin.Stage || actual["origin_case"] != origin.Case {
+		wantOrigin := origin
+		if stage.Case == "blocked" {
+			blockedOrigin := result.Stages[collectorStageIndex("blocked", "launch")]
+			wantOrigin = blockedOrigin
+		}
+		if actual["origin_sequence"] != float64(wantOrigin.Sequence) || actual["origin_stage"] != wantOrigin.Stage || actual["origin_case"] != wantOrigin.Case {
 			t.Fatalf("stage %d origin = %#v", i, actual)
 		}
 		assertCollectorEvidence(t, captured, stage, "prerequisite.not_reached", actual)
@@ -124,6 +135,12 @@ func TestCollectorRawLauncherEventsCannotOverrideAuthoritativeEvidence(t *testin
 
 	for i := 1; i < len(result.Stages); i++ {
 		if result.Stages[i].Stage == "cleanup" {
+			continue
+		}
+		if result.Stages[i].Case == "blocked" && result.Stages[i].Stage == "launch" {
+			if result.Stages[i].Error == nil || result.Stages[i].Error.Code != "prerequisite.blocked_induction_unavailable" {
+				t.Fatalf("canonical blocked failure was not preserved: %#v", result.Stages[i])
+			}
 			continue
 		}
 		if result.Stages[i].Verdict != "fail" || result.Stages[i].Assertions[0].ID != "prerequisite.not_reached" {

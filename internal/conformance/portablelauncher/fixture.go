@@ -8,17 +8,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/procrastivity/duo/internal/manifest"
 )
 
 // Artifact identifies one immutable executable used by a suite run.
 type Artifact struct {
-	Name    string
-	Path    string
-	Version string
-	Digest  string
-	Commit  string
+	Name      string
+	Path      string
+	Version   string
+	Digest    string
+	Commit    string
+	BuildDate string
 }
 
 // Credential carries isolated provider credentials into a fixture.
@@ -38,15 +40,20 @@ type SetupInput struct {
 	ConfigBytes           []byte
 	EffectiveConfigDigest string
 	Credential            Credential
+	// Duo identifies the exact per-run build expected from Artifacts["duo"].
+	// It is supplied by the run, not locked to the commit that designed the
+	// suite, and is copied unchanged into the authoritative result pins.
+	Duo DuoPin
 }
 
 // Fixture identifies the isolated filesystem paths for one suite run.
 type Fixture struct {
-	Root      string
-	Workspace string
-	Capture   string
-	Result    string
-	cleaned   bool
+	Root           string
+	Workspace      string
+	Capture        string
+	Result         string
+	InstallationID string
+	cleaned        bool
 }
 
 // CheckSetupPrerequisites is deliberately pure: callers must run it before
@@ -74,8 +81,14 @@ func CheckSetupPrerequisites(in SetupInput) error {
 			p.Add("launcher: exact accepted version and executable digest required")
 		}
 	}
-	if duo, ok := in.Artifacts["duo"]; ok && (duo.Name != "duo" || duo.Version == "" || duo.Commit != DuoSourceCommit) {
-		p.Add("duo: build must identify the locked source commit")
+	if duo, ok := in.Artifacts["duo"]; ok {
+		if duo.Name != "duo" || !validDuoPin(in.Duo) || duo.Version != in.Duo.Version || duo.Commit != in.Duo.Commit || duo.BuildDate != in.Duo.BuildDate || duo.Digest != in.Duo.ExecutableSHA256 {
+			p.Add("duo: artifact must exactly match the per-run version, commit, build date, and executable pin")
+		}
+	}
+	tool := in.ProductManifest.Tool
+	if tool.Name != "duo" || tool.Version != in.Duo.Version || tool.Commit != in.Duo.Commit || tool.Date != in.Duo.BuildDate || in.ProductManifest.Product.Name != "duo" || in.ProductManifest.Product.Version != in.Duo.Version {
+		p.Add("duo: product manifest build identity must exactly match the per-run pin")
 	}
 	if host, ok := in.Artifacts["host"]; ok {
 		if host.Name != "herdr" || host.Version != "0.8.2" || in.HostProtocol != "herdr-socket-api/20" || in.HostSchemaDigest != HostSchemaDigest {
@@ -193,12 +206,21 @@ func (f *Fixture) materialize(in SetupInput) error {
 	if installed.State != manifest.StateCurrent || installed.ContentDigest != SkillContentDigest || installed.InstallationID == "" {
 		return fmt.Errorf("portable launcher skill installation did not produce the locked current projection")
 	}
+	f.InstallationID = installed.InstallationID
 	for key, artifact := range in.Artifacts {
 		if err := copyFile(artifact.Path, filepath.Join(f.Root, "bin", artifact.Name), 0o700); err != nil {
 			return fmt.Errorf("copy %s: %w", key, err)
 		}
 	}
 	return nil
+}
+
+func validDuoPin(pin DuoPin) bool {
+	if pin.Version == "" || !exactCommitPattern.MatchString(pin.Commit) || strings.Trim(pin.Commit, "0") == "" || !digestPattern.MatchString(pin.ExecutableSHA256) {
+		return false
+	}
+	when, err := time.Parse(time.RFC3339, pin.BuildDate)
+	return err == nil && when.Location() == time.UTC
 }
 
 // Path resolves a clean relative path below the fixture root.
