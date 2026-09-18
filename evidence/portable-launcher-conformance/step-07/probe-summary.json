@@ -1,0 +1,198 @@
+{
+  "schema": "duo.portable-launcher-step07-evidence/v1",
+  "observed_at_utc": {
+    "start": "2026-09-18T07:45:21Z",
+    "finish": "2026-09-18T07:51:13Z"
+  },
+  "host": {
+    "kernel": "Linux 6.8.0-136-generic",
+    "architecture": "x86_64"
+  },
+  "checkout": {
+    "path": "$CHECKOUT",
+    "branch": "feat/portable-launcher-conformance",
+    "commit": "e38ff77744ad453912ba4dd3a9bc7372c95e1130",
+    "describe": "e38ff77-dirty",
+    "preexisting_out_of_scope_changes": true
+  },
+  "amp": {
+    "version": "0.0.1789715829-g82b7fb",
+    "release_time": "2026-09-18T07:17:09.000Z",
+    "command_path": "$AMP_COMMAND",
+    "resolved_path": "$AMP_RESOLVED",
+    "executable_bytes": 100787680,
+    "executable_sha256": "sha256:36b6da094db6e984ede80f65027674bda3fd1c126828b1fb4c254c003b6cd568",
+    "step01_version": "0.0.1789675234-g2899fe",
+    "step01_executable_sha256": "sha256:f351217dac739614b4d9b3eacad728ce6d61647ab1f5d4a4de44d99aba6598ee",
+    "matches_step01_pin": false,
+    "manifest_tested_version": "0.0.1789675234-g2899fe",
+    "matches_manifest_tested_version": false
+  },
+  "duo": {
+    "version": "e38ff77-dirty",
+    "commit": "e38ff77744ad453912ba4dd3a9bc7372c95e1130",
+    "build_date": "2026-09-18T07:45:21Z",
+    "executable_path": "$RUN/bin/duo",
+    "executable_bytes": 14407182,
+    "executable_sha256": "sha256:871361f7d066e67b72cd6a95ba07c2d73ed21c6db14cd614795a7f6569028cf8",
+    "manifest_digest": "sha256:f508953d954b9d1ad2f37f18753a1d77a3b71ef847c280572bfb6d196d0f528f"
+  },
+  "skill": {
+    "name": "duo-delegation-loop",
+    "format_version": "duo.skill/duo-delegation-loop/v1",
+    "content_digest": "sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182",
+    "size_bytes": 6284,
+    "installation_id": "99c41f9c084e349f940813980c9dcd22",
+    "installed_root": "$RUN/workspace/.agents/skills/duo-delegation-loop",
+    "installed_file": "$RUN/workspace/.agents/skills/duo-delegation-loop/SKILL.md",
+    "installed_stamp": "$RUN/workspace/.agents/skills/duo-delegation-loop/.duo-generated.json",
+    "stamp_sha256": "sha256:425ac11074b0822454d4d1bbbd83b07db9ddd632d1688e57b1f669af31c04c14"
+  },
+  "config": {
+    "schema": "duo.config/v3",
+    "path": "$RUN/xdg/config/duo/duo.config.yaml",
+    "source_bytes_sha256": "sha256:b208078bb16c4d218e123b60cbe7e0173436d39d0abf6165f398bfa9f4615cd8",
+    "effective_digest": "sha256:bb5b986318036d0c25d6ed9d5f586ffde5a0973ab2f3a38daf98fe29ab4ae674",
+    "presets": [
+      "builder"
+    ]
+  },
+  "authority": {
+    "path": "$RUN/xdg/data/duo/duo.db",
+    "state": "initializable",
+    "present": false,
+    "healthy": true,
+    "schema_version": 0,
+    "writer_active": false
+  },
+  "herdr": {
+    "version": "0.9.0",
+    "command_path": "$HERDR_COMMAND",
+    "resolved_path": "$HERDR_RESOLVED",
+    "executable_bytes": 39728936,
+    "executable_sha256": "sha256:5ef212a3f142f902b1a4eb3f7a76827ded9f313804c580c48297c060ac1fcac0",
+    "protocol_identity": "herdr-socket-api/22",
+    "schema_export_sha256": "sha256:226d4ecbd128d2e6bc84e4c8ddcec21ba9c7e51a0aafffcf087111ead3f1fa9a",
+    "compatibility": "unverified",
+    "required_suite_pin_available": false,
+    "required_suite_pin": {
+      "version": "0.8.2",
+      "protocol_identity": "herdr-socket-api/20",
+      "schema_digest": "sha256:c48f1f54ee0150ca27e11fd44455fe94aeadb20fdf4e4a62393ed822a4e5b150"
+    }
+  },
+  "installation": {
+    "command": "$RUN/bin/duo install portable-launchers --workspace $RUN/workspace --output json",
+    "exit_code": 0,
+    "schema": "duo.external/v1",
+    "operation": "projection.install",
+    "target": "portable_launchers",
+    "state": "current",
+    "changed": true,
+    "warnings": [],
+    "features": []
+  },
+  "amp_discovery": {
+    "commands": [
+      "amp skill list --json --settings-file $RUN/noauth/config/amp/settings.json",
+      "amp skill info duo-delegation-loop --json --settings-file $RUN/noauth/config/amp/settings.json"
+    ],
+    "exit_codes": [
+      0,
+      0
+    ],
+    "name": "duo-delegation-loop",
+    "source": "workspace-agents",
+    "base_dir": "file://$RUN/workspace/.agents/skills/duo-delegation-loop",
+    "info_path": "file://$RUN/workspace/.agents/skills/duo-delegation-loop",
+    "description_sha256": "sha256:47c044a8e999289d69dd7912f007af0d7f11b6e10a8f5ffe28e730c7139cb85e",
+    "skill_errors": [],
+    "loader_invoked": true,
+    "model_turn_invoked": false,
+    "threads_created": false
+  },
+  "isolation": {
+    "run_root": "$RUN",
+    "home": "$RUN/noauth/home",
+    "xdg_config_home": "$RUN/noauth/config",
+    "xdg_data_home": "$RUN/noauth/data",
+    "xdg_state_home": "$RUN/noauth/state",
+    "xdg_cache_home": "$RUN/noauth/cache",
+    "workspace": "$RUN/workspace",
+    "real_user_skill_tree_written": false,
+    "account_credentials_used_by_canonical_amp_probe": false,
+    "global_plugin_lookup_deliberately_denied": true,
+    "global_plugin_load_failures": 2,
+    "plugin_start_events": 0,
+    "project_plugin_root_present": false,
+    "system_plugin_root_present": false,
+    "mcp_initializations_with_empty_ready_and_disabled_sets": 2,
+    "mcp_configured": false,
+    "terminal_input_used": false
+  },
+  "positive_preflight": {
+    "command": "$RUN/bin/duo doctor --workspace $RUN/workspace --config $RUN/xdg/config/duo/duo.config.yaml --host herdr:$RUN/xdg/config/herdr/sessions/duo-step07/herdr.sock --output json",
+    "exit_code": 0,
+    "schema": "duo.launcher-preflight/v1",
+    "status": "ready",
+    "authority_scope": "local",
+    "checks": [
+      {"id": "duo_executable", "stage": "executable", "required": true, "status": "pass", "code": "ok"},
+      {"id": "effective_config", "stage": "config", "required": true, "status": "pass", "code": "ok"},
+      {"id": "authority_store", "stage": "authority", "required": true, "status": "pass", "code": "ok"},
+      {"id": "workspace", "stage": "workspace", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_selection", "stage": "host_selection", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_reachability", "stage": "host_reachability", "required": true, "status": "pass", "code": "ok"},
+      {"id": "skill_projection", "stage": "skill_projection", "required": true, "status": "pass", "code": "ok"},
+      {"id": "host_compatibility", "stage": "host_reachability", "required": false, "status": "warning", "code": "host.compatibility_unverified"}
+    ],
+    "skill_projection_state": "current",
+    "host_reachable": true,
+    "host_compatibility_required_for_readiness": false
+  },
+  "negative_preflight": {
+    "command": "$RUN/bin/duo doctor --workspace $RUN/workspace --config $RUN/xdg/config/duo/duo.config.yaml --host herdr:$RUN/xdg/runtime/no-server/herdr.sock --output json",
+    "exit_code": 0,
+    "schema": "duo.launcher-preflight/v1",
+    "status": "not_ready",
+    "authority_scope": "unavailable",
+    "failed_check": {
+      "id": "host_reachability",
+      "stage": "host_reachability",
+      "required": true,
+      "status": "fail",
+      "code": "host.unreachable",
+      "summary": "selected Herdr host did not answer the bounded ping",
+      "action": "Host reachability stage: start or select the Herdr server at $RUN/xdg/runtime/no-server/herdr.sock and make its socket reachable."
+    },
+    "compatibility_check": {
+      "status": "not_checked",
+      "code": "prerequisite.not_reached"
+    },
+    "duo_authority_entries_before": 0,
+    "duo_authority_entries_after": 0,
+    "workspace_payload_manifest_sha256_before": "sha256:f900a9968fff9683031b6e87016860c75f80508657f4c30ddab8a5561bcf61ea",
+    "workspace_payload_manifest_sha256_after": "sha256:f900a9968fff9683031b6e87016860c75f80508657f4c30ddab8a5561bcf61ea",
+    "launch_command_invoked": false,
+    "authority_store_created": false,
+    "workspace_changed": false
+  },
+  "scope_result": {
+    "step07": "blocked",
+    "blocker": "The accepted Amp 0.0.1789675234-g2899fe executable was not available for this run; the observed Amp 0.0.1789715829-g82b7fb executable is ineligible under the exact suite pin.",
+    "full_amp_suite_claimed": false,
+    "launcher_support_claimed": false,
+    "compatibility_warnings": [
+      "Live Amp differs from the Step 01 and manifest tested pin.",
+      "Reachable Herdr 0.9.0/protocol 22 is unverified, not the later suite's Herdr 0.8.2/protocol 20 pin."
+    ]
+  },
+  "scrub": {
+    "status": "pass",
+    "run_paths_replaced": true,
+    "credentials_present": false,
+    "private_transcripts_present": false,
+    "raw_vendor_state_present": false,
+    "unsanitized_environment_values_present": false
+  }
+}
