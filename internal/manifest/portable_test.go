@@ -97,14 +97,14 @@ func TestPortableManifestTargetAndAssetIdentity(t *testing.T) {
 		t.Fatalf("components = %v", target.Components)
 	}
 	wantLaunchers := []Launcher{
-		{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe"}},
+		{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"}},
 		{Name: "opencode", TestedVersions: []string{"1.18.31"}},
 		{Name: "codex", TestedVersions: []string{"0.154.0"}},
 	}
 	if !reflect.DeepEqual(target.Launchers, wantLaunchers) {
 		t.Fatalf("launchers = %#v", target.Launchers)
 	}
-	if got := testedVersionDisplay(target.Launchers); got != "amp=0.0.1789675234-g2899fe;opencode=1.18.31;codex=0.154.0" {
+	if got := testedVersionDisplay(target.Launchers); got != "amp=0.0.1789675234-g2899fe,0.0.1789724374-g0d2ed0;opencode=1.18.31;codex=0.154.0" {
 		t.Fatalf("tested version display = %q", got)
 	}
 	authored, err := os.ReadFile(filepath.Join("..", "..", "skills", "duo-delegation-loop", "SKILL.md"))

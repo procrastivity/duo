@@ -39,7 +39,7 @@ const (
 )
 
 var portableLaunchers = []Launcher{
-	{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe"}},
+	{Name: "amp", TestedVersions: []string{"0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"}},
 	{Name: "opencode", TestedVersions: []string{"1.18.31"}},
 	{Name: "codex", TestedVersions: []string{"0.154.0"}},
 }

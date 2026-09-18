@@ -45,7 +45,7 @@ the current suite when its exact version and executable SHA-256 are captured.
 | Host adapter | adapter `herdr`, build `stage1`, conformance record `notes/19-herdr-probes.md@2026-08-23` | `internal/host/herdr/factory.go` |
 | Skill baseline | `duo.skill/duo-delegation-loop/v1@sha256:6f8bc16b656f564a949c99f12d4cf0bcd04ec2c9b49a8b74fb65b2e355b5d182` | `skills/duo-delegation-loop/SKILL.md` and the companion installation contract |
 | Inner model selection | provider `openai-codex`, model line `gpt-5.6-luna`; this is captured as fixture input, not represented as an adapter compatibility claim | existing v3 dogfood configuration in `evidence/dogfood/2026-08-24/duo.config.yaml` |
-| Outer launchers | recognized names Amp, OpenCode, and Codex; exact name/version/executable SHA-256 immutable per run; initial historical observations are Amp `0.0.1789675234-g2899fe`, OpenCode `1.18.31`, and Codex CLI `0.154.0` | current common-suite capability evidence; historical metadata originated in `evidence/portable-launcher-conformance/step-01/probe-summary.json` |
+| Outer launchers | recognized names Amp, OpenCode, and Codex; exact name/version/executable SHA-256 immutable per run; ordered historical observations are Amp `0.0.1789675234-g2899fe`, Amp `0.0.1789724374-g0d2ed0`, OpenCode `1.18.31`, and Codex CLI `0.154.0` | current common-suite capability evidence; historical metadata originated in `evidence/portable-launcher-conformance/step-01/probe-summary.json` and the Amp follow-up in `evidence/portable-launcher-conformance/step-07/attempt-02/probe-summary.json` |
 
 The skill digest is a baseline. If Stage 2 changes its obsolete hand-install
 wording, the installed projection, manifest, doctor output, scenario

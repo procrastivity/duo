@@ -29,6 +29,13 @@ the three launcher support claims still require live evidence.
   host. The repository-relative symlink target
   `../../skills/duo-delegation-loop` was also live-confirmed. The checkout did
   not itself contain `.agents/`.
+- The 2026-09-18 Amp Step 07 follow-up in
+  [`../../evidence/portable-launcher-conformance/step-07/attempt-02/report.md`](../../evidence/portable-launcher-conformance/step-07/attempt-02/report.md)
+  recorded Amp `0.0.1789724374-g0d2ed0` (released
+  `2026-09-18T09:39:34.000Z`, executable SHA-256
+  `7c45e90d54d8a46adf8069077341e85471c6bff3e2a881afc00f0ab35b188f91`)
+  passing installed-skill discovery and reachable/unreachable preflight. It did
+  not run the full launcher suite or establish launcher support.
 - `internal/asset` resolves shipped or embedded assets. `internal/manifest`
   declares and installs the `portable_launchers` target with the normative
   `duo.projection-stamp/v1` ownership record. Its older `Stamp` and `Drift`
@@ -147,10 +154,10 @@ The stamp is `duo.projection-stamp/v1` with this specialization:
   "projection_format": "duo.skill/duo-delegation-loop/v1",
   "target": {
     "harness": "portable_launchers",
-    "tested_version_range": "amp=0.0.1789675234-g2899fe;opencode=1.18.31;codex=0.154.0",
+    "tested_version_range": "amp=0.0.1789675234-g2899fe,0.0.1789724374-g0d2ed0;opencode=1.18.31;codex=0.154.0",
     "launcher_eligibility": "capability_evidence",
     "launchers": [
-      {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe"]},
+      {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"]},
       {"name": "opencode", "tested_versions": ["1.18.31"]},
       {"name": "codex", "tested_versions": ["0.154.0"]}
     ]
@@ -319,7 +326,7 @@ stable fields:
     "content_digest": "sha256:<64 lowercase hex>"
   },
   "launchers": [
-    {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe"]},
+    {"name": "amp", "tested_versions": ["0.0.1789675234-g2899fe", "0.0.1789724374-g0d2ed0"]},
     {"name": "opencode", "tested_versions": ["1.18.31"]},
     {"name": "codex", "tested_versions": ["0.154.0"]}
   ]
