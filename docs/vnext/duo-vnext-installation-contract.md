@@ -380,6 +380,29 @@ OpenCode or Codex hook fact cannot become an optimistic path. The renderer
 installs the proven common component and reports optional components as
 `unverified`.
 
+(2026-09-23 amendment, OpenCode plugin wildcard removal: at exact pin
+OpenCode 2.0.12 — executable SHA-256
+`2b0825721cb12f9bca3d5099588087d557a21ed2b5b56efebea3f17dc5f79e6a`, source
+commit `2670273ff17da96f85c5826ced57aa1b368754fa`, pin dated and
+live-reverified 2026-09-23 — a high-priority `-*` remove directive with
+no re-add removed an unrelated lower-priority sibling plugin alongside
+its target. Both modules evaluated; neither set up, entered inventory,
+or called back, in two independent repetitions (duo-lab
+`opencode-v2-plugin-mcp-continuation` step-02, V2PC-06). A wildcard
+removal selects every declaration ordered before it across the merged
+config documents, including plugins Duo does not own and cannot
+enumerate; a sibling survives only by being declared after the wildcard,
+and no evidence establishes that a re-add rescues a sibling declared
+before it. A generated OpenCode `plugin` list therefore never contains a
+wildcard removal — `-*` or any `-` selector containing `*`. Exact-ID
+removals (`-<id>`) are the only emitted removal form, and only for
+targets the projection owns. A renderer that cannot express the desired
+end state under that rule reports the optional component `unverified`
+instead of writing a config that silently removes user plugins;
+`internal/runtime/opencode`'s `ValidatePluginSpecs` is the enforcement
+gate. This evidence enables no optional Herdr/Moshi integration and no
+OpenCode observer/control acceptance.)
+
 Generated instructions preserve notification IDs, reference URIs,
 idempotency keys, and causal context. They do not copy protected collaboration
 content into activation prompts. They do not include terminal-input authority

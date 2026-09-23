@@ -1190,3 +1190,40 @@ identity wait (`waitPromptIdentity`, deadline = the command's
 `expires_at`) then performs the same mint-log recovery. Both legs are now
 sealed: run 4 recovered in the send path; the capture pair treats the
 mid-flight show as in-bound, matching the Devin model captures.
+
+## 2026-09-23 — OpenCode plugin-spec gate fails closed on wildcard removal
+
+`pluginspec.go` is `internal/runtime/opencode`'s policy slice — it
+carries no adapter, factory, or probe of its own. It exists because one
+external behavior is already pinned and a future renderer must not
+re-derive it: at exact pin OpenCode 2.0.12 (executable SHA-256
+`2b0825721cb12f9bca3d5099588087d557a21ed2b5b56efebea3f17dc5f79e6a`, source
+commit `2670273ff17da96f85c5826ced57aa1b368754fa`; pin dated and
+live-reverified 2026-09-23, executable byte-identical), a high-priority
+`-*` plugin remove directive with no re-add removed an unrelated
+lower-priority sibling alongside its target — both modules evaluated,
+neither set up, entered inventory, or called back, in two independent
+repetitions (duo-lab `opencode-v2-plugin-mcp-continuation` step-02,
+V2PC-06). A wildcard removal's selection is every declaration ordered
+before it across the merged config documents, not a named target.
+
+**Why fail closed rather than handle.** The earlier capture where a
+sibling stayed active had that sibling re-declared *after* the wildcard
+in the higher document — evidence about ordering, not about rescuing a
+sibling declared before `-*`. And a renderer cannot enumerate the
+declarations a user's lower-priority `opencode.json` documents carry, so
+it can never prove a wildcard's blast radius stops at Duo-owned specs.
+`ValidatePluginSpecs` therefore refuses `-*`-class selectors outright —
+`-*`, `-prefix.*`, any `-` selector containing `*`, and the malformed
+bare `-` — and permits only exact-ID removals (`-<id>`), whose selection
+is bounded to one literal id. A renderer that cannot reach its desired
+end state under that rule reports the component `unverified`
+(installation contract §4's optional-component rule) instead of writing
+the config.
+
+**What this does not decide.** The 2026-09-23 evidence promotes no
+optional Herdr/Moshi integration and no OpenCode observer/control
+acceptance (V2PC-06's own boundary). Whether an emitted exact-ID removal
+needs an ownership check beyond "the projection named the id" — e.g.
+proving the id was Duo-installed rather than user-authored — is left to
+the renderer step that first produces a `plugin` list.
