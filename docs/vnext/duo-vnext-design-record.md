@@ -10,6 +10,11 @@
 > This record gives the reading order and accepted system shape. Each concept
 > has one focused normative home in Section 2. Decision notes 01 through 06
 > remain the provenance for the accepted design.
+>
+> **2026-09-25 strategy amendment:** [decision 07](./duo-vnext-decision-07-contract-native-harness-strategy.md)
+> supersedes the in-process southbound architecture and first-slice sequence
+> summarized below. `duo.external/v1` remains northbound. The older gate and
+> version pins retain historical provenance, not contract-native support.
 
 ## 1. Product contract
 
@@ -122,6 +127,7 @@ normative homes for detailed rules:
 | Permissions, enrollment, errors, and audit | [`duo-vnext-access-errors-audit.md`](./duo-vnext-access-errors-audit.md) |
 | Chat View consumer behavior | [`duo-vnext-chat-view-contract.md`](./duo-vnext-chat-view-contract.md) |
 | Integration and sequencing decision and provenance | [`duo-vnext-decision-06-integration-contracts-sequencing.md`](./duo-vnext-decision-06-integration-contracts-sequencing.md) |
+| Contract-native southbound strategy and shared-writer scope (supersedes affected Session 6 implementation choices) | [`duo-vnext-decision-07-contract-native-harness-strategy.md`](./duo-vnext-decision-07-contract-native-harness-strategy.md) |
 | Go components, storage, adapter roles, and effects | [`duo-vnext-go-architecture.md`](./duo-vnext-go-architecture.md) |
 | Adapter evidence, conformance records, and degradation | [`duo-vnext-integration-conformance.md`](./duo-vnext-integration-conformance.md) |
 | First cross-composition acceptance contract | [`duo-vnext-first-vertical-slice.md`](./duo-vnext-first-vertical-slice.md) |

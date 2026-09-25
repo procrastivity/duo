@@ -9,6 +9,10 @@
 >
 > Completion gate: **passed by architecture, conformance, and roadmap
 > walkthrough.** Live implementation gates remain required before release.
+>
+> **2026-09-25:** [decision 07](./duo-vnext-decision-07-contract-native-harness-strategy.md)
+> supersedes the in-process adapter boundary and first-slice sequence as the
+> long-term strategy. This dated gate and its pins remain historical evidence.
 
 ## 1. Problem and boundary
 

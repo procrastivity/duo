@@ -6,6 +6,11 @@
 # Duo vNext staged implementation roadmap
 
 > Status: **accepted Session 6 implementation sequence.**
+>
+> **2026-09-25:** [decision 07](./duo-vnext-decision-07-contract-native-harness-strategy.md)
+> replaces the in-process adapter sequence for new integration work. The
+> completed stages and dated gates remain historical, not contract-native
+> release evidence.
 
 ## 1. Sequencing rule
 

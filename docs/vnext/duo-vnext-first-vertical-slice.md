@@ -6,6 +6,10 @@
 # Duo vNext first vertical slice
 
 > Status: **accepted Session 6 end-to-end slice and acceptance contract.**
+>
+> **2026-09-25:** [decision 07](./duo-vnext-decision-07-contract-native-harness-strategy.md)
+> replaces this adapter-composition slice as the long-term contract-native
+> gate. Its dated pins and completed milestones retain historical scope.
 
 ## 1. Objective
 

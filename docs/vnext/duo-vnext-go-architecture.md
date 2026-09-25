@@ -6,6 +6,11 @@
 # Duo vNext Go architecture and adapter contract
 
 > Status: **normative implementation contract from Session 6.**
+>
+> **2026-09-25:** [decision 07](./duo-vnext-decision-07-contract-native-harness-strategy.md)
+> supersedes the in-process adapter/composer southbound implementation path.
+> Duo-owned transaction and effect-safety boundaries remain relevant; its
+> local writer lease does not coordinate multiple Duos at one harness.
 
 ## 1. Scope
 
