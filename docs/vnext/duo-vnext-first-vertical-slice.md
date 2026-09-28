@@ -7,6 +7,11 @@
 
 > Status: **accepted Session 6 end-to-end slice and acceptance contract.**
 
+> **2026-09-28 sequencing amendment:** The [own-agent-first checkpoints](2026-09-28-own-agent-first-increments.md)
+> precede this full acceptance gate. They do not replace its two external
+> compositions, collaboration flow, projections, or failure cases; a partial
+> own-agent profile is not a PASS for this slice.
+
 ## 1. Objective
 
 The first vertical slice proves one public contract across two materially
