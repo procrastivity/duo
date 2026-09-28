@@ -79,5 +79,30 @@ tests passed: stable owner ID across restart, single live owner, token refusal,
 unsupported operations, and unsafe directory refusal. An independent
 `jsonschema` check accepted its authenticated `describe` record. It advertises
 `profiles: []`; no session, turn, event or model call occurred. Checkpoint 2
-is next. The separate agent repository is now pushed and recoverable from its
-private remote; cloning Duo or duo-lab alone does not include it.
+was next. The bootstrap is pushed to the private remote; cloning Duo or
+duo-lab alone does not include the separate agent repository.
+
+**Checkpoint 2 result (2026-09-28):** `duo-agent` local commit `f034d27`
+(not yet pushed) persists the original owner/authority/key and immutable
+create command with its session. Five process-external tests covered a lost
+reply, changed-key meaning, SIGKILL/restart, and a mismatched owner file.
+`command.inspect`, `session.inspect`, and operation-scoped `support.inspect`
+are available to the single local development caller. Eight result/refusal
+records passed an independent pinned-schema check. This is not a complete
+observation profile or a multi-authority claim.
+
+**Checkpoint 3 partial result (2026-09-28):** `duo-agent` local commit
+`c612f8b` (not yet pushed) adds a deterministic disposable worker, durable
+`turn.submit` and original-key inspection, exact incarnation replacement on
+restart, and bounded frozen `conversation.snapshot` pages. Seven
+process-external tests and eight independently schema-checked records passed;
+an observed fixture effect followed by owner SIGKILL remained `unresolved`,
+without reissue or a fabricated snapshot item. The worker is not an agent
+model or tool loop, `profiles` remains empty, and the useful model-backed
+turn gate is **open**. The owner authorized SWE-2 use; the official
+[Devin model documentation](https://docs.devin.ai/desktop/models) reviewed
+2026-09-28 establishes Desktop/CLI availability, not a direct inference API
+for the first-party agent. No model or provider credential was used. A
+documented direct model route and owner-scoped credential (or an explicit
+choice of another directly callable model) is needed before closing step 3.
+No public binding, full-profile or original Session 6 verdict changes.
