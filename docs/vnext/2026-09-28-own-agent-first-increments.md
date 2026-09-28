@@ -71,12 +71,13 @@ owner PATs are one principal, not two. No new credential, provider turn,
 session mutation, live probe, or deployment is authorized by this sequence.
 
 **Checkpoint 1 result (2026-09-28):** A provisional local Git repository at
-`~/Code/duo-agent` (local `main` `0d53e19`, **no remote**) contains the
+`~/Code/duo-agent` (initial commit `0d53e19`, private
+`github.com/procrastivity/duo-agent` remote) contains the
 separate Python process and a private newline-JSON/Unix-socket development
 binding. Its README pins the contract-source digests. Two process-external
 tests passed: stable owner ID across restart, single live owner, token refusal,
 unsupported operations, and unsafe directory refusal. An independent
 `jsonschema` check accepted its authenticated `describe` record. It advertises
 `profiles: []`; no session, turn, event or model call occurred. Checkpoint 2
-is next. The Git commit is local to this runner: cloning Duo or duo-lab does
-not recover that new repository until it is assigned a remote and pushed.
+is next. The separate agent repository is now pushed and recoverable from its
+private remote; cloning Duo or duo-lab alone does not include it.
