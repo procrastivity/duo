@@ -154,3 +154,29 @@ distinct authority grants and a general S1 shared-writer policy are
 **unverified**. The private `local.human.*` operations are not public contract
 operations; `profiles: []` remains. Duo consumption and independent
 adjudication are the next checkpoint, not a public binding decision.
+
+**Checkpoint 6 partial development result (2026-09-28):** Duo's
+`internal/protocolowned/devclient` test starts the separate `duo-agent`
+process from a four-source-file SHA-256 pin
+`b1692fda4b47313efe47689338a6a2f85c3edc3c2752c803c7be07bd3d8d1f91`.
+The private Unix-socket client is generic to the authenticated operation
+envelope; it does not dispatch by implementation name or translate harness
+writes into Duo prompt commands. Against one disposable owner and one local
+development caller, Duo mints a hostless instance and explicitly binds its
+own correlation to the independently observed owner/session IDs. This is a
+test-only `SourceOwner` attestation, **not** a subject-issued Duo instance
+credential or production role integration.
+
+The test checks `protocol.describe` (including `profiles: []`), scoped
+`session.create` with an identical retry and changed-key refusal,
+`session.inspect`, `support.inspect`, an initial snapshot barrier, one
+deterministic `turn.submit` with an independently read effect marker,
+original-key `command.inspect`, two frozen snapshot pages, and ordered
+post-barrier `events.follow` replay without duplicate effect. Run with
+`DUO_AGENT_PROGRAM=/absolute/path/to/duo-agent/own_agent.py go test -count=1
+./internal/protocolowned/devclient` from the Duo development shell; without
+the separate checkout it explicitly skips. The test does not call a model,
+exercise cross-authority grants or shared-writer fencing from Duo, pass the
+external two-authority conformance runner, or close the adopted profile.
+Step 06 and the original two-composition Session 6 slice remain open; the
+public-binding decision remains DECLINE.
