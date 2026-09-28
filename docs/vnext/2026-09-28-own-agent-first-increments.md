@@ -132,5 +132,25 @@ middle event; the snapshot, four event records and an epoch-mismatch refusal
 also passed independent pinned-schema validation. No new provider/model call
 was made for this checkpoint. This is a narrow single-caller private-binding
 result, not a proof of public replay compatibility or of an adopted profile;
-`profiles: []` remains. The mediated S1 human/native writer policy is the
-next distinct gate.
+`profiles: []` remains. At that point the mediated S1 human/native writer
+policy was the next distinct gate.
+
+**Checkpoint 5 result (2026-09-28):** `duo-agent` local commit `734dc51`
+(not yet pushed) adds a first-party process-external terminal client as the
+only mediated ordinary human writer. It holds a renewable 90-second presence
+lease, sends its text through the same durable owner and selected session
+provider, and never silently retries a lost reply. One API turn per session
+may queue under `queue_until_safe` for at most 30 seconds and never past its
+original deadline; release rechecks incarnation, original revision,
+readiness, registered route, and writer absence. A human turn changes the
+revision so a held API turn fails without an attempt. Eighteen offline
+process-external tests passed: two human turns from a real client process,
+hold and priority, expiry/release, restart-stale refusal, and crash after a
+released fixture effect with no reissue. Pinned-schema checks accepted a
+queued command, a no-attempt failed command and `turn.submit` support.
+No new model call was made. This qualifies only the single local caller and
+that mediated console: unmanaged terminals, malicious same-UID processes,
+distinct authority grants and a general S1 shared-writer policy are
+**unverified**. The private `local.human.*` operations are not public contract
+operations; `profiles: []` remains. Duo consumption and independent
+adjudication are the next checkpoint, not a public binding decision.
