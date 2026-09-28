@@ -34,11 +34,13 @@ retains `duo.external/v1` northbound. Do not equate a Duo `session.launch` or
 2. **Create and observe.** Persist owner-scoped `session.create` under its
    original authority/key; return the same session across an identical retry
    and process restart, and reject a changed request under that key.
-   Implement `session.inspect` and per-operation, authority/target-scoped
-   `support.inspect`. Test with an independently started client/process and
-   inspect the durable record after restart. No turn or follow claim yet.
+   Implement `command.inspect` by ID and original authority/key alongside
+   this optional write, plus `session.inspect` and per-operation,
+   authority/target-scoped `support.inspect`. Test with an independently
+   started client/process and inspect the durable record after restart.
+   No turn or follow claim yet.
 3. **One useful turn and inspect.** Implement `turn.submit`, immutable
-   `command.inspect` by ID and original authority/key, and a bounded
+   turn commands using the established `command.inspect` path, and a bounded
    `conversation.snapshot`. Test a deliberately lost reply after admission,
    target-incarnation replacement, and an independently observed downstream
    effect: never resend an attempt of unknown effect. First use a deterministic
@@ -67,3 +69,14 @@ Session 6 slice. Two independent authorities and exhaustive third-party
 native qualification are deferred, not declared impossible. The first two
 owner PATs are one principal, not two. No new credential, provider turn,
 session mutation, live probe, or deployment is authorized by this sequence.
+
+**Checkpoint 1 result (2026-09-28):** A provisional local Git repository at
+`~/Code/duo-agent` (local `main` `0d53e19`, **no remote**) contains the
+separate Python process and a private newline-JSON/Unix-socket development
+binding. Its README pins the contract-source digests. Two process-external
+tests passed: stable owner ID across restart, single live owner, token refusal,
+unsupported operations, and unsafe directory refusal. An independent
+`jsonschema` check accepted its authenticated `describe` record. It advertises
+`profiles: []`; no session, turn, event or model call occurred. Checkpoint 2
+is next. The Git commit is local to this runner: cloning Duo or duo-lab does
+not recover that new repository until it is assigned a remote and pushed.
