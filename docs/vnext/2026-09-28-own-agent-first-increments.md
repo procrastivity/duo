@@ -91,18 +91,29 @@ are available to the single local development caller. Eight result/refusal
 records passed an independent pinned-schema check. This is not a complete
 observation profile or a multi-authority claim.
 
-**Checkpoint 3 partial result (2026-09-28):** `duo-agent` local commit
-`c612f8b` (not yet pushed) adds a deterministic disposable worker, durable
+**Checkpoint 3 result (2026-09-28):** `duo-agent` local commits `c612f8b`
+and `9202b08` (not yet pushed) add a deterministic disposable worker, durable
 `turn.submit` and original-key inspection, exact incarnation replacement on
-restart, and bounded frozen `conversation.snapshot` pages. Seven
-process-external tests and eight independently schema-checked records passed;
-an observed fixture effect followed by owner SIGKILL remained `unresolved`,
-without reissue or a fabricated snapshot item. The worker is not an agent
-model or tool loop, `profiles` remains empty, and the useful model-backed
-turn gate is **open**. The owner authorized SWE-2 use; the official
-[Devin model documentation](https://docs.devin.ai/desktop/models) reviewed
-2026-09-28 establishes Desktop/CLI availability, not a direct inference API
-for the first-party agent. No model or provider credential was used. A
-documented direct model route and owner-scoped credential (or an explicit
-choice of another directly callable model) is needed before closing step 3.
-No public binding, full-profile or original Session 6 verdict changes.
+restart, bounded frozen `conversation.snapshot` pages, and an opt-in
+OpenCode Go model worker. Ten offline tests passed; the observed fixture
+effect followed by owner SIGKILL remained `unresolved`, without reissue or a
+fabricated snapshot item. A separate disposable process-external turn used
+the owner-authorized OpenCode Go `deepseek-v4.1-flash` route: one coding prompt
+returned a correct Python `clamp` function and expected boundary examples,
+command inspection reported delivery, the private worker marker matched the
+two-record snapshot, and the records passed pinned-schema validation. The
+runner's `GET /zen/go/v1/models` returned that ID; singular `/model` returned
+404. The key file was narrowed locally from mode 0664 to 0600 before use;
+no key value was logged or committed.
+
+Provider routes are explicitly registered and selected per session; two
+different registered key files and missing-route refusal were tested without
+network calls. Only this one model adapter is implemented: there is no
+multi-turn context, tools or human-writer policy, no replay, and no proof of
+another provider type. `profiles: []` remains truthful. One useful model turn
+closes *only* checkpoint 3. The official
+[Devin model documentation](https://docs.devin.ai/desktop/models) still has
+not established a direct SWE-2 inference API for the first-party process;
+the owner's DeepSeek selection let this gate proceed without Devin CLI. No
+public binding, full-profile or original Session 6 verdict changes. Event
+follow/replay is the next checkpoint.
