@@ -180,3 +180,12 @@ exercise cross-authority grants or shared-writer fencing from Duo, pass the
 external two-authority conformance runner, or close the adopted profile.
 Step 06 and the original two-composition Session 6 slice remain open; the
 public-binding decision remains DECLINE.
+
+**Checkpoint 6 restart follow-up (2026-09-28):** The same Duo-side test now
+gracefully restarts that pinned external owner. It checks durable owner and
+session identity, a changed incarnation and revision, original-key command
+recovery, the next scoped `incarnation.replaced` event after the pre-restart
+cursor, replay of the identical original turn without another effect, and
+no-effect refusal for a new turn targeting the stale incarnation. This remains
+one local development caller with the disposable fixture, not crash-effect
+reconciliation or independently adjudicated full-profile conformance.

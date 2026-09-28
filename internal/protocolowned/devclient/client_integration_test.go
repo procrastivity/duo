@@ -82,6 +82,9 @@ func startSubject(t *testing.T, program, root string) *exec.Cmd {
 		t.Fatalf("start external subject: %v", err)
 	}
 	t.Cleanup(func() {
+		if cmd.ProcessState != nil { // The test may have stopped this owner to exercise restart.
+			return
+		}
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		done := make(chan error, 1)
 		go func() { done <- cmd.Wait() }()
@@ -346,6 +349,81 @@ func TestPrivateProtocolOwnedConsumer(t *testing.T) {
 	}
 	if strings.TrimSpace(followed.Cursor["position"]) != "5" {
 		t.Fatalf("follow cursor=%v, want position 5", followed.Cursor)
+	}
+	if err := child.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatalf("stop owner before restart: %v", err)
+	}
+	if err := child.Wait(); err != nil {
+		t.Fatalf("owner shutdown before restart: %v", err)
+	}
+	startSubject(t, program, root)
+	var afterRestart struct {
+		OwnerID          string `json:"owner_id"`
+		SessionID        string `json:"session_id"`
+		IncarnationID    string `json:"incarnation_id"`
+		Revision         string `json:"revision"`
+		IncarnationState string `json:"incarnation_state"`
+	}
+	call(t, client, "session", "session.inspect", map[string]any{"target": target}, &afterRestart)
+	if afterRestart.OwnerID != described.OwnerID || afterRestart.SessionID != observed.SessionID ||
+		afterRestart.IncarnationID == observed.IncarnationID || afterRestart.Revision == observed.Revision ||
+		afterRestart.IncarnationState != "live" {
+		t.Fatalf("restart changed owner/session identity or retained the stale incarnation: %+v", afterRestart)
+	}
+	call(t, client, "command", "command.inspect", map[string]any{
+		"target": map[string]string{"owner_id": described.OwnerID}, "key": "duo_dev_turn",
+	}, &recovered)
+	if recovered.CommandID != delivered.CommandID || recovered.State != "completed" {
+		t.Fatalf("restart lost original command identity: %+v", recovered)
+	}
+	var replaced struct {
+		Events []subjectDocument `json:"events"`
+		Cursor map[string]string `json:"cursor"`
+	}
+	response, err = client.Call(ctx, "events.follow", map[string]any{
+		"target": target, "cursor": followed.Cursor, "limit": 8,
+	})
+	if err != nil || json.Unmarshal(response, &replaced) != nil || len(replaced.Events) != 1 || replaced.Cursor["position"] != "6" {
+		t.Fatalf("restart follow lost the successor event: %v; events=%+v", err, replaced)
+	}
+	var incarnationEvent struct {
+		Kind     string            `json:"kind"`
+		Position string            `json:"position"`
+		Scope    map[string]string `json:"scope"`
+		Data     struct {
+			IncarnationID string `json:"incarnation_id"`
+		} `json:"data"`
+	}
+	if replaced.Events[0].Schema != "agent.harness/v0" || replaced.Events[0].Kind != "event" ||
+		json.Unmarshal(replaced.Events[0].Value, &incarnationEvent) != nil ||
+		incarnationEvent.Kind != "incarnation.replaced" || incarnationEvent.Position != "6" ||
+		incarnationEvent.Data.IncarnationID != afterRestart.IncarnationID ||
+		incarnationEvent.Scope["session_id"] != observed.SessionID {
+		t.Fatalf("replacement event does not match the scoped new incarnation: %+v", replaced.Events[0])
+	}
+	var repeatedTurn struct {
+		CommandID string `json:"command_id"`
+		State     string `json:"state"`
+	}
+	call(t, client, "command", "turn.submit", map[string]any{"write": turnWrite}, &repeatedTurn)
+	if repeatedTurn.CommandID != delivered.CommandID || repeatedTurn.State != "completed" {
+		t.Fatalf("retry of original key after restart lost its command: %+v", repeatedTurn)
+	}
+	staleWrite := map[string]any{}
+	for key, value := range turnWrite {
+		staleWrite[key] = value
+	}
+	staleWrite["idempotency_key"] = "duo_dev_stale_incarnation"
+	var stale struct {
+		Class  string `json:"class"`
+		Effect string `json:"effect"`
+	}
+	call(t, client, "refusal", "turn.submit", map[string]any{"write": staleWrite}, &stale)
+	if stale.Class != "conflict" || stale.Effect != "no_effect" {
+		t.Fatalf("stale incarnation accepted new input after restart: %+v", stale)
+	}
+	if entries, err := os.ReadDir(filepath.Join(root, "effects")); err != nil || len(entries) != 1 {
+		t.Fatalf("restart replay or stale write duplicated the fixture effect: entries=%d error=%v", len(entries), err)
 	}
 	// The dev test proves only the enumerated one-caller operations. Duo's
 	// prompt command model, product protocol-owned role and public binding
