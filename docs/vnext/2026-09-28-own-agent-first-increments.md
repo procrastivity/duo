@@ -305,3 +305,11 @@ supervisor crashes, the child may remain running and neither a new supervisor
 nor Duo can reattach or claim its exit. There is no automatic retry or
 public process-lifecycle/profile claim; the separate `connect` command still
 does not supervise a pre-existing process.
+
+**Persistence update (2026-09-28):** The earlier “not yet pushed” checkpoint
+notes describe their state when written. `duo-agent` through `96f6e56` is now
+on its private `origin/main`, and Duo's opt-in integration through `330774a`
+is on `origin/go`. A fresh runner still needs both repositories, the
+explicitly registered provider route, and disposable private state; Git
+contains no credential or existing session database. This does not change
+the provisional support or public-binding verdicts above.
