@@ -18,7 +18,7 @@ import (
 	"github.com/procrastivity/duo/internal/protocolowned/devclient"
 )
 
-func TestAgentLocalOneTurn(t *testing.T) {
+func TestAgentLocalTwoTurns(t *testing.T) {
 	program := os.Getenv("DUO_AGENT_PROGRAM")
 	if program == "" {
 		t.Skip("requires separate pinned duo-agent checkout: DUO_AGENT_PROGRAM=/absolute/path/own_agent.py")
@@ -37,7 +37,7 @@ func TestAgentLocalOneTurn(t *testing.T) {
 		}
 		_, _ = sum.Write(data)
 	}
-	if got := hex.EncodeToString(sum.Sum(nil)); got != "b1692fda4b47313efe47689338a6a2f85c3edc3c2752c803c7be07bd3d8d1f91" {
+	if got := hex.EncodeToString(sum.Sum(nil)); got != "2971734021e91eabae721cffa818530814f31e68be81d4aee4e852bd9967cee3" {
 		t.Fatalf("external agent source changed: %s; requalify before updating pin", got)
 	}
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
@@ -174,12 +174,55 @@ func TestAgentLocalOneTurn(t *testing.T) {
 	changed := append([]string(nil), turn...)
 	changed[6] = "Beta 17"
 	code, _, stderr = runSession(t, changed...)
-	if code == exitcode.Success || !strings.Contains(stderr, "output not observed") {
+	if code == exitcode.Success || !strings.Contains(stderr, "owner output not observed") {
 		t.Fatalf("changed input under original key should not be presented as success: %d %q", code, stderr)
 	}
 	entries, err := os.ReadDir(filepath.Join(root, "effects"))
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("repeat/changed-key attempt duplicated effect: %d %v", len(entries), err)
+	}
+	second := []string{
+		"agent-local", "turn", connected.DuoSessionID, "--state-dir", root,
+		"--text", "Beta 29", "--key", "duo_local_second",
+	}
+	code, secondOut, stderr := runSession(t, second...)
+	if code != exitcode.Success || stderr != "" {
+		t.Fatalf("second turn: code=%d stdout=%q stderr=%q", code, secondOut, stderr)
+	}
+	var secondDelivered struct {
+		Output  string `json:"output"`
+		TurnID  string `json:"turn_id"`
+		Command string `json:"owner_command_id"`
+	}
+	if err := json.Unmarshal([]byte(secondOut), &secondDelivered); err != nil ||
+		secondDelivered.Output != "92 ateB" || secondDelivered.TurnID == "" ||
+		secondDelivered.TurnID == delivered.TurnID || secondDelivered.Command == delivered.Command {
+		t.Fatalf("second answer attributed to wrong turn: %q %v", secondOut, err)
+	}
+	marker, err = os.ReadFile(filepath.Join(root, "effects", secondDelivered.TurnID))
+	if err != nil || string(marker) != secondDelivered.Output {
+		t.Fatalf("independent second effect: %q %v", marker, err)
+	}
+	if code, replay, _ := runSession(t, turn...); code != exitcode.Success || replay != out {
+		t.Fatalf("first-key replay after second turn: %d %q", code, replay)
+	}
+	if code, replay, _ := runSession(t, second...); code != exitcode.Success || replay != secondOut {
+		t.Fatalf("second-key replay: %d %q", code, replay)
+	}
+	wrongSecond := append([]string(nil), second...)
+	wrongSecond[6] = "Alpha 17" // matches the first input, not this key's turn ID
+	if code, _, stderr := runSession(t, wrongSecond...); code == exitcode.Success || !strings.Contains(stderr, "owner output not observed") {
+		t.Fatalf("second key was misattributed to the first input: %d %q", code, stderr)
+	}
+	third := []string{
+		"agent-local", "turn", connected.DuoSessionID, "--state-dir", root,
+		"--text", "Gamma 35", "--key", "duo_local_third",
+	}
+	if code, _, stderr := runSession(t, third...); code == exitcode.Success || !strings.Contains(stderr, "at most two owner turns") {
+		t.Fatalf("third turn must refuse before an effect: %d %q", code, stderr)
+	}
+	if entries, err := os.ReadDir(filepath.Join(root, "effects")); err != nil || len(entries) != 2 {
+		t.Fatalf("replay/third attempt duplicated fixture effect: %d %v", len(entries), err)
 	}
 	if strings.Contains(out+stderr, string(token)) {
 		t.Fatal("private token leaked to CLI output")

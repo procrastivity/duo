@@ -236,3 +236,23 @@ requested asymmetric boundary values (0 and 5). The private worker's JSON
 marker named that model and its `content` matched the CLI output exactly.
 This is one real model turn, not multi-turn context, tools, or a general
 writer/conformance verdict. The agent source still advertises `profiles: []`.
+
+**Bounded two-turn follow-up (2026-09-28):** The separate agent's four-source
+pin advanced to
+`2971734021e91eabae721cffa818530814f31e68be81d4aee4e852bd9967cee3`.
+Its model worker receives the prior user/assistant exchange from the owner's
+session-scoped store before the next user message. The owner refuses a third
+model turn before admission. Private snapshot records now include a `turn_id`
+extension: Duo requires both input and output records to match the inspected
+original-key command, not merely the prompt text. The opt-in CLI accepts two
+turns, replays each completed key without reissue, and refuses a third; the
+deterministic integration test passes three consecutive runs. The agent's 19
+offline tests and Duo's full Go suite/lint pass. A new disposable two-turn
+OpenCode Go session produced `ACK`, then answered `Cedar29` to a question
+that omitted the identifier. Its four ordered persisted records carried the
+respective turn IDs, and two JSON effect markers matched the CLI outputs.
+Replaying both keys produced no third effect; a direct third owner request
+also refused before an effect. This is bounded context, not a general
+context-window policy, tool loop or model quality claim. The private
+`turn_id` extension is not a public protocol decision. Duo still does not
+record prompt-command responsibility or supervise the owner process.

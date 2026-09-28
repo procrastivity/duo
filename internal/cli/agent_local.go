@@ -238,11 +238,26 @@ func writeLocalResult(streams *iostreams.Streams, result any) error {
 	return err
 }
 
+type localConversationRecord struct {
+	RecordID string `json:"record_id"`
+	TurnID   string `json:"turn_id"`
+	Blocks   []struct {
+		Type    string `json:"type"`
+		Source  string `json:"source"`
+		Content string `json:"content"`
+	} `json:"blocks"`
+}
+
+type localConversationSnapshot struct {
+	Items    []localConversationRecord `json:"items"`
+	NextPage string                    `json:"next_page"`
+}
+
 func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 	var root, text, key string
 	cmd := &cobra.Command{
 		Use: "turn <duo-session-id>", Args: cobra.ExactArgs(1),
-		Short: "submit one private first-party agent turn for a connected Duo session",
+		Short: "submit one of two bounded private agent turns for a connected Duo session",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if text == "" || key == "" {
 				return duoerr.New("invalid.request", "--text and --key are required")
@@ -284,6 +299,7 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				SessionID     string `json:"session_id"`
 				IncarnationID string `json:"incarnation_id"`
 				Revision      string `json:"revision"`
+				Provider      string `json:"provider"`
 			}
 			if err := localCall(ctx, owner.Client, "session.inspect", map[string]any{"target": target}, "session", &inspected); err != nil {
 				return err
@@ -334,20 +350,20 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			default:
 				return duoerr.New("operation.temporarily_unavailable", "original-key inspection returned an unexpected document")
 			}
-			var snap struct {
-				Items []struct {
-					Blocks []struct {
-						Content string `json:"content"`
-					} `json:"blocks"`
-				} `json:"items"`
-			}
+			var snap localConversationSnapshot
 			if err := localCall(ctx, owner.Client, "conversation.snapshot", map[string]any{"target": target, "page_size": 8}, "snapshot", &snap); err != nil {
 				return err
 			}
+			if snap.NextPage != "" || len(snap.Items)%2 != 0 || len(snap.Items) > 4 {
+				return duoerr.New("operation.temporarily_unavailable", "owner conversation exceeds this two-turn path")
+			}
+			original := snap.Items
+			pair := -1
 			if prior.CommandID == "" {
-				if len(snap.Items) != 0 {
-					return duoerr.New("operation.temporarily_unavailable", "this first increment accepts only an empty owner conversation")
+				if len(original) > 2 {
+					return duoerr.New("operation.temporarily_unavailable", "this path accepts at most two owner turns")
 				}
+				pair = len(original)
 				deadline := time.Now().UTC().Add(5 * time.Minute).Truncate(time.Second).Format("2006-01-02T15:04:05Z")
 				write := map[string]any{
 					"operation": "turn.submit", "target": map[string]string{
@@ -359,26 +375,59 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				if err := localCall(ctx, owner.Client, "turn.submit", map[string]any{"write": write}, "command", &prior); err != nil {
 					return err
 				}
+			} else {
+				for i := 0; i < len(original); i += 2 {
+					if original[i].TurnID == prior.Result.TurnID && original[i+1].TurnID == prior.Result.TurnID {
+						if pair != -1 {
+							return duoerr.New("operation.temporarily_unavailable", "original turn has ambiguous records")
+						}
+						pair = i
+					}
+				}
+				if pair == -1 {
+					return duoerr.New("operation.temporarily_unavailable", "original turn not observed for this key")
+				}
 			}
 			if prior.Operation != "turn.submit" || prior.Target.OwnerID != owner.ID ||
 				prior.Target.SessionID != sessionID || prior.State != "completed" || prior.CommandID == "" || prior.Result.TurnID == "" {
 				return duoerr.New("operation.temporarily_unavailable", "owner has not proved full input delivery; inspect original key")
 			}
-			if err := localCall(ctx, owner.Client, "conversation.snapshot", map[string]any{"target": target, "page_size": 8}, "snapshot", &snap); err != nil {
+			var after localConversationSnapshot
+			if err := localCall(ctx, owner.Client, "conversation.snapshot", map[string]any{"target": target, "page_size": 8}, "snapshot", &after); err != nil {
 				return err
 			}
-			if len(snap.Items) != 2 || len(snap.Items[0].Blocks) != 1 || len(snap.Items[1].Blocks) != 1 ||
-				snap.Items[0].Blocks[0].Content != text || snap.Items[1].Blocks[0].Content == "" {
-				return duoerr.New("operation.temporarily_unavailable", "owner output not observed for this one-turn session")
+			expected := len(original)
+			if pair == len(original) {
+				expected += 2
+			}
+			if after.NextPage != "" || len(after.Items) != expected {
+				return duoerr.New("operation.temporarily_unavailable", "owner output not observed for this bounded session")
+			}
+			for i, old := range original {
+				if old.RecordID == "" || old.RecordID != after.Items[i].RecordID || old.TurnID != after.Items[i].TurnID {
+					return duoerr.New("operation.temporarily_unavailable", "owner conversation changed during turn")
+				}
+			}
+			input, output := after.Items[pair], after.Items[pair+1]
+			worker := inspected.Provider
+			if worker == "" {
+				worker = "deterministic_worker"
+			}
+			if input.TurnID != prior.Result.TurnID || output.TurnID != prior.Result.TurnID ||
+				len(input.Blocks) != 1 || len(output.Blocks) != 1 ||
+				input.RecordID == "" || output.RecordID == "" || input.Blocks[0].Type != "text" ||
+				input.Blocks[0].Source != "caller" || input.Blocks[0].Content != text ||
+				output.Blocks[0].Type != "text" || output.Blocks[0].Source != worker || output.Blocks[0].Content == "" {
+				return duoerr.New("operation.temporarily_unavailable", "owner output not observed for this turn")
 			}
 			return writeLocalResult(streams, map[string]string{
 				"duo_session_id": args[0], "owner_command_id": prior.CommandID,
-				"turn_id": prior.Result.TurnID, "output": snap.Items[1].Blocks[0].Content,
+				"turn_id": prior.Result.TurnID, "output": output.Blocks[0].Content,
 			})
 		},
 	}
 	cmd.Flags().StringVar(&root, "state-dir", "", "absolute private state directory of an already-running first-party agent")
-	cmd.Flags().StringVar(&text, "text", "", "one text block for the first turn in an empty owner session")
+	cmd.Flags().StringVar(&text, "text", "", "one text block for the next bounded owner turn")
 	cmd.Flags().StringVar(&key, "key", "", "original owner-scoped command key for inspection, never automatically retried")
 	_ = cmd.MarkFlagRequired("state-dir")
 	_ = cmd.MarkFlagRequired("text")

@@ -22,7 +22,7 @@ import (
 
 // The fixture pin is intentionally independent of the subject's reported
 // build. Changing the separate checkout requires an explicit requalification.
-const fixtureBuild = "sha256:b1692fda4b47313efe47689338a6a2f85c3edc3c2752c803c7be07bd3d8d1f91"
+const fixtureBuild = "sha256:2971734021e91eabae721cffa818530814f31e68be81d4aee4e852bd9967cee3"
 
 type subjectDocument struct {
 	Schema string          `json:"schema"`
