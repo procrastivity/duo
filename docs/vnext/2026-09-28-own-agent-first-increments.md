@@ -273,5 +273,35 @@ Duo's existing attempt as `unknown_effect` without repeating the effect.
 A restarted disposable model owner let Duo project two prior turns as
 delivered without another model effect. This is a **private** route
 through the existing ledger, not a public `prompt.deliver` adapter or a
-general writer-arbitration result; process ownership/exit detection remain
-unimplemented.
+general writer-arbitration result. Process ownership/exit detection was still
+unimplemented at this checkpoint.
+
+**Foreground process follow-up (2026-09-28):** To opt into direct-child exit
+evidence, stop any independently running owner after creating its session,
+then run `DUO_AGENT_LOCAL=1 duo agent-local run <owner-session-id> --state-dir
+<absolute-private-state> --program <absolute-duo-agent/own_agent.py>`. The
+command prints a Duo session/instance ID once the new child responds, then
+stays in the foreground; `agent-local turn` can operate from another shell.
+The Ubuntu runner defaults to `/usr/bin/python3`; `--python` selects another
+absolute interpreter. Repeat `--opencode-route name=/absolute/key.env` to
+register the same explicit routes on each launch if that owner session uses
+a model route. Without `--resume`, each run creates a new hostless Duo
+session. After the child's direct `Wait` proves exit, the command records
+`Exit`, retires its correlation and leaves the session inactive. Explicit
+`--resume <duo-session-id>` on a subsequent run requires that inactive
+session's retired owner/session binding and creates a **new** runtime
+instance; it cannot infer a prior exit from an unavailable socket.
+`agent-local turn` now releases Duo's writer lease after durably accepting
+the attempt and reacquires it to commit the result; a delayed-owner fixture
+proved that the writer remained available while the request was in flight.
+
+Disposable process-external tests used the deterministic worker only: a
+foreground turn, child termination, explicit resume and second turn retained
+one Duo session with two exited instances; an unrelated process competing for
+the same owner socket was refused. Killing the supervisor itself left its
+surviving child and Duo's last live instance **unresolved**, not exited.
+This is a development foreground contract, not a persistent daemon: if the
+supervisor crashes, the child may remain running and neither a new supervisor
+nor Duo can reattach or claim its exit. There is no automatic retry or
+public process-lifecycle/profile claim; the separate `connect` command still
+does not supervise a pre-existing process.

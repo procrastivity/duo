@@ -21,11 +21,12 @@ import (
 )
 
 // The opt-in CLI is a private development path, not a projection of
-// session.launch or prompt.deliver. The external owner runs separately; Duo
-// does not yet supervise it or arbitrate its ordinary human writer.
+// session.launch or prompt.deliver. The owner may run separately, or run in
+// the foreground as a direct child; neither path arbitrates its ordinary
+// human writer through a public Duo operation.
 func agentLocalCommand(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{Use: "agent-local", Short: "opt-in private first-party agent path (development only)"}
-	cmd.AddCommand(agentLocalCreate(streams), agentLocalConnect(streams), agentLocalTurn(streams))
+	cmd.AddCommand(agentLocalCreate(streams), agentLocalConnect(streams), agentLocalTurn(streams), agentLocalRun(streams))
 	surface.Annotate(cmd, surface.Plumbing)
 	return cmd
 }
@@ -279,7 +280,11 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer func() { _ = store.Close() }()
+			defer func() {
+				if store != nil {
+					_ = store.Close()
+				}
+			}()
 			s, ok := a.Session(domain.SessionID(args[0]))
 			if !ok || s.Current == "" || s.State != domain.SessionActive {
 				return duoerr.New("object.not_found", "Duo session is not active")
@@ -430,6 +435,14 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				// An incomplete or ambiguous handoff is never counted as delivered.
 				reconcileCtx, stop := context.WithTimeout(context.Background(), 3*time.Second)
 				defer stop()
+				if store == nil {
+					var reopenErr error
+					a, store, reopenErr = openWriteAuthority(reconcileCtx)
+					if reopenErr != nil {
+						returnErr = duoerr.New("operation.temporarily_unavailable", "Duo could not reopen its uncertain attempt; inspect its command")
+						return
+					}
+				}
 				if err := a.ReconcileAttempt(reconcileCtx, duoCommand.ID, attempt, actor, provedNoEffect); err != nil {
 					returnErr = duoerr.New("operation.temporarily_unavailable", "Duo could not close the uncertain attempt; inspect its command")
 				}
@@ -456,6 +469,13 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			default:
 				return duoerr.New("operation.temporarily_unavailable", "Duo prompt responsibility is terminal without delivery")
 			}
+			// Do not hold Duo's writer lease during the possibly long model call.
+			// A foreground supervisor can then record a direct-child wait even
+			// when this attempt's owner reply has not arrived.
+			if err := store.Close(); err != nil {
+				return duoerr.New("operation.temporarily_unavailable", "Duo writer lease could not be released before the owner turn")
+			}
+			store = nil
 			if ownerWrite != nil {
 				if err := localCall(ctx, owner.Client, "turn.submit", map[string]any{"write": ownerWrite}, "command", &prior); err != nil {
 					var refused *localNoEffectRefusal
@@ -496,6 +516,10 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				return duoerr.New("operation.temporarily_unavailable", "owner output not observed for this turn")
 			}
 			if attempt != "" {
+				a, store, err = openWriteAuthority(cmd.Context())
+				if err != nil {
+					return duoerr.New("operation.temporarily_unavailable", "Duo could not reopen the owner turn result; inspect its command")
+				}
 				if err := a.CommitDelivered(cmd.Context(), duoCommand.ID, attempt, actor); err != nil {
 					return duoerr.New("operation.temporarily_unavailable", "Duo could not commit delivery; inspect its command")
 				}

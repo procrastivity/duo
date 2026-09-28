@@ -433,6 +433,13 @@ func TestAgentLocalUnknownEffectIsNotRetried(t *testing.T) {
 	if entries, err := os.ReadDir(filepath.Join(root, "effects")); err != nil || len(entries) != 1 {
 		t.Fatalf("fixture did not reach the post-effect window: %v", err)
 	}
+	_, writer, err := openWriteAuthority(context.Background())
+	if err != nil {
+		t.Fatalf("turn held the Duo writer lease across the delayed owner call: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if err := process.Process.Kill(); err != nil {
 		t.Fatal(err)
 	}
