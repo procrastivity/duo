@@ -1,5 +1,5 @@
 // Package devclient speaks the provisional local harness-owner binding for
-// development tests. It is not a public binding or a production Duo adapter.
+// opted-in development use. It is not a public binding or a production adapter.
 package devclient
 
 import (

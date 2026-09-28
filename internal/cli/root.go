@@ -63,6 +63,11 @@ func NewRootCommand(streams *iostreams.Streams, build buildinfo.Info) *cobra.Com
 	root.AddCommand(configCommand(streams))
 	root.AddCommand(workspaceCommand(streams))
 	root.AddCommand(providerCommand(streams))
+	// This local, explicitly opted-in development path is not a registered
+	// duo.external/v1 operation or a public harness binding.
+	if os.Getenv("DUO_AGENT_LOCAL") == "1" {
+		root.AddCommand(agentLocalCommand(streams))
+	}
 
 	// DUO_SELFTEST-gated fixture command: an end-to-end, through-the-built-
 	// binary exercise of the code-3/--output json refusal path before any real

@@ -189,3 +189,50 @@ cursor, replay of the identical original turn without another effect, and
 no-effect refusal for a new turn targeting the stale incarnation. This remains
 one local development caller with the disposable fixture, not crash-effect
 reconciliation or independently adjudicated full-profile conformance.
+
+**Opt-in Duo CLI increment (2026-09-28):** Set `DUO_AGENT_LOCAL=1` to expose
+`duo agent-local` in the CLI only. Start the separate `duo-agent` process as
+documented in its README with a private state directory. For one owner session
+and one hostless Duo association:
+
+```sh
+duo agent-local create --state-dir "$STATE" --label 'Local work' \
+  --key create_1 --deadline "$UTC_DEADLINE"
+duo agent-local connect "$OWNER_SESSION_ID" --state-dir "$STATE" --workspace "$WORKSPACE"
+duo agent-local turn "$DUO_SESSION_ID" --state-dir "$STATE" \
+  --text 'Alpha 17' --key turn_1
+```
+
+Keep the original `--deadline`, label, provider selection and key for a create
+retry; an opt-in `--provider opencode-go:<registered-route>` on `create` selects
+an agent-registered model route instead of the deterministic fixture. The
+commands print private JSON with the owner-session ID, Duo-session ID, and
+observed turn output respectively. `connect` is an explicit owner attestation,
+not a subject-issued Duo instance credential. The first `turn` requires an
+empty owner conversation and `require_ready`; it inspects its owner-scoped
+key before sending and returns only after a matching completed command and
+two-record output snapshot. It does not issue a Duo `prompt.deliver` command,
+record a Duo command responsibility state, or support a second turn in this
+increment. An ambiguous response is never automatically retried. The caller
+must inspect the original owner key before trying again.
+
+The agent process is started and stopped outside Duo; Duo does **not** yet
+supervise it, detect death automatically, own the human lease, or prove
+resume/instance continuity across owner restart. `agent-local` is deliberately
+absent from the public operation registry, manifest, MCP and `duo.external/v1`
+projection. This opt-in path is a first product-facing control experiment,
+not an adopted public profile or Session 6 acceptance result.
+
+The CLI integration test used the pinned separate process with a deterministic
+worker: `create` repeated under the same key, `connect` repeated without
+creating a second Duo session, and `turn` returned the independently observed
+effect. A mediated human lease refused the turn with no effect; release
+permitted it. A repeated turn key inspected the original command without
+another effect, and changed input under that key was not presented as a new
+success. Three runs and the full Go suite passed. One separately authorized
+disposable model-backed Duo CLI turn used the registered OpenCode Go
+`deepseek-v4.1-flash` route: the answer gave a `clamp` function and the
+requested asymmetric boundary values (0 and 5). The private worker's JSON
+marker named that model and its `content` matched the CLI output exactly.
+This is one real model turn, not multi-turn context, tools, or a general
+writer/conformance verdict. The agent source still advertises `profiles: []`.
