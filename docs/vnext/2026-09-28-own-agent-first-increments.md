@@ -115,5 +115,22 @@ closes *only* checkpoint 3. The official
 [Devin model documentation](https://docs.devin.ai/desktop/models) still has
 not established a direct SWE-2 inference API for the first-party process;
 the owner's DeepSeek selection let this gate proceed without Devin CLI. No
-public binding, full-profile or original Session 6 verdict changes. Event
-follow/replay is the next checkpoint.
+public binding, full-profile or original Session 6 verdict changes. At that
+point, event follow/replay remained the next checkpoint.
+
+**Checkpoint 4 result (2026-09-28):** The separate `duo-agent` process now
+commits session-scoped semantic events with create, turn admission, completed
+conversation/input-output, unresolved outcomes and incarnation replacement.
+Snapshots pin an event-stream barrier distinct from conversation-row count;
+`events.follow` pages strictly after it, with stable IDs and a repeatable
+cursor. A bounded 16-event retention window refuses pruned cursors, epoch
+mismatches and detected gaps with `retry: new_snapshot`. Older snapshot
+page tokens that lack an event barrier expire rather than silently acquiring
+the new epoch. Thirteen offline process-external tests passed, including
+replay/reconnect, deduplication, restart, expiry and a deliberately removed
+middle event; the snapshot, four event records and an epoch-mismatch refusal
+also passed independent pinned-schema validation. No new provider/model call
+was made for this checkpoint. This is a narrow single-caller private-binding
+result, not a proof of public replay compatibility or of an adopted profile;
+`profiles: []` remains. The mediated S1 human/native writer policy is the
+next distinct gate.
