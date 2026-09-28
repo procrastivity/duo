@@ -256,3 +256,22 @@ also refused before an effect. This is bounded context, not a general
 context-window policy, tool loop or model quality claim. The private
 `turn_id` extension is not a public protocol decision. Duo still does not
 record prompt-command responsibility or supervise the owner process.
+
+**Private command-responsibility follow-up (2026-09-28):** `agent-local turn`
+now uses Duo's existing prompt-command ledger under an `agent-local@<owner>`
+caller scope. It commits acceptance and a runtime attempt *before* contacting
+the authenticated owner. An explicit owner `no_effect` refusal requeues the
+Duo attempt; completed owner-command and turn-ID-linked snapshot evidence
+permit a delivered commit. Other incomplete/ambiguous outcomes close the
+attempt as `unknown_effect`, with no automatic resend. The CLI includes a
+`duo_command_id` so `duo prompt show` can inspect the durable responsibility.
+The deterministic test exercises requeue after a human lease and recovery
+when the owner completed after Duo's attempt but before Duo's delivered
+commit. A separately killed owner left an incomplete command after an
+independent effect; restarting it and inspecting that original key closed
+Duo's existing attempt as `unknown_effect` without repeating the effect.
+A restarted disposable model owner let Duo project two prior turns as
+delivered without another model effect. This is a **private** route
+through the existing ledger, not a public `prompt.deliver` adapter or a
+general writer-arbitration result; process ownership/exit detection remain
+unimplemented.

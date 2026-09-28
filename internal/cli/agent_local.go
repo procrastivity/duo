@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,6 +33,12 @@ func agentLocalCommand(streams *iostreams.Streams) *cobra.Command {
 type localOwner struct {
 	Client devclient.Client
 	ID     string
+}
+
+type localNoEffectRefusal struct{ Class string }
+
+func (e *localNoEffectRefusal) Error() string {
+	return fmt.Sprintf("private agent refused %s without effect", e.Class)
 }
 
 func openLocalOwner(ctx context.Context, root string) (localOwner, error) {
@@ -90,7 +97,7 @@ func localCall(ctx context.Context, client devclient.Client, operation string, f
 		if json.Unmarshal(doc.Value, &refused) != nil || refused.Effect != "no_effect" {
 			return duoerr.New("operation.temporarily_unavailable", "private agent refused with unknown effect")
 		}
-		return duoerr.New("operation.temporarily_unavailable", fmt.Sprintf("private agent refused %s without effect", refused.Class))
+		return &localNoEffectRefusal{Class: refused.Class}
 	}
 	if doc.Kind != kind || json.Unmarshal(doc.Value, dst) != nil {
 		return duoerr.New("operation.temporarily_unavailable", "private agent returned an unexpected result")
@@ -258,7 +265,7 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "turn <duo-session-id>", Args: cobra.ExactArgs(1),
 		Short: "submit one of two bounded private agent turns for a connected Duo session",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (returnErr error) {
 			if text == "" || key == "" {
 				return duoerr.New("invalid.request", "--text and --key are required")
 			}
@@ -268,7 +275,7 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a, store, err := openReadAuthority(cmd.Context())
+			a, store, err := openWriteAuthority(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -336,7 +343,25 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			case "command":
 				if json.Unmarshal(existing.Value, &prior) != nil || prior.Operation != "turn.submit" ||
 					prior.Target.OwnerID != owner.ID || prior.Target.SessionID != sessionID ||
-					prior.State != "completed" || prior.Result.TurnID == "" {
+					prior.CommandID == "" {
+					return duoerr.New("operation.temporarily_unavailable", "original command identity is not proved; turn not retried")
+				}
+				if prior.State != "completed" || prior.Result.TurnID == "" {
+					actor := "agent-local@" + owner.ID
+					accepted, err := a.AcceptPrompt(cmd.Context(), domain.AcceptPromptRequest{
+						Session: s.ID, Instance: s.Current, Actor: actor, IdempotencyKey: key,
+						CanonicalDigest: promptCanonicalDigest(text), ExpiresAt: time.Now().Add(5 * time.Minute),
+						QueuePolicy: domain.QueueUntilSafe,
+					})
+					if err != nil {
+						return duoerrFromDomain(err)
+					}
+					if accepted.Command.State == domain.ResponsibilityAttempting {
+						attempts := accepted.Command.Attempts
+						if len(attempts) == 0 || a.ReconcileAttempt(cmd.Context(), accepted.Command.ID, attempts[len(attempts)-1].ID, actor, false) != nil {
+							return duoerr.New("operation.temporarily_unavailable", "Duo could not close the uncertain attempt; inspect its command")
+						}
+					}
 					return duoerr.New("operation.temporarily_unavailable", "original command is not proved completed; turn not retried")
 				}
 			case "refusal":
@@ -359,21 +384,19 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 			}
 			original := snap.Items
 			pair := -1
+			var ownerWrite map[string]any
 			if prior.CommandID == "" {
 				if len(original) > 2 {
 					return duoerr.New("operation.temporarily_unavailable", "this path accepts at most two owner turns")
 				}
 				pair = len(original)
 				deadline := time.Now().UTC().Add(5 * time.Minute).Truncate(time.Second).Format("2006-01-02T15:04:05Z")
-				write := map[string]any{
+				ownerWrite = map[string]any{
 					"operation": "turn.submit", "target": map[string]string{
 						"owner_id": owner.ID, "session_id": sessionID, "incarnation_id": inspected.IncarnationID,
 					}, "idempotency_key": key, "deadline": deadline, "queue_policy": "require_ready",
 					"payload":       map[string]any{"blocks": []any{map[string]string{"type": "text", "content": text}}},
 					"preconditions": map[string]string{"session_revision": inspected.Revision}, "grant": "local",
-				}
-				if err := localCall(ctx, owner.Client, "turn.submit", map[string]any{"write": write}, "command", &prior); err != nil {
-					return err
 				}
 			} else {
 				for i := 0; i < len(original); i += 2 {
@@ -386,6 +409,58 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				}
 				if pair == -1 {
 					return duoerr.New("operation.temporarily_unavailable", "original turn not observed for this key")
+				}
+			}
+			actor := "agent-local@" + owner.ID
+			accepted, err := a.AcceptPrompt(cmd.Context(), domain.AcceptPromptRequest{
+				Session: s.ID, Instance: s.Current, Actor: actor, IdempotencyKey: key,
+				CanonicalDigest: promptCanonicalDigest(text), ExpiresAt: time.Now().Add(5 * time.Minute),
+				QueuePolicy: domain.QueueUntilSafe,
+			})
+			if err != nil {
+				return duoerrFromDomain(err)
+			}
+			duoCommand := accepted.Command
+			var attempt domain.AttemptID
+			provedNoEffect := false
+			defer func() {
+				if attempt == "" {
+					return
+				}
+				// An incomplete or ambiguous handoff is never counted as delivered.
+				reconcileCtx, stop := context.WithTimeout(context.Background(), 3*time.Second)
+				defer stop()
+				if err := a.ReconcileAttempt(reconcileCtx, duoCommand.ID, attempt, actor, provedNoEffect); err != nil {
+					returnErr = duoerr.New("operation.temporarily_unavailable", "Duo could not close the uncertain attempt; inspect its command")
+				}
+			}()
+			switch duoCommand.State {
+			case domain.ResponsibilityQueued:
+				attempt, err = a.CreateAttempt(cmd.Context(), duoCommand.ID, actor, domain.PromptPathRuntime)
+				if err != nil {
+					return duoerrFromDomain(err)
+				}
+			case domain.ResponsibilityAttempting:
+				if len(duoCommand.Attempts) == 0 {
+					return duoerr.New("operation.temporarily_unavailable", "Duo attempt has no durable identity")
+				}
+				attempt = duoCommand.Attempts[len(duoCommand.Attempts)-1].ID
+				if prior.CommandID == "" {
+					provedNoEffect = true // authenticated original-key absence; caller may explicitly retry
+					return duoerr.New("operation.temporarily_unavailable", "prior attempt had no owner command; retry the same key explicitly")
+				}
+			case domain.ResponsibilityDelivered:
+				if prior.CommandID == "" {
+					return duoerr.New("operation.temporarily_unavailable", "Duo says delivered but the owner has no original command")
+				}
+			default:
+				return duoerr.New("operation.temporarily_unavailable", "Duo prompt responsibility is terminal without delivery")
+			}
+			if ownerWrite != nil {
+				if err := localCall(ctx, owner.Client, "turn.submit", map[string]any{"write": ownerWrite}, "command", &prior); err != nil {
+					var refused *localNoEffectRefusal
+					provedNoEffect = errors.As(err, &refused)
+					return err
 				}
 			}
 			if prior.Operation != "turn.submit" || prior.Target.OwnerID != owner.ID ||
@@ -420,8 +495,14 @@ func agentLocalTurn(streams *iostreams.Streams) *cobra.Command {
 				output.Blocks[0].Type != "text" || output.Blocks[0].Source != worker || output.Blocks[0].Content == "" {
 				return duoerr.New("operation.temporarily_unavailable", "owner output not observed for this turn")
 			}
+			if attempt != "" {
+				if err := a.CommitDelivered(cmd.Context(), duoCommand.ID, attempt, actor); err != nil {
+					return duoerr.New("operation.temporarily_unavailable", "Duo could not commit delivery; inspect its command")
+				}
+				attempt = ""
+			}
 			return writeLocalResult(streams, map[string]string{
-				"duo_session_id": args[0], "owner_command_id": prior.CommandID,
+				"duo_session_id": args[0], "duo_command_id": string(duoCommand.ID), "owner_command_id": prior.CommandID,
 				"turn_id": prior.Result.TurnID, "output": output.Blocks[0].Content,
 			})
 		},
